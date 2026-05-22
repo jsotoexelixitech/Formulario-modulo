@@ -18,6 +18,7 @@ const swaggerSpec = require('./swagger');
 
 const catalogoRoutes = require('./routes/catalogo');
 const valrepRoutes   = require('./routes/valrep');
+const nexusAuth      = require('./middleware/nexusAuth');
 
 const app = express();
 
@@ -42,11 +43,13 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     module: 'formulario',
     upstream: process.env.LAMUNDIAL_BASE_URL || 'no configurado',
+    nexusAuth: process.env.NEXUS_AUTH_ENABLED === 'true',
   });
 });
 
-app.use('/api/catalogo', catalogoRoutes);
-app.use('/api/valrep',   valrepRoutes);
+// Multi-tenant: las rutas de datos requieren nexus_token
+app.use('/api/catalogo', nexusAuth, catalogoRoutes);
+app.use('/api/valrep',   nexusAuth, valrepRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('[modulo-formulario] error:', err);
