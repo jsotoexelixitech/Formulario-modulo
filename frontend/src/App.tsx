@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useWizardStore } from './store/wizardStore';
-import { publish } from '../../../shared/src/index';
 import { SidebarNav } from './components/SidebarNav';
 import { TopProgressBar } from './components/TopProgressBar';
 import { AuroraBackground } from './components/AuroraBackground';
@@ -61,16 +60,6 @@ export default function App() {
         '¡Formulario completado!',
         'Datos del cliente y vehículo guardados correctamente.',
       );
-      // Publicar evento para que módulos activos en el mismo contexto reciban los datos
-      const s = useWizardStore.getState();
-      publish({
-        source: 'formulario',
-        type: 'formulario:complete',
-        payload: {
-          tomador: s.tomador,
-          vehicle: s.vehicle,
-        },
-      });
       // Si el bridge está activo (flujo completo en cadena), avanzar al siguiente módulo
       window.__bridgeAdvance?.();
     }
