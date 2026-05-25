@@ -80,9 +80,11 @@ async function getListFromSis2000(domain) {
   const pool = await getSis2000Pool();
 
   // PARENTESCOS → tabla dedicada maparent
+  // cparentesco es smallint en Sis2000, no admite TRIM directo.
   if (domain === 'PARENTESCOS') {
     const result = await pool.request().query(`
-      SELECT TRIM(cparentesco) AS cvalor, TRIM(xparentesco) AS xdescripcion
+      SELECT TRIM(CAST(cparentesco AS NVARCHAR(20))) AS cvalor,
+             TRIM(xparentesco) AS xdescripcion
       FROM maparent
       ORDER BY cparentesco
     `);
