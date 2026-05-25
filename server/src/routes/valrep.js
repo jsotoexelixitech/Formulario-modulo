@@ -42,75 +42,32 @@ async function getSis2000Pool() {
   return _sis2000Pool;
 }
 
-// ── Fallback regulatorio (solo si Sis2000 no tiene la tabla) ─────────────────
-// Estos valores son estándar del mercado asegurador venezolano (SUDESEG).
-const REGULATORY_FALLBACK = {
-  SEXO: [
-    { cvalor: 'M', xdescripcion: 'Masculino' },
-    { cvalor: 'F', xdescripcion: 'Femenino' },
-  ],
-  EDOCIVIL: [
-    { cvalor: 'S', xdescripcion: 'Soltero(a)' },
-    { cvalor: 'C', xdescripcion: 'Casado(a)' },
-    { cvalor: 'D', xdescripcion: 'Divorciado(a)' },
-    { cvalor: 'V', xdescripcion: 'Viudo(a)' },
-    { cvalor: 'U', xdescripcion: 'Unión Estable de Hecho' },
-  ],
-  FRECUENCIAS: [
-    { cvalor: 'A', xdescripcion: 'Anual' },
-    { cvalor: 'S', xdescripcion: 'Semestral' },
-    { cvalor: 'T', xdescripcion: 'Trimestral' },
-    { cvalor: 'M', xdescripcion: 'Mensual' },
-  ],
-  MATIPCANAL: [
-    { cvalor: '1', xdescripcion: 'Directo' },
-    { cvalor: '2', xdescripcion: 'Broker' },
-    { cvalor: '3', xdescripcion: 'Banca-Seguros' },
-  ],
-};
-
 /**
  * Consulta Sis2000 para obtener la lista de un dominio.
- * Orden de intentos:
- *   1. maparent (para PARENTESCOS)
- *   2. madominio (tabla estándar de dominios en Sis2000 — puede existir tras fb_dom_maintenance)
- *   3. Fallback regulatorio (SUDESEG)
+ * Fuente: tabla macatvalores (confirmada en Sis2000 con SEXO, EDOCIVIL,
+ * FRECUENCIAS, MATIPCANAL, PARENTESCOS — todas con bactivo=true).
+ *
+ * Estructura: macatdominios (cdominio, xnombre) + macatvalores (cdominio, cvalor, xdescripcion, iorden, bactivo)
  */
 async function getListFromSis2000(domain) {
   const pool = await getSis2000Pool();
+  const req  = pool.request();
+  req.input('cdom', sql.NVarChar(30), domain);
 
-  // PARENTESCOS → tabla dedicada maparent
-  // cparentesco es smallint en Sis2000, no admite TRIM directo.
-  if (domain === 'PARENTESCOS') {
-    const result = await pool.request().query(`
-      SELECT TRIM(CAST(cparentesco AS NVARCHAR(20))) AS cvalor,
-             TRIM(xparentesco) AS xdescripcion
-      FROM maparent
-      ORDER BY cparentesco
-    `);
-    if (result.recordset?.length > 0) return result.recordset;
+  const result = await req.query(`
+    SELECT TRIM(cvalor)       AS cvalor,
+           TRIM(xdescripcion) AS xdescripcion
+    FROM   macatvalores
+    WHERE  cdominio = @cdom
+      AND  bactivo  = 1
+    ORDER  BY iorden, cvalor
+  `);
+
+  if (!result.recordset?.length) {
+    throw new Error(`Dominio ${domain} no encontrado en macatvalores (Sis2000)`);
   }
 
-  // Resto → intentar madominio (tabla que La Mundial agrega en fb_dom_maintenance)
-  try {
-    const req = pool.request();
-    req.input('cdom', sql.NVarChar(30), domain);
-    const result = await req.query(`
-      SELECT TRIM(cvalor) AS cvalor, TRIM(xdescripcion) AS xdescripcion
-      FROM madominio
-      WHERE cdominio = @cdom
-      ORDER BY cvalor
-    `);
-    if (result.recordset?.length > 0) return result.recordset;
-  } catch {
-    // madominio no existe aún → usar fallback regulatorio
-  }
-
-  // Fallback: valores estándar del mercado asegurador venezolano
-  const fallback = REGULATORY_FALLBACK[domain];
-  if (fallback) return fallback;
-
-  throw new Error(`No hay fuente disponible para el dominio ${domain}`);
+  return result.recordset;
 }
 
 function authHeaders() {
