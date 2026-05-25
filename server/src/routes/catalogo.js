@@ -1,11 +1,15 @@
 /**
  * Rutas de catalogos INMA (vehiculos) — Modulo Formulario.
  *
+ * Fuente: Sis2000 SQL Server — vista VInma (misma fuente que usa SysIP-backend internamente).
+ * La Mundial no expone endpoints INMA en su API externa con los paths correctos,
+ * por lo que se consulta directamente la base de datos Sis2000 de La Mundial.
+ *
  * Cascada: anios -> marcas (por anio) -> modelos -> versiones.
- * Ademas: categorias-uso por version y resolver para texto libre.
+ * Ademas: categorias-uso (extraidas de las versiones) y resolver para texto libre.
  */
 const express = require('express');
-const lamundialClient = require('../services/lamundialClient');
+const { getSis2000Pool, sql } = require('../services/sis2000Pool');
 
 const router = express.Router();
 
@@ -27,8 +31,6 @@ const router = express.Router();
  *                 success: { type: boolean, example: true }
  *                 min:     { type: integer, example: 1990 }
  *                 max:     { type: integer, example: 2025 }
- *       502:
- *         description: Error de comunicación con La Mundial
  *
  * /api/catalogo/marcas:
  *   get:
@@ -39,25 +41,9 @@ const router = express.Router();
  *         name: fano
  *         required: true
  *         schema: { type: integer, example: 2019 }
- *         description: Año de fabricación del vehículo
  *     responses:
  *       200:
  *         description: Lista de marcas
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       cmarca: { type: integer, example: 1 }
- *                       xmarca: { type: string, example: 'TOYOTA' }
- *       400:
- *         description: Falta el parámetro fano
  *
  * /api/catalogo/modelos:
  *   get:
@@ -72,10 +58,6 @@ const router = express.Router();
  *         name: cmarca
  *         required: true
  *         schema: { type: integer, example: 1 }
- *         description: Código de la marca (obtenido de /marcas)
- *     responses:
- *       200:
- *         description: Lista de modelos
  *
  * /api/catalogo/versiones:
  *   get:
@@ -94,9 +76,6 @@ const router = express.Router();
  *         name: cmodelo
  *         required: true
  *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Lista de versiones con sus atributos
  *
  * /api/catalogo/categorias-uso:
  *   get:
@@ -119,15 +98,11 @@ const router = express.Router();
  *         name: cversion
  *         required: true
  *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Lista de categorías de uso (PARTICULAR, TAXI, TRANSPORTE PÚBLICO…)
  *
  * /api/catalogo/resolver:
  *   get:
  *     tags: [Catálogo INMA]
  *     summary: Resuelve marca y modelo a partir de texto libre (placa OCR)
- *     description: Útil para precargar campos cuando el OCR detectó marca/modelo como texto.
  *     parameters:
  *       - in: query
  *         name: fano
@@ -141,25 +116,86 @@ const router = express.Router();
  *         name: modelo
  *         required: true
  *         schema: { type: string, example: 'COROLLA' }
- *     responses:
- *       200:
- *         description: Códigos resueltos de marca y modelo
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:  { type: boolean }
- *                 cmarca:   { type: integer }
- *                 cmodelo:  { type: integer }
- *                 xmarca:   { type: string }
- *                 xmodelo:  { type: string }
  */
+
+// ── Helpers Sis2000 ────────────────────────────────────────────────────────────
+
+async function inmaAnios() {
+  const pool = await getSis2000Pool();
+  const result = await pool.request().query(
+    `SELECT MAX(cano) AS [max], MIN(cano) AS [min] FROM VInma`
+  );
+  return result.recordset[0] ?? { min: 2000, max: new Date().getFullYear() + 1 };
+}
+
+async function inmaMarcas(fano) {
+  const pool = await getSis2000Pool();
+  const req  = pool.request();
+  req.input('fano', sql.Int, fano);
+  const result = await req.query(
+    `SELECT DISTINCT TRIM(cmarca) AS cmarca, TRIM(xmarca) AS xmarca
+     FROM VInma WHERE cano = @fano
+     ORDER BY xmarca`
+  );
+  return result.recordset;
+}
+
+async function inmaModelos(fano, cmarca) {
+  const pool = await getSis2000Pool();
+  const req  = pool.request();
+  req.input('fano',   sql.Int,     fano);
+  req.input('cmarca', sql.VarChar(20), String(cmarca));
+  const result = await req.query(
+    `SELECT DISTINCT TRIM(cmodelo) AS cmodelo, TRIM(cmarca) AS cmarca, TRIM(xmodelo) AS xmodelo
+     FROM VInma WHERE cano = @fano AND cmarca = @cmarca
+     ORDER BY xmodelo`
+  );
+  return result.recordset;
+}
+
+async function inmaVersiones(fano, cmarca, cmodelo) {
+  const pool = await getSis2000Pool();
+  const req  = pool.request();
+  req.input('fano',    sql.Int,         fano);
+  req.input('cmarca',  sql.VarChar(20), String(cmarca));
+  req.input('cmodelo', sql.VarChar(20), String(cmodelo));
+  const result = await req.query(
+    `SELECT DISTINCT
+       TRIM(cversion)       AS cversion,
+       TRIM(xversion)       AS xversion,
+       cmarca, cmodelo, mvalor,
+       ctipo, npasajero, ccategotr, xclasificacion, ctarifabi, xtipo
+     FROM VInma
+     WHERE cano = @fano AND cmarca = @cmarca AND cmodelo = @cmodelo
+     ORDER BY xversion`
+  );
+  return result.recordset;
+}
+
+async function inmaCategoriasUso(fano, cmarca, cmodelo, cversion) {
+  const pool = await getSis2000Pool();
+  const req  = pool.request();
+  req.input('fano',     sql.Int,         fano);
+  req.input('cmarca',   sql.VarChar(20), String(cmarca));
+  req.input('cmodelo',  sql.VarChar(20), String(cmodelo));
+  req.input('cversion', sql.VarChar(20), String(cversion));
+  const result = await req.query(
+    `SELECT DISTINCT ccategotr AS ccategoria_uso, TRIM(xclasificacion) AS xcategoria_uso
+     FROM VInma
+     WHERE cano = @fano AND cmarca = @cmarca AND cmodelo = @cmodelo AND cversion = @cversion
+     ORDER BY xclasificacion`
+  );
+  return result.recordset;
+}
+
+// ── Rutas ──────────────────────────────────────────────────────────────────────
+
 router.get('/anios', async (_req, res) => {
   try {
-    const data = await lamundialClient.getInmaAnios();
+    const data = await inmaAnios();
     res.json({ success: true, ...data });
   } catch (err) {
+    console.error('[catalogo/anios]', err.message);
     res.status(502).json({ success: false, message: err.message });
   }
 });
@@ -168,9 +204,10 @@ router.get('/marcas', async (req, res) => {
   const fano = parseInt(req.query.fano, 10);
   if (!fano) return res.status(400).json({ success: false, message: 'fano requerido' });
   try {
-    const data = await lamundialClient.getInmaMarcas(fano);
+    const data = await inmaMarcas(fano);
     res.json({ success: true, data });
   } catch (err) {
+    console.error('[catalogo/marcas]', err.message);
     res.status(502).json({ success: false, message: err.message });
   }
 });
@@ -180,9 +217,10 @@ router.get('/modelos', async (req, res) => {
   const cmarca = req.query.cmarca;
   if (!fano || !cmarca) return res.status(400).json({ success: false, message: 'fano y cmarca requeridos' });
   try {
-    const data = await lamundialClient.getInmaModelos(fano, cmarca);
+    const data = await inmaModelos(fano, cmarca);
     res.json({ success: true, data });
   } catch (err) {
+    console.error('[catalogo/modelos]', err.message);
     res.status(502).json({ success: false, message: err.message });
   }
 });
@@ -195,9 +233,10 @@ router.get('/versiones', async (req, res) => {
     return res.status(400).json({ success: false, message: 'fano, cmarca y cmodelo requeridos' });
   }
   try {
-    const data = await lamundialClient.getInmaVersiones(fano, cmarca, cmodelo);
+    const data = await inmaVersiones(fano, cmarca, cmodelo);
     res.json({ success: true, data });
   } catch (err) {
+    console.error('[catalogo/versiones]', err.message);
     res.status(502).json({ success: false, message: err.message });
   }
 });
@@ -211,9 +250,10 @@ router.get('/categorias-uso', async (req, res) => {
     return res.status(400).json({ success: false, message: 'fano, cmarca, cmodelo y cversion son requeridos' });
   }
   try {
-    const data = await lamundialClient.getCategoriasUso({ fano, cmarca, cmodelo, cversion });
+    const data = await inmaCategoriasUso(fano, cmarca, cmodelo, cversion);
     res.json({ success: true, data });
   } catch (err) {
+    console.error('[catalogo/categorias-uso]', err.message);
     res.status(502).json({ success: false, message: err.message });
   }
 });
@@ -228,8 +268,8 @@ router.get('/resolver', async (req, res) => {
     String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 
   try {
-    const marcas = await lamundialClient.getInmaMarcas(fano);
-    const normMarca = norm(marca);
+    const marcas     = await inmaMarcas(fano);
+    const normMarca  = norm(marca);
     const marcaMatch = marcas.find(m => norm(m.xmarca) === normMarca)
       ?? marcas.find(m => norm(m.xmarca).includes(normMarca) || normMarca.includes(norm(m.xmarca)));
 
@@ -237,7 +277,7 @@ router.get('/resolver', async (req, res) => {
       return res.json({ success: false, fallback: true, message: `Marca "${marca}" no encontrada` });
     }
 
-    const modelos = await lamundialClient.getInmaModelos(fano, marcaMatch.cmarca);
+    const modelos    = await inmaModelos(fano, marcaMatch.cmarca);
     const normModelo = norm(modelo);
     const modeloMatch = modelo
       ? (modelos.find(m => norm(m.xmodelo) === normModelo)
@@ -252,18 +292,19 @@ router.get('/resolver', async (req, res) => {
       });
     }
 
-    const versiones = await lamundialClient.getInmaVersiones(fano, marcaMatch.cmarca, resolvedModelo.cmodelo);
+    const versiones = await inmaVersiones(fano, marcaMatch.cmarca, resolvedModelo.cmodelo);
 
     res.json({
       success: true,
       fallback: !modeloMatch,
-      cmarca: marcaMatch.cmarca,
-      xmarca: marcaMatch.xmarca,
+      cmarca:  marcaMatch.cmarca,
+      xmarca:  marcaMatch.xmarca,
       cmodelo: resolvedModelo.cmodelo,
       xmodelo: resolvedModelo.xmodelo,
       versiones,
     });
   } catch (err) {
+    console.error('[catalogo/resolver]', err.message);
     res.status(502).json({ success: false, message: err.message });
   }
 });

@@ -8,39 +8,16 @@
  *
  * Fuentes:
  *   state / city  → LAMUNDIAL_BASE_URL  (documentado y funcional en La Mundial QA)
- *   getLists      → Sis2000 SQL Server  (maparent para PARENTESCOS, madominio para el resto)
+ *   getLists      → Sis2000 SQL Server  (tabla macatvalores — SEXO, EDOCIVIL, PARENTESCOS, FRECUENCIAS, MATIPCANAL)
  */
 const express = require('express');
 const axios   = require('axios');
-const sql     = require('mssql');
+const { getSis2000Pool, sql } = require('../services/sis2000Pool');
 
 const router = express.Router();
 
 const BASE_URL = (process.env.LAMUNDIAL_BASE_URL || 'https://qaapisys2000.lamundialdeseguros.com').replace(/\/$/, '');
 const TIMEOUT  = parseInt(process.env.LAMUNDIAL_TIMEOUT_MS, 10) || 15_000;
-
-// ── Sis2000 connection (lazy pool, reutilizado entre requests) ────────────────
-const sis2000Config = {
-  server:   process.env.SIS2000_SERVER   || '172.30.149.67',
-  database: process.env.SIS2000_DATABASE || 'Sis2000',
-  user:     process.env.SIS2000_USER     || 'sa',
-  password: process.env.SIS2000_PASSWORD || '',
-  options: {
-    encrypt:                    process.env.SIS2000_ENCRYPT               === 'true',
-    trustServerCertificate:     process.env.SIS2000_TRUST_CERT             !== 'false',
-    enableArithAbort:           true,
-    requestTimeout:             parseInt(process.env.SIS2000_TIMEOUT, 10) || 30_000,
-  },
-  pool: { max: 5, min: 0, idleTimeoutMillis: 30_000 },
-};
-
-let _sis2000Pool = null;
-
-async function getSis2000Pool() {
-  if (_sis2000Pool) return _sis2000Pool;
-  _sis2000Pool = await sql.connect(sis2000Config);
-  return _sis2000Pool;
-}
 
 /**
  * Consulta Sis2000 para obtener la lista de un dominio.
