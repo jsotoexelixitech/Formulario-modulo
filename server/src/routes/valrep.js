@@ -177,44 +177,52 @@ async function proxyPost(path, body = {}) {
  *       400:
  *         description: Dominio no permitido
  */
+// GET /api/valrep/state — Sis2000 producción (maestados), datos limpios sin basura de QA
 router.get('/state', async (_req, res) => {
   try {
-    const data = await proxyPost('/api/v1/valrep/state');
-    const items = data?.data?.state ?? [];
-    res.json({
-      ok: true,
-      items: items.map((s) => ({ code: s.cestado, label: s.xdescripcion_l })),
-    });
+    const pool   = await getSis2000Pool();
+    const result = await pool.request().query(`
+      SELECT cestado AS code, TRIM(xdescripcion_l) AS label
+      FROM   maestados
+      WHERE  cpais = 58
+      ORDER  BY xdescripcion_l
+    `);
+    res.json({ ok: true, source: 'sis2000', items: result.recordset });
   } catch (err) {
-    logUpstreamError('valrep/state', err);
-    res.status(502).json({
-      ok: false,
-      error: 'No se pudo obtener la lista de estados',
-      detail: err?.response?.data || err?.message,
-    });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[valrep/state] sis2000 error:', msg);
+    res.status(502).json({ ok: false, error: 'No se pudo obtener estados de Sis2000', detail: msg });
   }
 });
 
-// GET /api/valrep/city?cestado=<codigo>
+// GET /api/valrep/city?cestado=<codigo> — Sis2000 producción (maciudades), datos limpios
 router.get('/city', async (req, res) => {
-  const cestadoRaw = req.query.cestado ?? req.query.estado ?? '';
-  const cestado    = cestadoRaw ? parseInt(String(cestadoRaw), 10) : null;
+  const cestado = req.query.cestado ?? req.query.estado ?? null;
   try {
-    const body = cestado ? { cestado } : {};
-    const data = await proxyPost('/api/v1/valrep/city', body);
-    const items = data?.data?.city ?? data?.data?.state ?? [];
-    res.json({
-      ok: true,
-      cestado: cestado ?? null,
-      items: items.map((c) => ({ code: c.cciudad, label: c.xdescripcion_l })),
-    });
+    const pool = await getSis2000Pool();
+    const req2 = pool.request();
+    let query;
+    if (cestado) {
+      req2.input('cestado', sql.Int, parseInt(String(cestado), 10));
+      query = `
+        SELECT cciudad AS code, TRIM(xdescripcion_l) AS label
+        FROM   maciudades
+        WHERE  cestado = @cestado
+        ORDER  BY xdescripcion_l
+      `;
+    } else {
+      query = `
+        SELECT cciudad AS code, TRIM(xdescripcion_l) AS label
+        FROM   maciudades
+        ORDER  BY xdescripcion_l
+      `;
+    }
+    const result = await req2.query(query);
+    res.json({ ok: true, source: 'sis2000', cestado: cestado ? parseInt(cestado, 10) : null, items: result.recordset });
   } catch (err) {
-    logUpstreamError('valrep/city', err);
-    res.status(502).json({
-      ok: false,
-      error: 'No se pudo obtener la lista de ciudades',
-      detail: err?.response?.data || err?.message,
-    });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[valrep/city] sis2000 error:', msg);
+    res.status(502).json({ ok: false, error: 'No se pudo obtener ciudades de Sis2000', detail: msg });
   }
 });
 
