@@ -2,17 +2,24 @@
  * /api/valrep — Proxy a los catálogos de La Mundial de Seguros.
  *
  * Endpoints expuestos:
- *   GET /api/valrep/state          → lista de estados
- *   GET /api/valrep/city?cestado=N → ciudades del estado indicado
- *   GET /api/valrep/list/:domain   → lista genérica (SEXO, EDOCIVIL, PARENTESCOS, FRECUENCIAS, MATIPCANAL)
+ *   GET /api/valrep/state          → lista de estados      (La Mundial API)
+ *   GET /api/valrep/city?cestado=N → ciudades del estado   (La Mundial API)
+ *   GET /api/valrep/list/:domain   → lista genérica        (sysip-nest-api → Sis2000)
+ *
+ * Fuentes:
+ *   state/city  → LAMUNDIAL_BASE_URL  (existe en La Mundial: POST /api/v1/valrep/state|city)
+ *   getLists    → SYSIP_NEST_URL      (no existe en La Mundial; se obtiene de Sis2000 vía sysip-nest-api)
  */
 const express = require('express');
 const axios   = require('axios');
 
 const router = express.Router();
 
-const BASE_URL = (process.env.LAMUNDIAL_BASE_URL || 'https://qaapisys2000.lamundialdeseguros.com').replace(/\/$/, '');
-const TIMEOUT  = parseInt(process.env.LAMUNDIAL_TIMEOUT_MS, 10) || 15_000;
+const BASE_URL  = (process.env.LAMUNDIAL_BASE_URL || 'https://qaapisys2000.lamundialdeseguros.com').replace(/\/$/, '');
+// sysip-nest-api expone POST /api/v1/valrep/getLists con datos de Sis2000 (maparent + constantes regulatorias).
+// La Mundial no tiene este endpoint en su API externa.
+const SYSIP_URL = (process.env.SYSIP_NEST_URL || 'http://localhost:3001').replace(/\/$/, '');
+const TIMEOUT   = parseInt(process.env.LAMUNDIAL_TIMEOUT_MS, 10) || 15_000;
 
 function authHeaders() {
   const h = { 'Content-Type': 'application/json' };
@@ -163,6 +170,7 @@ router.get('/city', async (req, res) => {
 });
 
 // GET /api/valrep/list/:domain
+// Usa sysip-nest-api porque La Mundial no expone este endpoint en su API externa.
 router.get('/list/:domain', async (req, res) => {
   const domain = (req.params.domain || '').toUpperCase();
   const ALLOWED = ['SEXO', 'EDOCIVIL', 'PARENTESCOS', 'FRECUENCIAS', 'MATIPCANAL'];
@@ -171,10 +179,11 @@ router.get('/list/:domain', async (req, res) => {
   }
 
   try {
-    const data = await proxyPost('/api/v1/valrep/getLists', {
-      cdominio   : domain,
-      xtipo_orden: 'ASC',
-    });
+    const { data } = await axios.post(
+      `${SYSIP_URL}/api/v1/valrep/getLists`,
+      { cdominio: domain, xtipo_orden: 'ASC' },
+      { headers: { 'Content-Type': 'application/json' }, timeout: TIMEOUT },
+    );
 
     // La respuesta puede usar varias keys según el dominio.
     // Casos vistos:
