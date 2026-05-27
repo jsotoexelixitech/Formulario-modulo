@@ -13,6 +13,46 @@ const { getSis2000Pool, sql } = require('../services/sis2000Pool');
 
 const router = express.Router();
 
+function normCatalogText(s) {
+  return String(s)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Match de modelo INMA: evita elegir "BR" cuando el OCR trae "BR" y existe "BR200". */
+function findModeloMatch(modelos, modelo) {
+  if (!modelo || !modelos?.length) return null;
+  const n = normCatalogText(modelo);
+  const label = (m) => normCatalogText(m.xmodelo);
+
+  const exact = modelos.find((m) => label(m) === n);
+  if (exact) return exact;
+
+  const isShortPrefix = /^[A-Z]{1,4}$/.test(n) && !/\d/.test(n);
+  if (isShortPrefix) {
+    const byPrefix = modelos.filter((m) => label(m).startsWith(n));
+    if (byPrefix.length) {
+      return byPrefix.reduce((best, cur) =>
+        label(cur).length > label(best).length ? cur : best,
+      );
+    }
+  }
+
+  const candidates = modelos.filter((m) => {
+    const v = label(m);
+    if (!v) return false;
+    if (v.startsWith(n) || n.startsWith(v)) return true;
+    return v.includes(n) || n.includes(v);
+  });
+  if (!candidates.length) return null;
+  return candidates.reduce((best, cur) =>
+    label(cur).length > label(best).length ? cur : best,
+  );
+}
+
 /**
  * @openapi
  * /api/catalogo/anios:
@@ -276,25 +316,18 @@ router.get('/resolver', async (req, res) => {
   const modelo = (req.query.modelo || '').trim();
   if (!fano || !marca) return res.status(400).json({ success: false, message: 'fano y marca requeridos' });
 
-  const norm = (s) =>
-    String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
-
   try {
     const marcas     = await inmaMarcas(fano);
-    const normMarca  = norm(marca);
-    const marcaMatch = marcas.find(m => norm(m.xmarca) === normMarca)
-      ?? marcas.find(m => norm(m.xmarca).includes(normMarca) || normMarca.includes(norm(m.xmarca)));
+    const normMarca  = normCatalogText(marca);
+    const marcaMatch = marcas.find(m => normCatalogText(m.xmarca) === normMarca)
+      ?? marcas.find(m => normCatalogText(m.xmarca).includes(normMarca) || normMarca.includes(normCatalogText(m.xmarca)));
 
     if (!marcaMatch) {
       return res.json({ success: false, fallback: true, message: `Marca "${marca}" no encontrada` });
     }
 
     const modelos    = await inmaModelos(fano, marcaMatch.cmarca);
-    const normModelo = norm(modelo);
-    const modeloMatch = modelo
-      ? (modelos.find(m => norm(m.xmodelo) === normModelo)
-        ?? modelos.find(m => norm(m.xmodelo).includes(normModelo) || normModelo.includes(norm(m.xmodelo))))
-      : null;
+    const modeloMatch = modelo ? findModeloMatch(modelos, modelo) : null;
     const resolvedModelo = modeloMatch ?? modelos[0];
 
     if (!resolvedModelo) {
