@@ -8,25 +8,44 @@ import { WelcomeSplash } from './components/WelcomeSplash';
 import { Button } from './components/ui/Button';
 import { EmissionStep } from './features/emission/EmissionStep';
 import { VehicleStep } from './features/vehicle/VehicleStep';
+import { FuneralStep } from './features/funeral/FuneralStep';
+import { getProductConfig } from './lib/product';
 import { toast } from './store/toastStore';
 import { ChevronLeft, ChevronRight, Sparkles, ShieldCheck, HelpCircle } from 'lucide-react';
 
-const STEP_META = {
-  2: {
-    eyebrow: 'Paso 02 · Emisión',
-    title: 'Información del cliente',
-    sub: 'Verifica los datos detectados y completa lo que falte.',
+type StepMeta = { eyebrow: string; title: string; sub: string };
+
+const STEP_META_BY_PRODUCT: Record<'rcv' | 'funerario', Record<2 | 3, StepMeta>> = {
+  rcv: {
+    2: {
+      eyebrow: 'Paso 02 · Emisión',
+      title: 'Información del cliente',
+      sub: 'Verifica los datos detectados y completa lo que falte.',
+    },
+    3: {
+      eyebrow: 'Paso 03 · Vehículo',
+      title: 'Datos del vehículo',
+      sub: 'Información del vehículo a asegurar y conductor habitual.',
+    },
   },
-  3: {
-    eyebrow: 'Paso 03 · Vehículo',
-    title: 'Datos del vehículo',
-    sub: 'Información del vehículo a asegurar y conductor habitual.',
+  funerario: {
+    2: {
+      eyebrow: 'Paso 02 · Tomador',
+      title: 'Información del cliente',
+      sub: 'Verifica los datos detectados y completa lo que falte.',
+    },
+    3: {
+      eyebrow: 'Paso 03 · Personas',
+      title: 'Asegurados y beneficiarios',
+      sub: 'Indica las personas cubiertas y los beneficiarios de la póliza funeraria.',
+    },
   },
-} as const;
+};
 
 export default function App() {
   const { goTo } = useWizardStore();
   const [localStep, setLocalStep] = useState<2 | 3>(2);
+  const product = getProductConfig();
 
   // Inicializa el store en el paso 2 para que el sidebar lo resalte correctamente
   useEffect(() => { goTo(2); }, [goTo]);
@@ -51,21 +70,25 @@ export default function App() {
       const validate = (window as unknown as Record<string, unknown>).__validateStep3 as (() => boolean) | undefined;
       if (validate && !validate()) {
         toast.warning(
-          'Datos del vehículo incompletos',
-          'Completa placa, marca y modelo.',
+          product.hasVehicle ? 'Datos del vehículo incompletos' : 'Datos de las personas incompletos',
+          product.hasVehicle
+            ? 'Completa placa, marca y modelo.'
+            : 'Completa los datos de los asegurados, la frecuencia y acepta los términos.',
         );
         return;
       }
       toast.success(
         '¡Formulario completado!',
-        'Datos del cliente y vehículo guardados correctamente.',
+        product.hasVehicle
+          ? 'Datos del cliente y vehículo guardados correctamente.'
+          : 'Datos del cliente y las personas guardados correctamente.',
       );
       // Si el bridge está activo (flujo completo en cadena), avanzar al siguiente módulo
       window.__bridgeAdvance?.();
     }
   }
 
-  const meta = STEP_META[localStep];
+  const meta = STEP_META_BY_PRODUCT[product.id][localStep];
 
   return (
     <div className="min-h-screen relative">
@@ -107,7 +130,7 @@ export default function App() {
             <section key={localStep} className="surface-card overflow-hidden step-enter">
               <div className="p-6 sm:p-8 lg:p-10">
                 {localStep === 2 && <EmissionStep />}
-                {localStep === 3 && <VehicleStep />}
+                {localStep === 3 && (product.hasVehicle ? <VehicleStep /> : <FuneralStep />)}
               </div>
 
               <div className="hidden md:flex items-center justify-between gap-4 px-8 lg:px-10 py-5 border-t border-slate-100/80 bg-gradient-to-b from-slate-50/50 to-white/40 backdrop-blur-sm">
