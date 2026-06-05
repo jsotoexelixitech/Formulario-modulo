@@ -1,4 +1,4 @@
-﻿import { Fragment, useState, useRef } from 'react';
+import { Fragment, useState, useRef } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
 import { Field, Input, Select, Textarea } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
@@ -87,9 +87,19 @@ interface ValidationErrors {
 }
 
 const emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /** Limpia el telefono: solo digitos, maximo 11 */
 function formatTelefono(raw: string): string {
   return raw.replace(/\D/g, '').slice(0, 11);
+}
+
+/** Aplica máscara visual al teléfono: (0414) 123-4567 */
+function maskPhone(v: string | undefined): string {
+  if (!v) return '';
+  const d = v.replace(/\D/g, '');
+  if (d.length <= 4) return d;
+  if (d.length <= 7) return `(${d.slice(0, 4)}) ${d.slice(4)}`;
+  return `(${d.slice(0, 4)}) ${d.slice(4, 7)}-${d.slice(7, 11)}`;
 }
 
 /** Solo letras, tildes, ñ y espacios */
@@ -170,7 +180,11 @@ export function EmissionStep() {
       e.email2 = 'Los correos no coinciden';
     }
 
-    if (req(tomador.fechaNac)) e.fechaNac = 'La fecha de nacimiento es obligatoria';
+    if (req(tomador.fechaNac)) {
+      e.fechaNac = 'La fecha de nacimiento es obligatoria';
+    } else if (new Date(tomador.fechaNac) > new Date()) {
+      e.fechaNac = 'La fecha de nacimiento no puede ser mayor a hoy';
+    }
     if (req(tomador.estado))   e.estado   = 'El estado es obligatorio';
     if (req(tomador.ciudad))   e.ciudad   = 'La ciudad es obligatoria';
 
@@ -292,12 +306,12 @@ export function EmissionStep() {
     telefono: (
       <Field label="Teléfono *" error={errors.telefono} hint="Exactamente 11 dígitos, ej. 04121234567">
         <Input
-          value={tomador.telefono}
+          value={maskPhone(tomador.telefono)}
           onChange={(e) => setTomador({ telefono: formatTelefono(e.target.value) })}
-          placeholder="04121234567"
+          placeholder="(0412) 123-4567"
           type="tel"
           inputMode="numeric"
-          maxLength={11}
+          maxLength={15}
         />
       </Field>
     ),
@@ -496,12 +510,12 @@ export function EmissionStep() {
               </Field>
               <Field label="Teléfono del pagador *" error={errors.pag_telefono} hint="Solo dígitos, ej. 04121234567">
                 <Input
-                  value={pagador.telefono ?? ''}
+                  value={maskPhone(pagador.telefono)}
                   onChange={(e) => setPagador({ telefono: formatTelefono(e.target.value) })}
-                  placeholder="04121234567"
+                  placeholder="(0412) 123-4567"
                   type="tel"
                   inputMode="numeric"
-                  maxLength={11}
+                  maxLength={15}
                 />
               </Field>
               <Field label="Correo electrónico (opcional)" error={errors.pag_email} full>
@@ -558,7 +572,7 @@ export function EmissionStep() {
                 />
               </Field>
               <Field label="Fecha de nacimiento">
-                <Input value={asegurado.fechaNac ?? ''} onChange={(e) => setAsegurado({ fechaNac: e.target.value })} type="date" />
+                <Input value={asegurado.fechaNac ?? ''} onChange={(e) => setAsegurado({ fechaNac: e.target.value })} type="date" max={new Date().toISOString().split('T')[0]} />
               </Field>
             </div>
           )}

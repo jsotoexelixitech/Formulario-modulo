@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
-import { Field, Input, Select, Textarea } from '../../components/ui/FormField';
+import { Field, Input, Textarea } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SearchSelect } from '../../components/ui/SearchSelect';
@@ -42,6 +42,7 @@ function PersonFields({
   parentescoOptions,
   sexoOptions,
   loading,
+  isReadOnly,
   onChange,
 }: {
   person: FuneralPerson;
@@ -50,17 +51,20 @@ function PersonFields({
   parentescoOptions: { value: string; label: string }[];
   sexoOptions: { value: string; label: string }[];
   loading: boolean;
+  isReadOnly?: boolean;
   onChange: (patch: Partial<FuneralPerson>) => void;
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Field label="Identificación *" error={errors.identificacion}>
-        <IdentityInput
-          tipoDoc={person.tipoDoc || 'V'}
-          identificacion={person.identificacion}
-          onTipoDocChange={(v) => onChange({ tipoDoc: v })}
-          onIdentificacionChange={(v) => onChange({ identificacion: v })}
-        />
+        <div className={isReadOnly ? "opacity-50 pointer-events-none" : ""}>
+          <IdentityInput
+            tipoDoc={person.tipoDoc || 'V'}
+            identificacion={person.identificacion}
+            onTipoDocChange={(v) => onChange({ tipoDoc: v })}
+            onIdentificacionChange={(v) => onChange({ identificacion: v })}
+          />
+        </div>
       </Field>
 
       <Field label="Parentesco *" error={errors.parentesco}>
@@ -73,6 +77,7 @@ function PersonFields({
             onChange={(value) => onChange({ parentesco: value })}
             placeholder="— Seleccionar —"
             loading={loading}
+            disabled={isReadOnly}
           />
         )}
       </Field>
@@ -82,6 +87,7 @@ function PersonFields({
           value={person.nombre}
           onChange={(e) => onChange({ nombre: onlyLetters(e.target.value) })}
           placeholder="Nombre"
+          disabled={isReadOnly}
         />
       </Field>
 
@@ -90,6 +96,7 @@ function PersonFields({
           value={person.apellido}
           onChange={(e) => onChange({ apellido: onlyLetters(e.target.value) })}
           placeholder="Apellido"
+          disabled={isReadOnly}
         />
       </Field>
 
@@ -99,6 +106,7 @@ function PersonFields({
           onChange={(e) => onChange({ fechaNac: e.target.value })}
           type="date"
           max={new Date().toISOString().split('T')[0]}
+          disabled={isReadOnly}
         />
       </Field>
 
@@ -116,6 +124,7 @@ function PersonFields({
           onChange={(value) => onChange({ sexo: value })}
           placeholder="— Seleccionar —"
           loading={loading}
+          disabled={isReadOnly}
         />
       </Field>
     </div>
@@ -123,7 +132,34 @@ function PersonFields({
 }
 
 export function FuneralStep() {
-  const { tomador, funeral, setFuneral } = useWizardStore();
+  const { tomador, funeral, setFuneral, differentPayer } = useWizardStore();
+
+  useEffect(() => {
+    if (!differentPayer) {
+      const current = funeral.asegurados[0] || ({} as Partial<FuneralPerson>);
+      const needsSync =
+        current.identificacion !== tomador.identificacion ||
+        current.nombre !== tomador.nombre ||
+        current.apellido !== tomador.apellido ||
+        current.fechaNac !== tomador.fechaNac ||
+        current.sexo !== tomador.sexo;
+
+      if (needsSync) {
+        const nextAsegurados = [...funeral.asegurados];
+        nextAsegurados[0] = {
+          ...nextAsegurados[0],
+          tipoDoc: tomador.tipoDoc || 'V',
+          identificacion: tomador.identificacion,
+          nombre: tomador.nombre,
+          apellido: tomador.apellido,
+          fechaNac: tomador.fechaNac,
+          sexo: tomador.sexo,
+          parentesco: '1',
+        };
+        setFuneral({ asegurados: nextAsegurados });
+      }
+    }
+  }, [differentPayer, tomador, funeral.asegurados, setFuneral]);
   const catalogs = useCatalogs();
   const [asegErrors, setAsegErrors] = useState<PersonErrors[]>([]);
   const [benefErrors, setBenefErrors] = useState<PersonErrors[]>([]);
@@ -200,7 +236,11 @@ export function FuneralStep() {
 
     if (req(p.nombre)) e.nombre = 'Obligatorio';
     if (req(p.apellido)) e.apellido = 'Obligatorio';
-    if (req(p.fechaNac)) e.fechaNac = 'Obligatoria';
+    if (req(p.fechaNac)) {
+      e.fechaNac = 'Obligatoria';
+    } else if (new Date(p.fechaNac) > new Date()) {
+      e.fechaNac = 'No puede ser mayor a hoy';
+    }
     if (req(p.sexo)) e.sexo = 'Selecciona';
     if (!isTitular && req(p.parentesco)) e.parentesco = 'Selecciona';
 
@@ -243,7 +283,7 @@ export function FuneralStep() {
                   {idx === 0 ? 'Titular' : `Asegurado ${idx + 1}`}
                 </span>
                 <div className="flex items-center gap-2">
-                  {idx === 0 && (
+                  {idx === 0 && differentPayer && (
                     <button
                       type="button"
                       onClick={usarDatosTomador}
@@ -270,6 +310,7 @@ export function FuneralStep() {
                 parentescoOptions={parentescoOptions}
                 sexoOptions={sexoOptions}
                 loading={catalogs.loading}
+                isReadOnly={idx === 0 && !differentPayer}
                 onChange={(patch) => updateAsegurado(idx, patch)}
               />
             </div>
@@ -338,14 +379,12 @@ export function FuneralStep() {
         description="¿Cada cuánto deseas pagar la póliza?"
       >
         <Field label="Frecuencia *">
-          <Select
+          <SearchSelect
             value={funeral.frecuencia}
-            onChange={(e) => setFuneral({ frecuencia: e.target.value })}
-          >
-            {FRECUENCIAS.map((f) => (
-              <option key={f.value} value={f.value}>{f.label}</option>
-            ))}
-          </Select>
+            options={FRECUENCIAS}
+            onChange={(value) => setFuneral({ frecuencia: value })}
+            placeholder="— Seleccionar —"
+          />
         </Field>
       </SectionCard>
 
