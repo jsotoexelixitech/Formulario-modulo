@@ -105,6 +105,10 @@ function onlyLetters(v: string): string {
   return v.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
 }
 
+import { useProductConfig } from '../../hooks/useProductConfig';
+
+const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
+
 export function EmissionStep() {
   const {
     tomador, setTomador,
@@ -116,9 +120,17 @@ export function EmissionStep() {
     beneficiario, setBeneficiario,
   } = useWizardStore();
 
-  const catalogs = useCatalogs();
+  const catalogs = useCiudades(tomador.cestado); // useCiudades and useCatalogs logic
+  const catalogsRoot = useCatalogs();
   const ciudadesState = useCiudades(tomador.cestado);
   const [errors, setErrors] = useState<ValidationErrors>({});
+
+  const producto = new URLSearchParams(window.location.search).get('product') as 'rcv' | 'funerario' ?? 'rcv';
+  const { config } = useProductConfig(EMPRESA_ID, producto, 'formulario');
+
+  const isActivo = (campo: string) => !config?.campos ? true : (config.campos[campo]?.activo ?? true);
+  const isObligatorio = (campo: string) => !config?.campos ? true : (config.campos[campo]?.obligatorio ?? true);
+  const isSeccionActiva = (seccion: string) => !config?.secciones ? true : (config.secciones[seccion]?.activo ?? true);
 
   const validate = () => {
     const e: ValidationErrors = {};
@@ -126,85 +138,108 @@ export function EmissionStep() {
     const len  = (v?: string) => (v ?? '').trim().length;
     const digs = (v?: string) => (v ?? '').replace(/\D/g, '').length;
 
+    const check = (campo: string, validator: () => void) => {
+      if (isActivo(campo)) {
+        validator();
+      }
+    };
+
     // ── Tomador ───────────────────────────────────────────────────────────
-    if (req(tomador.identificacion)) {
-      e.identificacion = 'La identificación es obligatoria';
-    } else if (digs(tomador.identificacion) < 6) {
-      e.identificacion = 'La identificación debe tener al menos 6 dígitos';
-    } else if (digs(tomador.identificacion) > 9) {
-      e.identificacion = 'La identificación no puede tener más de 9 dígitos';
-    }
+    check('identificacion', () => {
+      if (req(tomador.identificacion)) {
+        if (isObligatorio('identificacion')) e.identificacion = 'La identificación es obligatoria';
+      } else if (digs(tomador.identificacion) < 6) {
+        e.identificacion = 'La identificación debe tener al menos 6 dígitos';
+      } else if (digs(tomador.identificacion) > 9) {
+        e.identificacion = 'La identificación no puede tener más de 9 dígitos';
+      }
+    });
 
-    if (req(tomador.nombre)) {
-      e.nombre = 'El nombre es obligatorio';
-    } else if (len(tomador.nombre) < 2) {
-      e.nombre = 'El nombre debe tener al menos 2 caracteres';
-    } else if (len(tomador.nombre) > 50) {
-      e.nombre = 'El nombre no puede superar 50 caracteres';
-    }
+    check('nombre', () => {
+      if (req(tomador.nombre)) {
+        if (isObligatorio('nombre')) e.nombre = 'El nombre es obligatorio';
+      } else if (len(tomador.nombre) < 2) {
+        e.nombre = 'El nombre debe tener al menos 2 caracteres';
+      } else if (len(tomador.nombre) > 50) {
+        e.nombre = 'El nombre no puede superar 50 caracteres';
+      }
+    });
 
-    if (req(tomador.apellido)) {
-      e.apellido = 'El apellido es obligatorio';
-    } else if (len(tomador.apellido) < 2) {
-      e.apellido = 'El apellido debe tener al menos 2 caracteres';
-    } else if (len(tomador.apellido) > 50) {
-      e.apellido = 'El apellido no puede superar 50 caracteres';
-    }
+    check('apellido', () => {
+      if (req(tomador.apellido)) {
+        if (isObligatorio('apellido')) e.apellido = 'El apellido es obligatorio';
+      } else if (len(tomador.apellido) < 2) {
+        e.apellido = 'El apellido debe tener al menos 2 caracteres';
+      } else if (len(tomador.apellido) > 50) {
+        e.apellido = 'El apellido no puede superar 50 caracteres';
+      }
+    });
 
-    if (req(tomador.sexo))       e.sexo        = 'Selecciona el sexo';
-    if (req(tomador.estadoCivil)) e.estadoCivil = 'Selecciona el estado civil';
+    check('sexo', () => { if (req(tomador.sexo) && isObligatorio('sexo')) e.sexo = 'Selecciona el sexo'; });
+    check('estadoCivil', () => { if (req(tomador.estadoCivil) && isObligatorio('estadoCivil')) e.estadoCivil = 'Selecciona el estado civil'; });
 
-    if (req(tomador.telefono)) {
-      e.telefono = 'El teléfono es obligatorio';
-    } else if (digs(tomador.telefono) !== 11) {
-      e.telefono = 'El teléfono debe tener exactamente 11 dígitos (ej. 04121234567)';
-    } else if (!isValidPhonePrefix(tomador.telefono || '')) {
-      e.telefono = 'El prefijo debe ser válido en Venezuela (ej. 0414, 0412, 0212)';
-    }
+    check('telefono', () => {
+      if (req(tomador.telefono)) {
+        if (isObligatorio('telefono')) e.telefono = 'El teléfono es obligatorio';
+      } else if (digs(tomador.telefono) !== 11) {
+        e.telefono = 'El teléfono debe tener exactamente 11 dígitos (ej. 04121234567)';
+      } else if (!isValidPhonePrefix(tomador.telefono || '')) {
+        e.telefono = 'El prefijo debe ser válido en Venezuela (ej. 0414, 0412, 0212)';
+      }
+    });
 
-    if (req(tomador.email)) {
-      e.email = 'El correo electrónico es obligatorio';
-    } else if (len(tomador.email) < 5) {
-      e.email = 'El correo debe tener al menos 5 caracteres';
-    } else if (len(tomador.email) > 50) {
-      e.email = 'El correo no puede superar 50 caracteres';
-    } else if (!emailRe.test(tomador.email.trim())) {
-      e.email = 'Ingresa un correo válido (ej. usuario@dominio.com)';
-    }
+    check('email', () => {
+      if (req(tomador.email)) {
+        if (isObligatorio('email')) e.email = 'El correo electrónico es obligatorio';
+      } else if (len(tomador.email) < 5) {
+        e.email = 'El correo debe tener al menos 5 caracteres';
+      } else if (len(tomador.email) > 50) {
+        e.email = 'El correo no puede superar 50 caracteres';
+      } else if (!emailRe.test(tomador.email.trim())) {
+        e.email = 'Ingresa un correo válido (ej. usuario@dominio.com)';
+      }
+    });
 
-    if (req(tomador.email2)) {
-      e.email2 = 'Confirma tu correo electrónico';
-    } else if (!emailRe.test(tomador.email2.trim())) {
-      e.email2 = 'Ingresa un correo válido para confirmar';
-    } else if (tomador.email.trim() !== tomador.email2.trim()) {
-      e.email2 = 'Los correos no coinciden';
-    }
+    check('email2', () => {
+      if (req(tomador.email2)) {
+        if (isObligatorio('email2')) e.email2 = 'Confirma tu correo electrónico';
+      } else if (!emailRe.test(tomador.email2.trim())) {
+        e.email2 = 'Ingresa un correo válido para confirmar';
+      } else if (tomador.email.trim() !== tomador.email2.trim()) {
+        e.email2 = 'Los correos no coinciden';
+      }
+    });
 
-    if (req(tomador.fechaNac)) {
-      e.fechaNac = 'La fecha de nacimiento es obligatoria';
-    } else if (new Date(tomador.fechaNac) > new Date()) {
-      e.fechaNac = 'La fecha de nacimiento no puede ser mayor a hoy';
-    }
-    if (req(tomador.estado))   e.estado   = 'El estado es obligatorio';
-    if (req(tomador.ciudad))   e.ciudad   = 'La ciudad es obligatoria';
+    check('fechaNac', () => {
+      if (req(tomador.fechaNac)) {
+        if (isObligatorio('fechaNac')) e.fechaNac = 'La fecha de nacimiento es obligatoria';
+      } else if (new Date(tomador.fechaNac) > new Date()) {
+        e.fechaNac = 'La fecha de nacimiento no puede ser mayor a hoy';
+      }
+    });
 
-    if (req(tomador.direccion)) {
-      e.direccion = 'La dirección es obligatoria';
-    } else if (len(tomador.direccion) < 5) {
-      e.direccion = 'La dirección debe tener al menos 5 caracteres';
-    } else if (len(tomador.direccion) > 200) {
-      e.direccion = 'La dirección no puede superar 200 caracteres';
-    }
+    check('estado', () => { if (req(tomador.estado) && isObligatorio('estado')) e.estado = 'El estado es obligatorio'; });
+    check('ciudad', () => { if (req(tomador.ciudad) && isObligatorio('ciudad')) e.ciudad = 'La ciudad es obligatoria'; });
+
+    check('direccion', () => {
+      if (req(tomador.direccion)) {
+        if (isObligatorio('direccion')) e.direccion = 'La dirección es obligatoria';
+      } else if (len(tomador.direccion) < 5) {
+        e.direccion = 'La dirección debe tener al menos 5 caracteres';
+      } else if (len(tomador.direccion) > 200) {
+        e.direccion = 'La dirección no puede superar 200 caracteres';
+      }
+    });
 
     // ── Asegurado (solo si está habilitado) ───────────────────────────────
-    if (!sameInsured) {
+    if (isSeccionActiva('asegurado') && !sameInsured) {
       if (req(asegurado.nombre))         e.aseg_nombre         = 'El nombre es obligatorio';
       if (req(asegurado.apellido))       e.aseg_apellido       = 'El apellido es obligatorio';
       if (req(asegurado.identificacion)) e.aseg_identificacion = 'La identificación es obligatoria';
     }
 
     // ── Pagador (solo si NO eres quien paga) ──────────────────────────────
-    if (differentPayer) {
+    if (isSeccionActiva('pagador') && differentPayer) {
       if (req(pagador.nombre)) {
         e.pag_nombre = 'El nombre del pagador es obligatorio';
       } else if (len(pagador.nombre) < 2) {
@@ -238,7 +273,7 @@ export function EmissionStep() {
     }
 
     // ── Beneficiario (solo si está habilitado) ────────────────────────────
-    if (hasBeneficiary) {
+    if (isSeccionActiva('beneficiario') && hasBeneficiary) {
       if (req(beneficiario.nombre))         e.benef_nombre         = 'El nombre es obligatorio';
       if (req(beneficiario.apellido))       e.benef_apellido       = 'El apellido es obligatorio';
       if (req(beneficiario.identificacion)) e.benef_identificacion = 'La identificación es obligatoria';
@@ -448,7 +483,7 @@ export function EmissionStep() {
           description="Necesitamos saber quién está contratando el seguro"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {fieldOrder.map((key) => (
+            {fieldOrder.filter(k => isActivo(k)).map((key) => (
               <Fragment key={key}>{tomadorFieldMap[key]}</Fragment>
             ))}
           </div>
@@ -474,6 +509,7 @@ export function EmissionStep() {
         </SectionCard>
 
         {/* Pagador */}
+        {isSeccionActiva('pagador') && (
         <SectionCard
           Icon={Wallet}
           title="¿Eres quien paga la póliza?"
@@ -532,11 +568,12 @@ export function EmissionStep() {
             </div>
           )}
         </SectionCard>
+        )}
 
         {/* Asegurado — oculto a pedido del cliente. En la práctica el tomador
             siempre es el asegurado. Conservamos el código para reactivar a futuro
             sin volver a escribirlo (mismo patrón que "Beneficiario" más abajo). */}
-        {false && (
+        {isSeccionActiva('asegurado') && (
         <SectionCard
           Icon={UserPlus}
           title="¿El seguro es para ti?"
@@ -583,7 +620,7 @@ export function EmissionStep() {
         )}
 
         {/* Beneficiario — oculto temporalmente, conservar codigo */}
-        {false && (
+        {isSeccionActiva('beneficiario') && (
         <SectionCard
           Icon={Heart}
           title="Beneficiario"
