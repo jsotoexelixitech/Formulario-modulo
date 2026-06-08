@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useProductConfig } from '../hooks/useProductConfig';
 import {
   Settings2, RotateCcw, Save, CheckCircle2,
-  AlertTriangle, Loader2, Eye, EyeOff, ShieldCheck,
-  User, Sliders, Users
+  AlertTriangle, Loader2,
+  User, Users
 } from 'lucide-react';
 
 const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
@@ -99,7 +99,6 @@ export function FormularioConfigPanel() {
 
   const campos = local?.campos ?? {};
   const secciones = local?.secciones ?? {};
-  const gruposUnicos = [...new Set(Object.values(CAMPO_META).map(m => m.grupo))];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 p-6 lg:p-10">
