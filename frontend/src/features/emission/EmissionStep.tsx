@@ -120,8 +120,7 @@ export function EmissionStep() {
     beneficiario, setBeneficiario,
   } = useWizardStore();
 
-  const catalogs = useCiudades(tomador.cestado); // useCiudades and useCatalogs logic
-  const catalogsRoot = useCatalogs();
+  const catalogs = useCatalogs();
   const ciudadesState = useCiudades(tomador.cestado);
   const [errors, setErrors] = useState<ValidationErrors>({});
 
