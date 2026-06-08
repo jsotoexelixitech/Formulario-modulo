@@ -88,31 +88,8 @@ interface ValidationErrors {
 
 const emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Limpia el telefono: solo digitos, maximo 11. Y ajusta prefijos validos */
-function formatTelefono(raw: string): string {
-  let d = raw.replace(/\D/g, '');
-  if (d.length > 0 && /^[428]/.test(d[0])) d = '0' + d;
-  
-  if (d.length >= 1 && d[0] !== '0') d = '';
-  if (d.length >= 2 && !/^[42]/.test(d[1])) d = d.slice(0, 1);
-  if (d.length >= 3) {
-    if (d[1] === '4' && !/^[12]/.test(d[2])) d = d.slice(0, 2);
-  }
-  if (d.length >= 4) {
-    const pref = d.slice(0, 4);
-    const valid = ['0414','0424','0412','0416','0426','0212','0234','0235','0238','0239','0240','0241','0242','0243','0244','0245','0246','0247','0248','0249','0251','0252','0253','0254','0255','0256','0257','0258','0259','0261','0262','0263','0264','0265','0266','0267','0268','0269','0271','0272','0273','0274','0275','0276','0277','0278','0279','0281','0282','0283','0284','0285','0286','0287','0288','0289','0291','0292','0293','0294','0295'];
-    if (!valid.includes(pref)) d = d.slice(0, 3);
-  }
-  
-  return d.slice(0, 11);
-}
+import { formatTelefono, isValidPhonePrefix } from '@exelixi/shared';
 
-function isValidPhonePrefix(phone: string): boolean {
-  if (!phone || phone.length !== 11) return false;
-  const pref = phone.slice(0, 4);
-  const valid = ['0414','0424','0412','0416','0426','0212','0234','0235','0238','0239','0240','0241','0242','0243','0244','0245','0246','0247','0248','0249','0251','0252','0253','0254','0255','0256','0257','0258','0259','0261','0262','0263','0264','0265','0266','0267','0268','0269','0271','0272','0273','0274','0275','0276','0277','0278','0279','0281','0282','0283','0284','0285','0286','0287','0288','0289','0291','0292','0293','0294','0295'];
-  return valid.includes(pref);
-}
 
 /** Aplica máscara visual al teléfono: (0414) 123-4567 */
 function maskPhone(v: string | undefined): string {
