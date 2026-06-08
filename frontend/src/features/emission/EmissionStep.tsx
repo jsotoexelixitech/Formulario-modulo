@@ -88,15 +88,36 @@ interface ValidationErrors {
 
 const emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Limpia el telefono: solo digitos, maximo 11 */
+/** Limpia el telefono: solo digitos, maximo 11. Y ajusta prefijos validos */
 function formatTelefono(raw: string): string {
-  return raw.replace(/\D/g, '').slice(0, 11);
+  let d = raw.replace(/\D/g, '');
+  if (d.length > 0 && /^[428]/.test(d[0])) d = '0' + d;
+  
+  if (d.length >= 1 && d[0] !== '0') d = '';
+  if (d.length >= 2 && !/^[42]/.test(d[1])) d = d.slice(0, 1);
+  if (d.length >= 3) {
+    if (d[1] === '4' && !/^[12]/.test(d[2])) d = d.slice(0, 2);
+  }
+  if (d.length >= 4) {
+    const pref = d.slice(0, 4);
+    const valid = ['0414','0424','0412','0416','0426','0212','0234','0235','0238','0239','0240','0241','0242','0243','0244','0245','0246','0247','0248','0249','0251','0252','0253','0254','0255','0256','0257','0258','0259','0261','0262','0263','0264','0265','0266','0267','0268','0269','0271','0272','0273','0274','0275','0276','0277','0278','0279','0281','0282','0283','0284','0285','0286','0287','0288','0289','0291','0292','0293','0294','0295'];
+    if (!valid.includes(pref)) d = d.slice(0, 3);
+  }
+  
+  return d.slice(0, 11);
+}
+
+function isValidPhonePrefix(phone: string): boolean {
+  if (!phone || phone.length !== 11) return false;
+  const pref = phone.slice(0, 4);
+  const valid = ['0414','0424','0412','0416','0426','0212','0234','0235','0238','0239','0240','0241','0242','0243','0244','0245','0246','0247','0248','0249','0251','0252','0253','0254','0255','0256','0257','0258','0259','0261','0262','0263','0264','0265','0266','0267','0268','0269','0271','0272','0273','0274','0275','0276','0277','0278','0279','0281','0282','0283','0284','0285','0286','0287','0288','0289','0291','0292','0293','0294','0295'];
+  return valid.includes(pref);
 }
 
 /** Aplica máscara visual al teléfono: (0414) 123-4567 */
 function maskPhone(v: string | undefined): string {
   if (!v) return '';
-  const d = v.replace(/\D/g, '');
+  let d = formatTelefono(v);
   if (d.length <= 4) return d;
   if (d.length <= 7) return `(${d.slice(0, 4)}) ${d.slice(4)}`;
   return `(${d.slice(0, 4)}) ${d.slice(4, 7)}-${d.slice(7, 11)}`;
@@ -160,6 +181,8 @@ export function EmissionStep() {
       e.telefono = 'El teléfono es obligatorio';
     } else if (digs(tomador.telefono) !== 11) {
       e.telefono = 'El teléfono debe tener exactamente 11 dígitos (ej. 04121234567)';
+    } else if (!isValidPhonePrefix(tomador.telefono || '')) {
+      e.telefono = 'El prefijo debe ser válido en Venezuela (ej. 0414, 0412, 0212)';
     }
 
     if (req(tomador.email)) {
@@ -227,6 +250,8 @@ export function EmissionStep() {
         e.pag_telefono = 'El teléfono del pagador es obligatorio';
       } else if (digs(pagador.telefono) !== 11) {
         e.pag_telefono = 'El teléfono debe tener exactamente 11 dígitos (ej. 04121234567)';
+      } else if (!isValidPhonePrefix(pagador.telefono || '')) {
+        e.pag_telefono = 'El prefijo debe ser válido en Venezuela (ej. 0414, 0412, 0212)';
       }
 
       const pagEmail = (pagador.email ?? '').trim();
@@ -566,9 +591,10 @@ export function EmissionStep() {
               <Field label="Cédula o documento *" error={errors.aseg_identificacion}>
                 <Input
                   value={asegurado.identificacion}
-                  onChange={(e) => setAsegurado({ identificacion: e.target.value.replace(/[^0-9A-Za-z]/g, '') })}
+                  onChange={(e) => setAsegurado({ identificacion: e.target.value.replace(/\D/g, '') })}
                   placeholder="Número de identificación"
                   inputMode="numeric"
+                  maxLength={9}
                 />
               </Field>
               <Field label="Fecha de nacimiento">
