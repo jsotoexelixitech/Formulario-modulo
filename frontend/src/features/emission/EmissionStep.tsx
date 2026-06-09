@@ -283,27 +283,23 @@ export function EmissionStep() {
     return Object.keys(e).length === 0;
   };
 
-  // ── Orden fijo de campos ────────────────────────────────────────────────
-  // Se calcula UNA SOLA VEZ al montar (con datos OCR que ya estaban pre-
-  // cargados). De esta forma los campos nunca saltan de posición mientras
-  // el usuario escribe. Si el campo estaba lleno al abrir → va arriba;
-  // si estaba vacío → va abajo. Esa posición no vuelve a cambiar.
-  const has = (v?: string) => Boolean((v ?? '').trim());
-  const initialOrderRef = useRef<string[] | null>(null);
-  if (initialOrderRef.current === null) {
-    const ALL_KEYS = [
+  // ── Orden dinámico de campos ────────────────────────────────────────────
+  // Extraemos el orden directamente de la configuración (si es array) o de
+  // las claves (si es objeto legacy). Si no hay config, usamos un default.
+  let fieldOrder: string[] = [];
+  if (config?.campos) {
+    if (Array.isArray(config.campos)) {
+      fieldOrder = config.campos.map((c: any) => c.key);
+    } else {
+      fieldOrder = Object.keys(config.campos);
+    }
+  } else {
+    fieldOrder = [
       'identificacion', 'nombre', 'apellido', 'telefono',
       'email', 'email2', 'fechaNac', 'sexo', 'estadoCivil',
       'estado', 'ciudad', 'direccion',
     ];
-    const filled  = ALL_KEYS.filter((k) => {
-      if (k === 'email2') return has(tomador.email);
-      return has((tomador as unknown as Record<string, string>)[k]);
-    });
-    const unfilled = ALL_KEYS.filter((k) => !filled.includes(k));
-    initialOrderRef.current = [...filled, ...unfilled];
   }
-  const fieldOrder = initialOrderRef.current;
 
   (window as unknown as Record<string, unknown>).__validateStep2 = validate;
 

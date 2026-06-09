@@ -4,9 +4,26 @@ import { getProductId } from '../lib/product';
 import {
   Settings2, RotateCcw, Save, CheckCircle2, AlertTriangle,
   Loader2, Plus, Trash2, ArrowLeftRight,
-  LayoutList, Layers, ChevronUp, Sparkles
+  LayoutList, Layers, ChevronUp, Sparkles, GripVertical
 } from 'lucide-react';
 import { AuroraBackground } from '../components/AuroraBackground';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
@@ -50,6 +67,48 @@ function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean
 
 const TIPOS_CAMPO = ['text', 'email', 'date', 'select', 'phone', 'number', 'textarea'];
 
+// ── COMPONENTE SORTABLE ROW ──
+function SortableRow({ id, children, active }: { id: string; children: React.ReactNode; active: boolean }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : 'auto',
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative flex flex-col md:flex-row md:items-center gap-3 md:gap-5 transition-all duration-300 rounded-2xl border p-5 group
+        ${isDragging ? 'shadow-2xl shadow-indigo-500/20 border-indigo-400 bg-white scale-[1.02] ring-2 ring-indigo-500/20' : ''}
+        ${!isDragging && active ? 'border-indigo-100 bg-white/50 backdrop-blur-sm shadow-sm hover:shadow-md hover:bg-white' : ''}
+        ${!isDragging && !active ? 'border-slate-200/50 bg-slate-50/50 opacity-60 grayscale-[50%]' : ''}`}
+    >
+      <div
+        className="absolute left-2 top-1/2 -translate-y-1/2 cursor-grab active:cursor-grabbing text-slate-300 hover:text-indigo-500 p-1.5 rounded-lg hover:bg-indigo-50 transition-colors hidden md:block outline-none"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical size={18} />
+      </div>
+      <div className="md:ml-6 flex-1 min-w-0 flex flex-col md:flex-row md:items-center gap-5 w-full">
+        {children}
+      </div>
+      
+      {/* Mobile drag handle */}
+      <div
+        className="absolute right-2 top-2 cursor-grab active:cursor-grabbing text-slate-300 hover:text-indigo-500 p-2 rounded-lg hover:bg-indigo-50 transition-colors md:hidden outline-none"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical size={18} />
+      </div>
+    </div>
+  );
+}
+
 export function FormularioConfigPanel() {
   const producto = getProductId();
   const { config, loadState, saving, saveError, saveConfig, resetConfig } =
@@ -67,9 +126,14 @@ export function FormularioConfigPanel() {
   const [autocompletarConductor, setAutocompletarConductor] = useState(false);
   const [validacionParentesco, setValidacionParentesco] = useState(false);
 
+  // Sensores DND
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
   useEffect(() => {
     if (!config) return;
-    // Normalizar campos: admite array o objeto legacy
     const rawCampos = config.campos;
     if (Array.isArray(rawCampos)) {
       setCampos(rawCampos as CampoField[]);
@@ -97,7 +161,7 @@ export function FormularioConfigPanel() {
     setValidacionParentesco(config.validacionParentesco ?? false);
   }, [config]);
 
-  // ── campos handlers ─────────────────────────────────────────────
+  // ── handlers ─────────────────────────────────────────────
   const updateCampo = useCallback((key: string, field: keyof CampoField, val: any) => {
     setCampos(prev => prev.map(c => {
       if (c.key !== key) return c;
@@ -120,7 +184,6 @@ export function FormularioConfigPanel() {
     setSaved(false);
   };
 
-  // ── secciones handlers ──────────────────────────────────────────
   const updateSeccion = (key: string, field: keyof SeccionField, val: any) => {
     setSecciones(prev => prev.map(s => s.key !== key ? s : { ...s, [field]: val }));
     setSaved(false);
@@ -135,13 +198,37 @@ export function FormularioConfigPanel() {
     setSaved(false);
   };
 
-  // ── api map handlers ───────────────────────────────────────────
   const addMapEntry = () => { setApiMap(p => [...p, { internalKey: '', externalKey: '', transform: 'none' }]); setSaved(false); };
   const updateMapEntry = (idx: number, field: keyof ApiMapEntry, val: string) => {
     setApiMap(p => p.map((e, i) => i === idx ? { ...e, [field]: val } : e));
     setSaved(false);
   };
   const removeMapEntry = (idx: number) => { setApiMap(p => p.filter((_, i) => i !== idx)); setSaved(false); };
+
+  // ── drag and drop handlers ──────────────────────────────────────
+  function handleDragEndCampos(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setCampos((items) => {
+        const oldIndex = items.findIndex((item) => item.key === active.id);
+        const newIndex = items.findIndex((item) => item.key === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+      setSaved(false);
+    }
+  }
+
+  function handleDragEndSecciones(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setSecciones((items) => {
+        const oldIndex = items.findIndex((item) => item.key === active.id);
+        const newIndex = items.findIndex((item) => item.key === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+      setSaved(false);
+    }
+  }
 
   // ── save ───────────────────────────────────────────────────────
   async function handleSave() {
@@ -169,7 +256,7 @@ export function FormularioConfigPanel() {
                 Módulo Formulario
               </h1>
               <p className="text-slate-500 text-sm mt-2 max-w-xl leading-relaxed">
-                Personaliza los campos de entrada de datos, secciones dinámicas y el mapeador a la API.
+                Personaliza y reordena los campos de entrada de datos, secciones dinámicas y el mapeador a la API.
               </p>
             </div>
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 grid place-items-center shadow-lg shadow-indigo-500/20">
@@ -268,48 +355,52 @@ export function FormularioConfigPanel() {
                       </div>
                     )}
 
-                    <div className="space-y-3">
-                      {campos.map(campo => (
-                        <div key={campo.key} className={`rounded-2xl border p-5 flex flex-col md:flex-row md:items-center gap-5 transition-all duration-300 group ${campo.activo ? 'border-indigo-100 bg-white/50 backdrop-blur-sm shadow-sm hover:shadow-md hover:bg-white' : 'border-slate-200/50 bg-slate-50/50 opacity-60 grayscale-[50%]'}`}>
-                          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 hidden md:flex">
-                            <LayoutList size={18} className={campo.activo ? 'text-indigo-500' : 'text-slate-400'} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <input
-                              className="font-bold text-slate-800 text-base bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-400 outline-none w-full pb-0.5"
-                              value={campo.label}
-                              onChange={e => updateCampo(campo.key, 'label', e.target.value)}
-                            />
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-slate-400 font-mono">{campo.key}</span>
-                              <span className="text-slate-300">•</span>
-                              <select
-                                className="text-xs font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-md px-1.5 py-0.5 border-none outline-none cursor-pointer transition-colors"
-                                value={campo.tipo}
-                                onChange={e => updateCampo(campo.key, 'tipo', e.target.value)}
-                              >
-                                {TIPOS_CAMPO.map(t => <option key={t} value={t}>{t}</option>)}
-                              </select>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 w-full md:w-auto overflow-x-auto justify-between md:justify-end">
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase">Activo</span>
-                              <Toggle on={campo.activo} onChange={v => updateCampo(campo.key, 'activo', v)} />
-                            </div>
-                            <div className="w-px h-8 bg-slate-200" />
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase">Oblig.</span>
-                              <Toggle on={campo.obligatorio} onChange={v => updateCampo(campo.key, 'obligatorio', v)} disabled={!campo.activo} />
-                            </div>
-                            <div className="w-px h-8 bg-slate-200" />
-                            <button onClick={() => removeCampo(campo.key)} className="p-2 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors">
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndCampos}>
+                      <SortableContext items={campos.map(c => c.key)} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-3">
+                          {campos.map(campo => (
+                            <SortableRow key={campo.key} id={campo.key} active={campo.activo}>
+                              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 hidden md:flex">
+                                <LayoutList size={18} className={campo.activo ? 'text-indigo-500' : 'text-slate-400'} />
+                              </div>
+                              <div className="flex-1 min-w-0 pr-8 md:pr-0">
+                                <input
+                                  className="font-bold text-slate-800 text-base bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-400 outline-none w-full pb-0.5"
+                                  value={campo.label}
+                                  onChange={e => updateCampo(campo.key, 'label', e.target.value)}
+                                />
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs text-slate-400 font-mono truncate">{campo.key}</span>
+                                  <span className="text-slate-300">•</span>
+                                  <select
+                                    className="text-xs font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-md px-1.5 py-0.5 border-none outline-none cursor-pointer transition-colors"
+                                    value={campo.tipo}
+                                    onChange={e => updateCampo(campo.key, 'tipo', e.target.value)}
+                                  >
+                                    {TIPOS_CAMPO.map(t => <option key={t} value={t}>{t}</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 w-full md:w-auto overflow-x-auto justify-between md:justify-end mt-2 md:mt-0">
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase">Activo</span>
+                                  <Toggle on={campo.activo} onChange={v => updateCampo(campo.key, 'activo', v)} />
+                                </div>
+                                <div className="w-px h-8 bg-slate-200" />
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase">Oblig.</span>
+                                  <Toggle on={campo.obligatorio} onChange={v => updateCampo(campo.key, 'obligatorio', v)} disabled={!campo.activo} />
+                                </div>
+                                <div className="w-px h-8 bg-slate-200" />
+                                <button onClick={() => removeCampo(campo.key)} className="p-2 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </SortableRow>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </SortableContext>
+                    </DndContext>
                   </div>
                 )}
 
@@ -339,49 +430,53 @@ export function FormularioConfigPanel() {
                       </div>
                     )}
 
-                    <div className="space-y-3">
-                      {secciones.map(sec => (
-                        <div key={sec.key} className={`rounded-2xl border p-5 flex flex-col md:flex-row md:items-center gap-5 transition-all duration-300 group ${sec.activo ? 'border-indigo-100 bg-white/50 backdrop-blur-sm shadow-sm hover:shadow-md hover:bg-white' : 'border-slate-200/50 bg-slate-50/50 opacity-60 grayscale-[50%]'}`}>
-                          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 hidden md:flex">
-                            <Layers size={18} className={sec.activo ? 'text-indigo-500' : 'text-slate-400'} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <input
-                              className="font-bold text-slate-800 text-base bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-400 outline-none w-full pb-0.5"
-                              value={sec.label}
-                              onChange={e => updateSeccion(sec.key, 'label', e.target.value)}
-                            />
-                            <div className="flex items-center gap-3 mt-1">
-                              <span className="text-xs text-slate-400 font-mono">{sec.key}</span>
-                              {sec.maxPersonas !== undefined && (
-                                <>
-                                  <span className="text-slate-300">•</span>
-                                  <div className="flex items-center gap-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Máx. registros:</label>
-                                    <input
-                                      type="number" min={1} max={20}
-                                      className="w-14 text-xs font-semibold border border-slate-200 bg-slate-50 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
-                                      value={sec.maxPersonas}
-                                      onChange={e => updateSeccion(sec.key, 'maxPersonas', Number(e.target.value))}
-                                    />
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 w-full md:w-auto justify-between md:justify-end">
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase">Activo</span>
-                              <Toggle on={sec.activo} onChange={v => updateSeccion(sec.key, 'activo', v)} />
-                            </div>
-                            <div className="w-px h-8 bg-slate-200" />
-                            <button onClick={() => removeSeccion(sec.key)} className="p-2 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors">
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndSecciones}>
+                      <SortableContext items={secciones.map(s => s.key)} strategy={verticalListSortingStrategy}>
+                        <div className="space-y-3">
+                          {secciones.map(sec => (
+                            <SortableRow key={sec.key} id={sec.key} active={sec.activo}>
+                              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 hidden md:flex">
+                                <Layers size={18} className={sec.activo ? 'text-indigo-500' : 'text-slate-400'} />
+                              </div>
+                              <div className="flex-1 min-w-0 pr-8 md:pr-0">
+                                <input
+                                  className="font-bold text-slate-800 text-base bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-400 outline-none w-full pb-0.5"
+                                  value={sec.label}
+                                  onChange={e => updateSeccion(sec.key, 'label', e.target.value)}
+                                />
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span className="text-xs text-slate-400 font-mono truncate">{sec.key}</span>
+                                  {sec.maxPersonas !== undefined && (
+                                    <>
+                                      <span className="text-slate-300">•</span>
+                                      <div className="flex items-center gap-2">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Máx. registros:</label>
+                                        <input
+                                          type="number" min={1} max={20}
+                                          className="w-14 text-xs font-semibold border border-slate-200 bg-slate-50 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
+                                          value={sec.maxPersonas}
+                                          onChange={e => updateSeccion(sec.key, 'maxPersonas', Number(e.target.value))}
+                                        />
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 w-full md:w-auto justify-between md:justify-end mt-2 md:mt-0">
+                                <div className="flex flex-col items-center gap-1">
+                                  <span className="text-[9px] font-bold text-slate-400 uppercase">Activo</span>
+                                  <Toggle on={sec.activo} onChange={v => updateSeccion(sec.key, 'activo', v)} />
+                                </div>
+                                <div className="w-px h-8 bg-slate-200" />
+                                <button onClick={() => removeSeccion(sec.key)} className="p-2 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </SortableRow>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </SortableContext>
+                    </DndContext>
                   </div>
                 )}
 
