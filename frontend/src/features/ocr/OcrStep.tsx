@@ -503,8 +503,8 @@ export function OcrStep() {
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [preview, setPreview] = useState<{ file: DocumentFile; title: string } | null>(null);
 
-  const requiredDocs = (config?.documentos || []).filter((d: any) => d.obligatorio && d.activo).map((d: any) => d.key);
-  const allRequiredDone = requiredDocs.every((d: string) => documents[d]?.status === 'done');
+  const requiredDocs: DocType[] = ['cedula', 'licencia', 'certificado'];
+  const allRequiredDone = requiredDocs.every((d) => documents[d]?.status === 'done');
 
   useEffect(() => {
     if (allRequiredDone && !ocrDone) {

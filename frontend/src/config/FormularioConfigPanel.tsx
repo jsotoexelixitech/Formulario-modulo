@@ -355,7 +355,7 @@ export function FormularioConfigPanel() {
                       </div>
                     )}
 
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndCampos}>
+                    <DndContext id="dnd-campos" sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndCampos}>
                       <SortableContext items={campos.map(c => c.key)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-3">
                           {campos.map(campo => (
@@ -430,7 +430,7 @@ export function FormularioConfigPanel() {
                       </div>
                     )}
 
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndSecciones}>
+                    <DndContext id="dnd-secciones" sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEndSecciones}>
                       <SortableContext items={secciones.map(s => s.key)} strategy={verticalListSortingStrategy}>
                         <div className="space-y-3">
                           {secciones.map(sec => (
