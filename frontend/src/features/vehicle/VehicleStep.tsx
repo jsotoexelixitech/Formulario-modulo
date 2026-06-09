@@ -147,7 +147,14 @@ export function VehicleStep() {
 
   const producto = new URLSearchParams(window.location.search).get('product') as 'rcv' | 'funerario' ?? 'rcv';
   const { config } = useProductConfig(EMPRESA_ID, producto, 'formulario');
-  const isSeccionActiva = (seccion: string) => !config?.secciones ? true : (config.secciones[seccion]?.activo ?? true);
+  const isSeccionActiva = (seccion: string) => {
+    if (!config?.secciones) return true;
+    if (Array.isArray(config.secciones)) {
+      const found = config.secciones.find((s: any) => s.key === seccion);
+      return found ? found.activo : true;
+    }
+    return config.secciones[seccion]?.activo ?? true;
+  };
 
   const {
     marcas, modelos, versiones, categoriasUso,

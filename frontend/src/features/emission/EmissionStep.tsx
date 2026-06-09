@@ -127,9 +127,32 @@ export function EmissionStep() {
   const producto = new URLSearchParams(window.location.search).get('product') as 'rcv' | 'funerario' ?? 'rcv';
   const { config } = useProductConfig(EMPRESA_ID, producto, 'formulario');
 
-  const isActivo = (campo: string) => !config?.campos ? true : (config.campos[campo]?.activo ?? true);
-  const isObligatorio = (campo: string) => !config?.campos ? true : (config.campos[campo]?.obligatorio ?? true);
-  const isSeccionActiva = (seccion: string) => !config?.secciones ? true : (config.secciones[seccion]?.activo ?? true);
+  const isActivo = (campo: string) => {
+    if (!config?.campos) return true;
+    if (Array.isArray(config.campos)) {
+      const found = config.campos.find((c: any) => c.key === campo);
+      return found ? found.activo : true;
+    }
+    return config.campos[campo]?.activo ?? true;
+  };
+
+  const isObligatorio = (campo: string) => {
+    if (!config?.campos) return true;
+    if (Array.isArray(config.campos)) {
+      const found = config.campos.find((c: any) => c.key === campo);
+      return found ? found.obligatorio : true;
+    }
+    return config.campos[campo]?.obligatorio ?? true;
+  };
+
+  const isSeccionActiva = (seccion: string) => {
+    if (!config?.secciones) return true;
+    if (Array.isArray(config.secciones)) {
+      const found = config.secciones.find((s: any) => s.key === seccion);
+      return found ? found.activo : true;
+    }
+    return config.secciones[seccion]?.activo ?? true;
+  };
 
   const validate = () => {
     const e: ValidationErrors = {};
