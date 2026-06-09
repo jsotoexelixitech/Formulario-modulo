@@ -151,7 +151,7 @@ export function VehicleStep() {
     if (!config?.secciones) return true;
     if (Array.isArray(config.secciones)) {
       const found = config.secciones.find((s: any) => s.key === seccion);
-      return found ? found.activo : true;
+      return found ? found.activo : false;
     }
     return config.secciones[seccion]?.activo ?? true;
   };

@@ -131,7 +131,7 @@ export function EmissionStep() {
     if (!config?.campos) return true;
     if (Array.isArray(config.campos)) {
       const found = config.campos.find((c: any) => c.key === campo);
-      return found ? found.activo : true;
+      return found ? found.activo : false;
     }
     return config.campos[campo]?.activo ?? true;
   };
@@ -140,7 +140,7 @@ export function EmissionStep() {
     if (!config?.campos) return true;
     if (Array.isArray(config.campos)) {
       const found = config.campos.find((c: any) => c.key === campo);
-      return found ? found.obligatorio : true;
+      return found ? found.obligatorio : false;
     }
     return config.campos[campo]?.obligatorio ?? true;
   };
@@ -149,7 +149,7 @@ export function EmissionStep() {
     if (!config?.secciones) return true;
     if (Array.isArray(config.secciones)) {
       const found = config.secciones.find((s: any) => s.key === seccion);
-      return found ? found.activo : true;
+      return found ? found.activo : false;
     }
     return config.secciones[seccion]?.activo ?? true;
   };
