@@ -42,7 +42,13 @@ const STEP_META_BY_PRODUCT: Record<'rcv' | 'funerario', Record<2 | 3, StepMeta>>
   },
 };
 
+import { FormularioConfigPanel } from './config/FormularioConfigPanel';
+
 export default function App() {
+  if (window.location.pathname === '/config') {
+    return <FormularioConfigPanel />;
+  }
+
   const { goTo } = useWizardStore();
   const [localStep, setLocalStep] = useState<2 | 3>(2);
   const product = getProductConfig();
