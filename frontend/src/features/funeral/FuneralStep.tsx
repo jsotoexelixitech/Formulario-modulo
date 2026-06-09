@@ -5,9 +5,12 @@ import { IdentityInput } from '../../components/ui/IdentityInput';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { useCatalogs } from '../../hooks/useCatalogs';
+import { useProductConfig } from '../../hooks/useProductConfig';
 import { SectionCard } from '../emission/EmissionStep';
 import type { FuneralPerson } from '../../types';
 import { Users, Heart, ShieldAlert, CalendarClock, Plus, Trash2 } from 'lucide-react';
+
+const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
 /** Solo letras, tildes, ñ y espacios. */
 function onlyLetters(v: string): string {
@@ -133,6 +136,10 @@ function PersonFields({
 
 export function FuneralStep() {
   const { tomador, funeral, setFuneral, differentPayer } = useWizardStore();
+
+  const producto = new URLSearchParams(window.location.search).get('product') as 'rcv' | 'funerario' ?? 'funerario';
+  const { config } = useProductConfig(EMPRESA_ID, producto, 'formulario');
+  const isSeccionActiva = (seccion: string) => !config?.secciones ? true : (config.secciones[seccion]?.activo ?? true);
 
   useEffect(() => {
     if (!differentPayer) {
@@ -270,6 +277,7 @@ export function FuneralStep() {
   return (
     <div className="animate-fade-in space-y-5">
       {/* Asegurados */}
+      {isSeccionActiva('asegurados') && (
       <SectionCard
         Icon={Users}
         title="Personas aseguradas"
@@ -325,8 +333,10 @@ export function FuneralStep() {
           </button>
         </div>
       </SectionCard>
+      )}
 
       {/* Beneficiarios */}
+      {isSeccionActiva('beneficiario') && (
       <SectionCard
         Icon={Heart}
         title="Beneficiarios"
@@ -371,8 +381,10 @@ export function FuneralStep() {
           </button>
         </div>
       </SectionCard>
+      )}
 
       {/* Frecuencia de pago */}
+      {isSeccionActiva('frecuencia') && (
       <SectionCard
         Icon={CalendarClock}
         title="Frecuencia de pago"
@@ -387,6 +399,7 @@ export function FuneralStep() {
           />
         </Field>
       </SectionCard>
+      )}
 
       {/* Declaraciones */}
       <SectionCard

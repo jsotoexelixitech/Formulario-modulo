@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
 import { Field, Input, Select } from '../../components/ui/FormField';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
@@ -11,6 +11,9 @@ import { toast } from '../../store/toastStore';
 import { cn } from '../../lib/utils';
 import { catalogoApi, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
 import type { VehicleData } from '../../types';
+import { useProductConfig } from '../../hooks/useProductConfig';
+
+const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
 const COLOR_SWATCHES: Record<string, string> = {
   blanco: '#F8FAFC', negro: '#0F172A', gris: '#94A3B8', plateado: '#CBD5E1',
@@ -141,6 +144,10 @@ export function VehicleStep() {
   // Refs para controlar el auto-select por OCR (no sobrescribir selección manual)
   const autoSelectedMarca  = useRef(false);
   const autoSelectedModelo = useRef(false);
+
+  const producto = new URLSearchParams(window.location.search).get('product') as 'rcv' | 'funerario' ?? 'rcv';
+  const { config } = useProductConfig(EMPRESA_ID, producto, 'formulario');
+  const isSeccionActiva = (seccion: string) => !config?.secciones ? true : (config.secciones[seccion]?.activo ?? true);
 
   const {
     marcas, modelos, versiones, categoriasUso,
@@ -783,42 +790,56 @@ export function VehicleStep() {
       </SectionCard>
 
       {/* ── Conductor habitual ─────────────────────────────────────────────────── */}
-      <SectionCard Icon={UserCog} title="¿Hay otro conductor?" description="Si alguien más conduce este vehículo con frecuencia, regístralo aquí">
-        <ToggleSwitch
-          checked={hasDriver} onChange={setHasDriver}
-          label="Sí, hay otra persona que lo maneja"
-          description="Puede ser un familiar, empleado o cualquier persona que utilice el vehículo con regularidad."
-        />
-        {hasDriver && (
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
-            <Field label="Nombre del conductor *" error={errors.cond_nombre}>
-              <Input
-                value={conductor.nombre}
-                onChange={(e) => setConductor({ nombre: e.target.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '') })}
-                placeholder="Nombre"
-              />
-            </Field>
-            <Field label="Apellido del conductor *" error={errors.cond_apellido}>
-              <Input
-                value={conductor.apellido}
-                onChange={(e) => setConductor({ apellido: e.target.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '') })}
-                placeholder="Apellido"
-              />
-            </Field>
-            <Field label="Número de licencia de conducir *" error={errors.cond_licencia}>
-              <Input
-                value={conductor.licencia ?? ''}
-                onChange={(e) => setConductor({ licencia: e.target.value.toUpperCase() })}
-                placeholder="Ej. LIC-0234567"
-                className="uppercase font-mono tracking-wider"
-              />
-            </Field>
-            <Field label="¿Qué relación tiene contigo?">
-              <Input value={conductor.relacion ?? ''} onChange={(e) => setConductor({ relacion: e.target.value })} placeholder="Ej. hijo, esposa, empleado..." />
-            </Field>
-          </div>
-        )}
-      </SectionCard>
+      {isSeccionActiva('conductor') && (
+        <SectionCard Icon={UserCog} title="¿Hay otro conductor?" description="Si alguien más conduce este vehículo con frecuencia, regístralo aquí">
+          <ToggleSwitch
+            checked={hasDriver} onChange={setHasDriver}
+            label="Sí, hay otra persona que lo maneja"
+            description="Puede ser un familiar, empleado o cualquier persona que utilice el vehículo con regularidad."
+          />
+          {hasDriver && (
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+              <Field label="Nombre del conductor *" error={errors.cond_nombre}>
+                <Input
+                  value={conductor.nombre}
+                  onChange={(e) => setConductor({ nombre: e.target.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '') })}
+                  placeholder="Nombre"
+                />
+              </Field>
+              <Field label="Apellido del conductor *" error={errors.cond_apellido}>
+                <Input
+                  value={conductor.apellido}
+                  onChange={(e) => setConductor({ apellido: e.target.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '') })}
+                  placeholder="Apellido"
+                />
+              </Field>
+              <Field label="Número de licencia de conducir *" error={errors.cond_licencia}>
+                <Input
+                  value={conductor.licencia ?? ''}
+                  onChange={(e) => setConductor({ licencia: e.target.value.toUpperCase() })}
+                  placeholder="Ej. LIC-0234567"
+                  className="uppercase font-mono tracking-wider"
+                />
+              </Field>
+              <Field label="¿Qué relación tiene contigo?">
+                <Select
+                  value={conductor.parentesco ?? ''}
+                  onChange={(e) => setConductor({ parentesco: e.target.value })}
+                >
+                  <option value="">— Opcional —</option>
+                  <option value="Conyuge">Cónyuge</option>
+                  <option value="Hijo">Hijo / Hija</option>
+                  <option value="Padre">Padre / Madre</option>
+                  <option value="Hermano">Hermano / Hermana</option>
+                  <option value="Empleado">Empleado / Chofer</option>
+                  <option value="Amigo">Amigo / Conocido</option>
+                  <option value="Otro">Otro parentesco</option>
+                </Select>
+              </Field>
+            </div>
+          )}
+        </SectionCard>
+      )}
     </div>
   );
 }
