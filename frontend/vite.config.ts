@@ -27,5 +27,8 @@ export default defineConfig(({ mode }) => {
       allowedHosts: true,
       proxy,
     },
+    build: {
+      chunkSizeWarningLimit: 1000,
+    },
   }
 })
