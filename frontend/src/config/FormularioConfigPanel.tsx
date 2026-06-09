@@ -4,8 +4,9 @@ import { getProductId } from '../lib/product';
 import {
   Settings2, RotateCcw, Save, CheckCircle2, AlertTriangle,
   Loader2, ShieldCheck, Plus, Trash2, ArrowLeftRight,
-  LayoutList, Layers, ChevronUp,
+  LayoutList, Layers, ChevronUp, Sparkles
 } from 'lucide-react';
+import { AuroraBackground } from '../components/AuroraBackground';
 
 const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
@@ -148,253 +149,292 @@ export function FormularioConfigPanel() {
   const allCampoKeys = [...new Set([...campos.map(c => c.key), ...secciones.map(s => s.key)])];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50/30 p-6 lg:p-10">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen relative">
+      <AuroraBackground />
 
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 grid place-items-center shadow-lg">
-              <Settings2 size={18} className="text-white" />
+      {/* Título flotante como en App.tsx */}
+      <div className="pt-[40px] px-6 lg:px-10 pb-12 max-w-4xl mx-auto relative z-10">
+        <header className="mb-8 animate-fade-in">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <p className="text-[0.68rem] font-black tracking-[0.22em] gradient-text-indigo uppercase mb-2 inline-flex items-center gap-1.5">
+                <Sparkles size={11} className="text-indigo-500" />
+                PARAMETRIZADOR · {producto}
+              </p>
+              <h1 className="font-display text-3xl sm:text-[2.5rem] font-black text-slate-900 tracking-tight leading-tight">
+                Módulo Formulario
+              </h1>
+              <p className="text-slate-500 text-sm mt-2 max-w-xl leading-relaxed">
+                Personaliza los campos de entrada de datos, secciones dinámicas y el mapeador a la API.
+              </p>
             </div>
-            <div>
-              <p className="text-[0.65rem] font-black tracking-widest text-violet-600 uppercase">Parametrizador</p>
-              <h1 className="font-bold text-slate-900 text-xl leading-tight">Módulo Formulario</h1>
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 grid place-items-center shadow-lg shadow-indigo-500/20">
+              <Settings2 size={24} className="text-white" />
             </div>
           </div>
-          <span className="px-2.5 py-1 rounded-lg bg-violet-100 text-violet-700 text-xs font-bold capitalize border border-violet-200">{producto}</span>
-        </div>
+        </header>
 
-        {/* Tabs */}
-        <div className="flex gap-1 mb-6 bg-slate-100 rounded-xl p-1">
-          {([['campos', 'Campos', LayoutList], ['secciones', 'Secciones', Layers], ['mapeador', 'Mapeador API', ArrowLeftRight]] as const).map(([t, label, Icon]) => (
-            <button
-              key={t}
-              onClick={() => setTab(t as Tab)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-colors ${tab === t ? 'bg-white shadow text-violet-700' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              <Icon size={13} />{label}
-            </button>
-          ))}
-        </div>
+        <section className="surface-card overflow-hidden animate-fade-in">
+          <div className="p-6 sm:p-8 lg:p-10">
+            {/* Tabs */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-8 bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/50 backdrop-blur-sm">
+              {([['campos', 'Campos', LayoutList], ['secciones', 'Secciones', Layers], ['mapeador', 'Mapeador API', ArrowLeftRight]] as const).map(([t, label, Icon]) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t as Tab)}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all ${tab === t ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <Icon size={15} />{label}
+                </button>
+              ))}
+            </div>
 
-        {loadState === 'loading' && (
-          <div className="flex items-center justify-center gap-3 py-20 text-slate-400">
-            <Loader2 size={20} className="animate-spin" /><span className="text-sm">Cargando...</span>
-          </div>
-        )}
-
-        {loadState === 'error' && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 flex items-start gap-3 mb-4">
-            <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
-            <p className="text-amber-700 text-sm font-medium">No se pudo cargar la configuración. Se usan los valores por defecto.</p>
-          </div>
-        )}
-
-        {loadState !== 'loading' && (
-          <>
-            {/* ── TAB CAMPOS ── */}
-            {tab === 'campos' && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Campos del formulario</p>
-                  <button onClick={() => setAddingCampo(v => !v)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors">
-                    {addingCampo ? <ChevronUp size={13} /> : <Plus size={13} />}{addingCampo ? 'Cancelar' : 'Agregar campo'}
-                  </button>
-                </div>
-
-                {addingCampo && (
-                  <div className="rounded-xl border-2 border-dashed border-violet-300 bg-violet-50/60 p-4 space-y-2 mb-3">
-                    <p className="text-xs font-bold text-violet-700">Nuevo campo</p>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">Clave *</label>
-                        <input className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 font-mono outline-none focus:border-violet-400" placeholder="ej: profesion" value={newCampo.key} onChange={e => setNewCampo(p => ({ ...p, key: e.target.value }))} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">Etiqueta *</label>
-                        <input className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-violet-400" placeholder="ej: Profesión" value={newCampo.label} onChange={e => setNewCampo(p => ({ ...p, label: e.target.value }))} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">Tipo</label>
-                        <select className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-violet-400 bg-white" value={newCampo.tipo} onChange={e => setNewCampo(p => ({ ...p, tipo: e.target.value }))}>
-                          {TIPOS_CAMPO.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={newCampo.obligatorio} onChange={e => setNewCampo(p => ({ ...p, obligatorio: e.target.checked }))} className="rounded" />
-                      <span className="text-xs text-slate-600 font-medium">Obligatorio</span>
-                    </label>
-                    <button onClick={addCampo} className="w-full py-2 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 transition-colors">✓ Agregar</button>
-                  </div>
-                )}
-
-                {campos.map(campo => (
-                  <div key={campo.key} className={`rounded-xl border p-3 flex items-center gap-3 transition-all ${campo.activo ? 'border-violet-200 bg-white shadow-sm' : 'border-slate-200 bg-slate-50 opacity-60'}`}>
-                    <div className="flex-1 min-w-0">
-                      <input
-                        className="font-semibold text-slate-900 text-sm bg-transparent border-b border-transparent hover:border-slate-200 focus:border-violet-400 outline-none w-full"
-                        value={campo.label}
-                        onChange={e => updateCampo(campo.key, 'label', e.target.value)}
-                      />
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-slate-400 font-mono">{campo.key}</span>
-                        <select
-                          className="text-[10px] text-slate-500 bg-transparent border-none outline-none cursor-pointer"
-                          value={campo.tipo}
-                          onChange={e => updateCampo(campo.key, 'tipo', e.target.value)}
-                        >
-                          {TIPOS_CAMPO.map(t => <option key={t} value={t}>{t}</option>)}
-                        </select>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <label className="flex items-center gap-1 cursor-pointer text-[10px] text-slate-500">
-                        <Toggle on={campo.activo} onChange={v => updateCampo(campo.key, 'activo', v)} />
-                        Activo
-                      </label>
-                      <label className="flex items-center gap-1 cursor-pointer text-[10px] text-slate-500">
-                        <Toggle on={campo.obligatorio} onChange={v => updateCampo(campo.key, 'obligatorio', v)} disabled={!campo.activo} />
-                        <ShieldCheck size={10} className={campo.obligatorio ? 'text-emerald-500' : ''} />
-                      </label>
-                      <button onClick={() => removeCampo(campo.key)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+            {loadState === 'loading' && (
+              <div className="flex items-center justify-center gap-3 py-20 text-slate-400">
+                <Loader2 size={20} className="animate-spin" /><span className="text-sm">Cargando configuración...</span>
               </div>
             )}
 
-            {/* ── TAB SECCIONES ── */}
-            {tab === 'secciones' && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Secciones del flujo</p>
-                  <button onClick={() => setAddingSeccion(v => !v)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors">
-                    {addingSeccion ? <ChevronUp size={13} /> : <Plus size={13} />}{addingSeccion ? 'Cancelar' : 'Agregar sección'}
-                  </button>
-                </div>
+            {loadState === 'error' && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 flex items-start gap-3 mb-4">
+                <AlertTriangle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-amber-700 text-sm font-medium">No se pudo cargar la configuración. Se usan los valores por defecto.</p>
+              </div>
+            )}
 
-                {addingSeccion && (
-                  <div className="rounded-xl border-2 border-dashed border-violet-300 bg-violet-50/60 p-4 space-y-2 mb-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">Clave *</label>
-                        <input className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 font-mono outline-none focus:border-violet-400" placeholder="ej: referencias" value={newSeccion.key} onChange={e => setNewSeccion(p => ({ ...p, key: e.target.value }))} />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-semibold text-slate-500 block mb-1">Etiqueta *</label>
-                        <input className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-violet-400" placeholder="ej: Referencias personales" value={newSeccion.label} onChange={e => setNewSeccion(p => ({ ...p, label: e.target.value }))} />
-                      </div>
+            {loadState !== 'loading' && (
+              <>
+                {/* ── TAB CAMPOS ── */}
+                {tab === 'campos' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Campos del formulario</p>
+                      <button onClick={() => setAddingCampo(v => !v)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600/10 text-indigo-700 text-xs font-bold hover:bg-indigo-600/20 transition-colors">
+                        {addingCampo ? <ChevronUp size={14} /> : <Plus size={14} />}{addingCampo ? 'Cancelar' : 'Agregar campo'}
+                      </button>
                     </div>
-                    <button onClick={addSeccion} className="w-full py-2 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 transition-colors">✓ Agregar</button>
-                  </div>
-                )}
 
-                {secciones.map(sec => (
-                  <div key={sec.key} className={`rounded-xl border p-3 flex items-center gap-3 transition-all ${sec.activo ? 'border-violet-200 bg-white shadow-sm' : 'border-slate-200 bg-slate-50 opacity-60'}`}>
-                    <div className="flex-1 min-w-0">
-                      <input
-                        className="font-semibold text-slate-900 text-sm bg-transparent border-b border-transparent hover:border-slate-200 focus:border-violet-400 outline-none w-full"
-                        value={sec.label}
-                        onChange={e => updateSeccion(sec.key, 'label', e.target.value)}
-                      />
-                      <span className="text-[10px] text-slate-400 font-mono">{sec.key}</span>
-                      {sec.maxPersonas !== undefined && (
-                        <div className="mt-1 flex items-center gap-2">
-                          <label className="text-[10px] text-slate-500">Máx. personas:</label>
-                          <input
-                            type="number" min={1} max={20}
-                            className="w-12 text-xs border border-slate-200 rounded px-1 py-0.5 outline-none"
-                            value={sec.maxPersonas}
-                            onChange={e => updateSeccion(sec.key, 'maxPersonas', Number(e.target.value))}
-                          />
+                    {addingCampo && (
+                      <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-5 space-y-4 mb-4 animate-fade-in shadow-inner">
+                        <p className="text-xs font-black text-indigo-800 uppercase tracking-wider">Nuevo campo</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-500 block mb-1.5">Clave *</label>
+                            <input className="w-full text-sm border border-indigo-100 rounded-xl px-3 py-2 font-mono outline-none focus:border-indigo-400 bg-white" placeholder="ej: profesion" value={newCampo.key} onChange={e => setNewCampo(p => ({ ...p, key: e.target.value }))} />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-500 block mb-1.5">Etiqueta visible *</label>
+                            <input className="w-full text-sm border border-indigo-100 rounded-xl px-3 py-2 outline-none focus:border-indigo-400 bg-white" placeholder="ej: Profesión" value={newCampo.label} onChange={e => setNewCampo(p => ({ ...p, label: e.target.value }))} />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-500 block mb-1.5">Tipo de entrada</label>
+                            <select className="w-full text-sm border border-indigo-100 rounded-xl px-3 py-2 outline-none focus:border-indigo-400 bg-white" value={newCampo.tipo} onChange={e => setNewCampo(p => ({ ...p, tipo: e.target.value }))}>
+                              {TIPOS_CAMPO.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2.5 shrink-0">
-                      <label className="flex items-center gap-1 cursor-pointer text-[10px] text-slate-500">
-                        <Toggle on={sec.activo} onChange={v => updateSeccion(sec.key, 'activo', v)} />
-                        Activo
-                      </label>
-                      <button onClick={() => removeSeccion(sec.key)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={newCampo.obligatorio} onChange={e => setNewCampo(p => ({ ...p, obligatorio: e.target.checked }))} className="rounded w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300" />
+                            <span className="text-sm text-slate-700 font-medium">Es un campo obligatorio</span>
+                          </label>
+                          <button onClick={addCampo} className="w-full sm:w-auto px-6 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold shadow-md hover:bg-indigo-700 hover:shadow-lg transition-all">✓ Guardar campo</button>
+                        </div>
+                      </div>
+                    )}
 
-            {/* ── TAB MAPEADOR ── */}
-            {tab === 'mapeador' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mapeador de campos API</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Traduce los campos del formulario al formato de la API destino.</p>
-                  </div>
-                  <button onClick={addMapEntry} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-semibold hover:bg-violet-700 transition-colors">
-                    <Plus size={13} /> Agregar
-                  </button>
-                </div>
-
-                {apiMap.length === 0 && (
-                  <div className="text-center py-10 text-slate-400 text-sm rounded-xl border-2 border-dashed border-slate-200">
-                    Sin mapeos. Los campos se enviarán con el nombre interno.
+                    <div className="space-y-3">
+                      {campos.map(campo => (
+                        <div key={campo.key} className={`rounded-2xl border p-4 flex flex-col md:flex-row md:items-center gap-4 transition-all duration-300 ${campo.activo ? 'border-slate-200 bg-white shadow-sm hover:shadow-md' : 'border-slate-200/50 bg-slate-50/50 opacity-60'}`}>
+                          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 hidden md:flex">
+                            <LayoutList size={18} className={campo.activo ? 'text-indigo-500' : 'text-slate-400'} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <input
+                              className="font-bold text-slate-800 text-base bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-400 outline-none w-full pb-0.5"
+                              value={campo.label}
+                              onChange={e => updateCampo(campo.key, 'label', e.target.value)}
+                            />
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-slate-400 font-mono">{campo.key}</span>
+                              <span className="text-slate-300">•</span>
+                              <select
+                                className="text-xs font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-md px-1.5 py-0.5 border-none outline-none cursor-pointer transition-colors"
+                                value={campo.tipo}
+                                onChange={e => updateCampo(campo.key, 'tipo', e.target.value)}
+                              >
+                                {TIPOS_CAMPO.map(t => <option key={t} value={t}>{t}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 w-full md:w-auto overflow-x-auto justify-between md:justify-end">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">Activo</span>
+                              <Toggle on={campo.activo} onChange={v => updateCampo(campo.key, 'activo', v)} />
+                            </div>
+                            <div className="w-px h-8 bg-slate-200" />
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">Oblig.</span>
+                              <Toggle on={campo.obligatorio} onChange={v => updateCampo(campo.key, 'obligatorio', v)} disabled={!campo.activo} />
+                            </div>
+                            <div className="w-px h-8 bg-slate-200" />
+                            <button onClick={() => removeCampo(campo.key)} className="p-2 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
-                {apiMap.map((entry, idx) => (
-                  <div key={idx} className="rounded-xl border border-slate-200 bg-white p-3 grid grid-cols-[1fr_1fr_auto_auto] gap-2 items-end shadow-sm">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Campo interno</label>
-                      <select className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white font-mono outline-none focus:border-violet-400" value={entry.internalKey} onChange={e => updateMapEntry(idx, 'internalKey', e.target.value)}>
-                        <option value="">— Seleccionar —</option>
-                        {allCampoKeys.map(k => <option key={k} value={k}>{k}</option>)}
-                      </select>
+                {/* ── TAB SECCIONES ── */}
+                {tab === 'secciones' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Secciones del flujo</p>
+                      <button onClick={() => setAddingSeccion(v => !v)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600/10 text-indigo-700 text-xs font-bold hover:bg-indigo-600/20 transition-colors">
+                        {addingSeccion ? <ChevronUp size={14} /> : <Plus size={14} />}{addingSeccion ? 'Cancelar' : 'Agregar sección'}
+                      </button>
                     </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Campo destino</label>
-                      <input className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 font-mono outline-none focus:border-violet-400" placeholder="ej: xnombre" value={entry.externalKey} onChange={e => updateMapEntry(idx, 'externalKey', e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-500 block mb-1">Transform.</label>
-                      <select className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white outline-none" value={entry.transform ?? 'none'} onChange={e => updateMapEntry(idx, 'transform', e.target.value)}>
-                        <option value="none">Ninguna</option>
-                        <option value="date_ddmmyyyy">DD/MM/YYYY</option>
-                        <option value="date_yyyymmdd">YYYY-MM-DD</option>
-                        <option value="strip_prefix">Quitar +58</option>
-                        <option value="uppercase">MAYÚSCULAS</option>
-                        <option value="lowercase">minúsculas</option>
-                      </select>
-                    </div>
-                    <button onClick={() => removeMapEntry(idx)} className="p-2 rounded-lg text-red-400 hover:bg-red-50 transition-colors self-end">
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
 
-            {/* Actions */}
-            {saveError && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 flex items-center gap-2 text-xs text-rose-700 mt-4">
-                <AlertTriangle size={14} />{saveError}
-              </div>
+                    {addingSeccion && (
+                      <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-5 space-y-4 mb-4 animate-fade-in shadow-inner">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-500 block mb-1.5">Clave *</label>
+                            <input className="w-full text-sm border border-indigo-100 rounded-xl px-3 py-2 font-mono outline-none focus:border-indigo-400 bg-white" placeholder="ej: referencias" value={newSeccion.key} onChange={e => setNewSeccion(p => ({ ...p, key: e.target.value }))} />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-500 block mb-1.5">Etiqueta visible *</label>
+                            <input className="w-full text-sm border border-indigo-100 rounded-xl px-3 py-2 outline-none focus:border-indigo-400 bg-white" placeholder="ej: Referencias personales" value={newSeccion.label} onChange={e => setNewSeccion(p => ({ ...p, label: e.target.value }))} />
+                          </div>
+                        </div>
+                        <button onClick={addSeccion} className="w-full py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold shadow-md hover:bg-indigo-700 transition-all">✓ Crear sección</button>
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      {secciones.map(sec => (
+                        <div key={sec.key} className={`rounded-2xl border p-4 flex flex-col md:flex-row md:items-center gap-4 transition-all duration-300 ${sec.activo ? 'border-slate-200 bg-white shadow-sm hover:shadow-md' : 'border-slate-200/50 bg-slate-50/50 opacity-60'}`}>
+                          <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 hidden md:flex">
+                            <Layers size={18} className={sec.activo ? 'text-indigo-500' : 'text-slate-400'} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <input
+                              className="font-bold text-slate-800 text-base bg-transparent border-b border-transparent hover:border-slate-200 focus:border-indigo-400 outline-none w-full pb-0.5"
+                              value={sec.label}
+                              onChange={e => updateSeccion(sec.key, 'label', e.target.value)}
+                            />
+                            <div className="flex items-center gap-3 mt-1">
+                              <span className="text-xs text-slate-400 font-mono">{sec.key}</span>
+                              {sec.maxPersonas !== undefined && (
+                                <>
+                                  <span className="text-slate-300">•</span>
+                                  <div className="flex items-center gap-2">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Máx. registros:</label>
+                                    <input
+                                      type="number" min={1} max={20}
+                                      className="w-14 text-xs font-semibold border border-slate-200 bg-slate-50 rounded-lg px-2 py-1 outline-none focus:border-indigo-400"
+                                      value={sec.maxPersonas}
+                                      onChange={e => updateSeccion(sec.key, 'maxPersonas', Number(e.target.value))}
+                                    />
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 w-full md:w-auto justify-between md:justify-end">
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">Activo</span>
+                              <Toggle on={sec.activo} onChange={v => updateSeccion(sec.key, 'activo', v)} />
+                            </div>
+                            <div className="w-px h-8 bg-slate-200" />
+                            <button onClick={() => removeSeccion(sec.key)} className="p-2 rounded-lg text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── TAB MAPEADOR ── */}
+                {tab === 'mapeador' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Mapeador de campos API</p>
+                        <p className="text-xs text-slate-400 mt-1">Traduce los campos del formulario al formato de la API destino.</p>
+                      </div>
+                      <button onClick={addMapEntry} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600/10 text-indigo-700 text-xs font-bold hover:bg-indigo-600/20 transition-colors">
+                        <Plus size={14} /> Nueva regla
+                      </button>
+                    </div>
+
+                    {apiMap.length === 0 && (
+                      <div className="text-center py-12 text-slate-400 text-sm rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50">
+                        No hay mapeos. Los campos se enviarán con el nombre interno.<br/><span className="text-xs">Agrega reglas para transformar datos antes de enviarlos.</span>
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      {apiMap.map((entry, idx) => (
+                        <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end shadow-sm hover:shadow-md transition-shadow">
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-500 block mb-1.5">Campo origen (Formulario)</label>
+                            <select className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 font-mono outline-none focus:border-indigo-400" value={entry.internalKey} onChange={e => updateMapEntry(idx, 'internalKey', e.target.value)}>
+                              <option value="">— Seleccionar campo —</option>
+                              {allCampoKeys.map(k => <option key={k} value={k}>{k}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-500 block mb-1.5">Campo destino (API)</label>
+                            <input className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 font-mono outline-none focus:border-indigo-400" placeholder="ej: xnombre" value={entry.externalKey} onChange={e => updateMapEntry(idx, 'externalKey', e.target.value)} />
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-bold text-slate-500 block mb-1.5">Transformación</label>
+                            <select className="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white outline-none focus:border-indigo-400" value={entry.transform ?? 'none'} onChange={e => updateMapEntry(idx, 'transform', e.target.value)}>
+                              <option value="none">Ninguna</option>
+                              <option value="date_ddmmyyyy">Fecha DD/MM/YYYY</option>
+                              <option value="date_yyyymmdd">Fecha YYYY-MM-DD</option>
+                              <option value="strip_prefix">Quitar prefijos (V-)</option>
+                              <option value="uppercase">MAYÚSCULAS</option>
+                              <option value="lowercase">minúsculas</option>
+                            </select>
+                          </div>
+                          <button onClick={() => removeMapEntry(idx)} className="p-2.5 rounded-xl text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
-            <div className="flex gap-3 pt-5 mt-5 border-t border-slate-100">
-              <button onClick={() => { if (confirm('¿Restaurar valores por defecto?')) resetConfig(); }} disabled={saving} className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:border-slate-300 transition-colors disabled:opacity-50">
-                <RotateCcw size={14} /> Defaults
-              </button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 flex items-center justify-center gap-2 py-2.5 px-6 rounded-xl font-bold text-sm bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-lg hover:-translate-y-0.5 transition-all disabled:opacity-50">
-                {saving ? <><Loader2 size={15} className="animate-spin" /> Guardando...</> : saved ? <><CheckCircle2 size={15} /> ¡Guardado!</> : <><Save size={15} /> Guardar configuración</>}
-              </button>
+          </div>
+
+          {/* Actions */}
+          {loadState !== 'loading' && (
+            <div className="px-6 sm:px-8 lg:px-10 py-5 bg-slate-50/80 border-t border-slate-100 backdrop-blur-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+              {saveError && (
+                <div className="w-full sm:w-auto flex items-center gap-2 text-xs text-rose-600 bg-rose-50 px-4 py-2 rounded-xl">
+                  <AlertTriangle size={14} />{saveError}
+                </div>
+              )}
+              <div className="flex gap-3 w-full sm:w-auto sm:ml-auto">
+                <button onClick={() => { if (confirm('¿Restaurar configuración original?')) resetConfig(); }} disabled={saving} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-all disabled:opacity-50 shadow-sm">
+                  <RotateCcw size={15} /> Restaurar defaults
+                </button>
+                <button onClick={handleSave} disabled={saving} className="flex-1 sm:flex-none flex items-center justify-center gap-2 py-2.5 px-8 rounded-xl font-bold text-sm bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all disabled:opacity-50">
+                  {saving ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : saved ? <><CheckCircle2 size={16} /> ¡Guardado!</> : <><Save size={16} /> Guardar cambios</>}
+                </button>
+              </div>
             </div>
-          </>
-        )}
+          )}
+        </section>
       </div>
     </div>
   );
