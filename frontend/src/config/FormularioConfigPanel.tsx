@@ -64,6 +64,8 @@ export function FormularioConfigPanel() {
   const [addingSeccion, setAddingSeccion] = useState(false);
   const [newCampo, setNewCampo] = useState({ key: '', label: '', tipo: 'text', obligatorio: true });
   const [newSeccion, setNewSeccion] = useState({ key: '', label: '' });
+  const [autocompletarConductor, setAutocompletarConductor] = useState(false);
+  const [validacionParentesco, setValidacionParentesco] = useState(false);
 
   useEffect(() => {
     if (!config) return;
@@ -91,6 +93,8 @@ export function FormularioConfigPanel() {
       );
     }
     setApiMap((config.apiMap as ApiMapEntry[]) ?? []);
+    setAutocompletarConductor(config.autocompletarConductor ?? false);
+    setValidacionParentesco(config.validacionParentesco ?? false);
   }, [config]);
 
   // ── campos handlers ─────────────────────────────────────────────
@@ -141,7 +145,7 @@ export function FormularioConfigPanel() {
 
   // ── save ───────────────────────────────────────────────────────
   async function handleSave() {
-    await saveConfig({ campos, secciones, apiMap });
+    await saveConfig({ campos, secciones, apiMap, autocompletarConductor, validacionParentesco });
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   }
@@ -157,7 +161,7 @@ export function FormularioConfigPanel() {
         <header className="mb-8 animate-fade-in">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="min-w-0">
-              <p className="text-[0.68rem] font-black tracking-[0.22em] gradient-text-indigo uppercase mb-2 inline-flex items-center gap-1.5">
+              <p className="text-[0.68rem] font-black tracking-[0.22em] text-indigo-500 uppercase mb-2 inline-flex items-center gap-1.5">
                 <Sparkles size={11} className="text-indigo-500" />
                 PARAMETRIZADOR · {producto}
               </p>
@@ -174,7 +178,7 @@ export function FormularioConfigPanel() {
           </div>
         </header>
 
-        <section className="surface-card overflow-hidden animate-fade-in">
+        <section className="bg-white/80 backdrop-blur-xl border border-white/40 shadow-xl rounded-3xl overflow-hidden animate-fade-in">
           <div className="p-6 sm:p-8 lg:p-10">
             {/* Tabs */}
             <div className="flex flex-col sm:flex-row gap-2 mb-8 bg-slate-100/50 p-1.5 rounded-xl border border-slate-200/50 backdrop-blur-sm">
@@ -182,7 +186,7 @@ export function FormularioConfigPanel() {
                 <button
                   key={t}
                   onClick={() => setTab(t as Tab)}
-                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-bold transition-all ${tab === t ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all ${tab === t ? 'bg-white shadow-sm text-indigo-700' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'}`}
                 >
                   <Icon size={15} />{label}
                 </button>
@@ -207,6 +211,27 @@ export function FormularioConfigPanel() {
                 {/* ── TAB CAMPOS ── */}
                 {tab === 'campos' && (
                   <div className="space-y-4">
+                    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4 mb-6">
+                      {producto === 'rcv' && (
+                        <label className="flex items-start gap-3 cursor-pointer p-2 rounded-xl hover:bg-slate-50 transition-colors">
+                          <input type="checkbox" checked={autocompletarConductor} onChange={e => { setAutocompletarConductor(e.target.checked); setSaved(false); }} className="rounded w-5 h-5 text-indigo-600 focus:ring-indigo-500 border-slate-300 mt-0.5" />
+                          <div>
+                            <span className="text-sm text-slate-800 font-bold block mb-1">Omitir Conductor (Autocompletar)</span>
+                            <span className="text-xs text-slate-500">Ofrecer un checkbox en el formulario para autocompletar los datos del conductor si es el mismo que el tomador.</span>
+                          </div>
+                        </label>
+                      )}
+                      {producto === 'funerario' && (
+                        <label className="flex items-start gap-3 cursor-pointer p-2 rounded-xl hover:bg-slate-50 transition-colors">
+                          <input type="checkbox" checked={validacionParentesco} onChange={e => { setValidacionParentesco(e.target.checked); setSaved(false); }} className="rounded w-5 h-5 text-indigo-600 focus:ring-indigo-500 border-slate-300 mt-0.5" />
+                          <div>
+                            <span className="text-sm text-slate-800 font-bold block mb-1">Validación de Parentesco</span>
+                            <span className="text-xs text-slate-500">Exigir obligatoriamente declarar la relación o parentesco para cada beneficiario agregado.</span>
+                          </div>
+                        </label>
+                      )}
+                    </div>
+
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Campos del formulario</p>
                       <button onClick={() => setAddingCampo(v => !v)} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600/10 text-indigo-700 text-xs font-bold hover:bg-indigo-600/20 transition-colors">
@@ -245,7 +270,7 @@ export function FormularioConfigPanel() {
 
                     <div className="space-y-3">
                       {campos.map(campo => (
-                        <div key={campo.key} className={`rounded-2xl border p-4 flex flex-col md:flex-row md:items-center gap-4 transition-all duration-300 ${campo.activo ? 'border-slate-200 bg-white shadow-sm hover:shadow-md' : 'border-slate-200/50 bg-slate-50/50 opacity-60'}`}>
+                        <div key={campo.key} className={`rounded-2xl border p-5 flex flex-col md:flex-row md:items-center gap-5 transition-all duration-300 group ${campo.activo ? 'border-indigo-100 bg-white/50 backdrop-blur-sm shadow-sm hover:shadow-md hover:bg-white' : 'border-slate-200/50 bg-slate-50/50 opacity-60 grayscale-[50%]'}`}>
                           <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 hidden md:flex">
                             <LayoutList size={18} className={campo.activo ? 'text-indigo-500' : 'text-slate-400'} />
                           </div>
@@ -316,7 +341,7 @@ export function FormularioConfigPanel() {
 
                     <div className="space-y-3">
                       {secciones.map(sec => (
-                        <div key={sec.key} className={`rounded-2xl border p-4 flex flex-col md:flex-row md:items-center gap-4 transition-all duration-300 ${sec.activo ? 'border-slate-200 bg-white shadow-sm hover:shadow-md' : 'border-slate-200/50 bg-slate-50/50 opacity-60'}`}>
+                        <div key={sec.key} className={`rounded-2xl border p-5 flex flex-col md:flex-row md:items-center gap-5 transition-all duration-300 group ${sec.activo ? 'border-indigo-100 bg-white/50 backdrop-blur-sm shadow-sm hover:shadow-md hover:bg-white' : 'border-slate-200/50 bg-slate-50/50 opacity-60 grayscale-[50%]'}`}>
                           <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 hidden md:flex">
                             <Layers size={18} className={sec.activo ? 'text-indigo-500' : 'text-slate-400'} />
                           </div>
@@ -381,7 +406,7 @@ export function FormularioConfigPanel() {
 
                     <div className="space-y-3">
                       {apiMap.map((entry, idx) => (
-                        <div key={idx} className="rounded-2xl border border-slate-200 bg-white p-4 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-4 items-end shadow-sm hover:shadow-md transition-shadow">
+                        <div key={idx} className="rounded-2xl border border-indigo-100 bg-white/50 backdrop-blur-sm p-5 grid grid-cols-1 md:grid-cols-[1fr_1fr_auto_auto] gap-5 items-end shadow-sm hover:shadow-md hover:bg-white transition-all group">
                           <div>
                             <label className="text-[11px] font-bold text-slate-500 block mb-1.5">Campo origen (Formulario)</label>
                             <select className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-slate-50 font-mono outline-none focus:border-indigo-400" value={entry.internalKey} onChange={e => updateMapEntry(idx, 'internalKey', e.target.value)}>
@@ -404,7 +429,7 @@ export function FormularioConfigPanel() {
                               <option value="lowercase">minúsculas</option>
                             </select>
                           </div>
-                          <button onClick={() => removeMapEntry(idx)} className="p-2.5 rounded-xl text-rose-400 hover:bg-rose-50 hover:text-rose-600 transition-colors">
+                          <button onClick={() => removeMapEntry(idx)} className="p-2.5 rounded-xl text-slate-300 hover:bg-rose-50 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100">
                             <Trash2 size={16} />
                           </button>
                         </div>
