@@ -3,7 +3,7 @@ import { useProductConfig } from '../hooks/useProductConfig';
 import { getProductId } from '../lib/product';
 import {
   Settings2, RotateCcw, Save, CheckCircle2, AlertTriangle,
-  Loader2, ShieldCheck, Plus, Trash2, ArrowLeftRight,
+  Loader2, Plus, Trash2, ArrowLeftRight,
   LayoutList, Layers, ChevronUp, Sparkles
 } from 'lucide-react';
 import { AuroraBackground } from '../components/AuroraBackground';
