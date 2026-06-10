@@ -244,7 +244,7 @@ export function FormularioConfigPanel() {
       <AuroraBackground />
 
       {/* Título flotante como en App.tsx */}
-      <div className="pt-[40px] px-6 lg:px-10 pb-12 max-w-4xl mx-auto relative z-10">
+      <div className="pt-[40px] px-4 sm:px-6 lg:px-10 pb-12 w-full max-w-5xl mx-auto relative z-10">
         <header className="mb-8 animate-fade-in">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="min-w-0">
