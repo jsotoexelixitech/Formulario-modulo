@@ -390,23 +390,7 @@ export function FuneralStep() {
       </SectionCard>
       )}
 
-      {/* Frecuencia de pago */}
-      {isSeccionActiva('frecuencia') && (
-      <SectionCard
-        Icon={CalendarClock}
-        title="Frecuencia de pago"
-        description="¿Cada cuánto deseas pagar la póliza?"
-      >
-        <Field label="Frecuencia *">
-          <SearchSelect
-            value={funeral.frecuencia}
-            options={FRECUENCIAS}
-            onChange={(value) => setFuneral({ frecuencia: value })}
-            placeholder="— Seleccionar —"
-          />
-        </Field>
-      </SectionCard>
-      )}
+
 
       {/* Declaraciones */}
       <SectionCard
