@@ -79,7 +79,7 @@ export default function App() {
           product.hasVehicle ? 'Datos del vehículo incompletos' : 'Datos de las personas incompletos',
           product.hasVehicle
             ? 'Completa placa, marca y modelo.'
-            : 'Completa los datos de los asegurados, la frecuencia y acepta los términos.',
+            : 'Completa correctamente los datos de todos los asegurados, beneficiarios y acepta los términos.',
         );
         return;
       }
