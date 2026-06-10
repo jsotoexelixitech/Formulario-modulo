@@ -8,7 +8,7 @@ import { useCatalogs } from '../../hooks/useCatalogs';
 import { useProductConfig } from '../../hooks/useProductConfig';
 import { SectionCard } from '../emission/EmissionStep';
 import type { FuneralPerson } from '../../types';
-import { Users, Heart, ShieldAlert, CalendarClock, Plus, Trash2 } from 'lucide-react';
+import { Users, Heart, ShieldAlert, Plus, Trash2 } from 'lucide-react';
 
 const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
@@ -17,13 +17,7 @@ function onlyLetters(v: string): string {
   return v.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
 }
 
-const FRECUENCIAS = [
-  { value: 'M', label: 'Mensual' },
-  { value: 'T', label: 'Trimestral' },
-  { value: 'C', label: 'Cuatrimestral' },
-  { value: 'S', label: 'Semestral' },
-  { value: 'A', label: 'Anual' },
-];
+
 
 interface PersonErrors {
   nombre?: string;

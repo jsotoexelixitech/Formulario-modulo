@@ -1,11 +1,11 @@
 import { Fragment, useState } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
-import { Field, Input, Select, Textarea } from '../../components/ui/FormField';
+import { Field, Input, Textarea } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { useCatalogs, useCiudades } from '../../hooks/useCatalogs';
-import { User, UserPlus, Heart, Wallet, ShieldAlert } from 'lucide-react';
+import { User, Wallet, ShieldAlert } from 'lucide-react';
 
 export function SectionCard({
   title,
@@ -112,12 +112,12 @@ const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 export function EmissionStep() {
   const {
     tomador, setTomador,
-    sameInsured, setSameInsured,
-    asegurado, setAsegurado,
+    sameInsured,
+    asegurado,
     differentPayer, setDifferentPayer,
     pagador, setPagador,
-    hasBeneficiary, setHasBeneficiary,
-    beneficiario, setBeneficiario,
+    hasBeneficiary,
+    beneficiario,
   } = useWizardStore();
 
   const catalogs = useCatalogs();
