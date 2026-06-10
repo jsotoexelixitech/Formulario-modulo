@@ -112,8 +112,8 @@ const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 export function EmissionStep() {
   const {
     tomador, setTomador,
-    sameInsured,
-    asegurado,
+    sameInsured, setSameInsured,
+    asegurado, setAsegurado,
     differentPayer, setDifferentPayer,
     pagador, setPagador,
     hasBeneficiary,
@@ -506,6 +506,75 @@ export function EmissionStep() {
             ))}
           </div>
         </SectionCard>
+
+        {/* Asegurado Titular */}
+        {isSeccionActiva('asegurado') && (
+          <SectionCard
+            Icon={User}
+            title="¿Quién es el asegurado titular?"
+            description="La persona a la que protegerá la póliza."
+          >
+            <ToggleSwitch
+              checked={sameInsured}
+              onChange={(v) => setSameInsured(v)}
+              label="Yo seré el asegurado titular"
+              description="Usaremos los datos personales que llenaste arriba."
+            />
+            {!sameInsured && (
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+                <Field label="Nombre *" error={errors.aseg_nombre}>
+                  <Input
+                    value={asegurado.nombre}
+                    onChange={(e) => setAsegurado({ nombre: onlyLetters(e.target.value) })}
+                    placeholder="Nombre"
+                  />
+                </Field>
+                <Field label="Apellido *" error={errors.aseg_apellido}>
+                  <Input
+                    value={asegurado.apellido}
+                    onChange={(e) => setAsegurado({ apellido: onlyLetters(e.target.value) })}
+                    placeholder="Apellido"
+                  />
+                </Field>
+                <Field label="Cédula o documento *" error={errors.aseg_identificacion}>
+                  <IdentityInput
+                    tipoDoc={asegurado.tipoDoc ?? 'V'}
+                    identificacion={asegurado.identificacion}
+                    onTipoDocChange={(v) => setAsegurado({ tipoDoc: v })}
+                    onIdentificacionChange={(v) => setAsegurado({ identificacion: v })}
+                  />
+                </Field>
+                <Field label="Fecha de nacimiento (Opcional)">
+                  <Input
+                    value={asegurado.fechaNac ?? ''}
+                    onChange={(e) => setAsegurado({ fechaNac: e.target.value })}
+                    type="date"
+                    max={new Date().toISOString().split('T')[0]}
+                  />
+                </Field>
+                <Field label="Teléfono (Opcional)" hint="Ej. 04121234567">
+                  <Input
+                    value={maskPhone(asegurado.telefono)}
+                    onChange={(e) => setAsegurado({ telefono: formatTelefono(e.target.value) })}
+                    placeholder="(0412) 123-4567"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={15}
+                  />
+                </Field>
+                <Field label="Correo (Opcional)">
+                  <Input
+                    value={asegurado.email ?? ''}
+                    onChange={(e) => setAsegurado({ email: e.target.value })}
+                    placeholder="correo@ejemplo.com"
+                    type="email"
+                    inputMode="email"
+                  />
+                </Field>
+              </div>
+            )}
+          </SectionCard>
+        )}
 
         {/* Persona Políticamente Expuesta — declaración legal requerida por La Mundial */}
         <SectionCard
