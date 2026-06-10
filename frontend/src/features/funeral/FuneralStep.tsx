@@ -84,6 +84,7 @@ function PersonFields({
           value={person.nombre}
           onChange={(e) => onChange({ nombre: onlyLetters(e.target.value) })}
           placeholder="Nombre"
+          autoComplete="given-name"
           disabled={isReadOnly}
         />
       </Field>
@@ -93,6 +94,7 @@ function PersonFields({
           value={person.apellido}
           onChange={(e) => onChange({ apellido: onlyLetters(e.target.value) })}
           placeholder="Apellido"
+          autoComplete="family-name"
           disabled={isReadOnly}
         />
       </Field>
@@ -236,21 +238,41 @@ export function FuneralStep() {
   const validatePerson = (p: FuneralPerson, isTitular: boolean): PersonErrors => {
     const e: PersonErrors = {};
     const req = (v?: string) => !(v ?? '').trim();
+    const len = (v?: string) => (v ?? '').trim().length;
     const digs = (v?: string) => (v ?? '').replace(/\D/g, '').length;
 
-    if (req(p.identificacion)) e.identificacion = 'Obligatoria';
-    else if (digs(p.identificacion) < 6) e.identificacion = 'Mínimo 6 dígitos';
-    else if (digs(p.identificacion) > 9) e.identificacion = 'Máximo 9 dígitos';
-
-    if (req(p.nombre)) e.nombre = 'Obligatorio';
-    if (req(p.apellido)) e.apellido = 'Obligatorio';
-    if (req(p.fechaNac)) {
-      e.fechaNac = 'Obligatoria';
-    } else if (new Date(p.fechaNac) > new Date()) {
-      e.fechaNac = 'No puede ser mayor a hoy';
+    if (req(p.identificacion)) {
+      e.identificacion = 'La identificación es obligatoria';
+    } else if (digs(p.identificacion) < 6) {
+      e.identificacion = 'Debe tener al menos 6 dígitos';
+    } else if (digs(p.identificacion) > 9) {
+      e.identificacion = 'No puede tener más de 9 dígitos';
     }
-    if (req(p.sexo)) e.sexo = 'Selecciona';
-    if (!isTitular && req(p.parentesco)) e.parentesco = 'Selecciona';
+
+    if (req(p.nombre)) {
+      e.nombre = 'El nombre es obligatorio';
+    } else if (len(p.nombre) < 2) {
+      e.nombre = 'Debe tener al menos 2 caracteres';
+    } else if (len(p.nombre) > 50) {
+      e.nombre = 'No puede superar 50 caracteres';
+    }
+
+    if (req(p.apellido)) {
+      e.apellido = 'El apellido es obligatorio';
+    } else if (len(p.apellido) < 2) {
+      e.apellido = 'Debe tener al menos 2 caracteres';
+    } else if (len(p.apellido) > 50) {
+      e.apellido = 'No puede superar 50 caracteres';
+    }
+
+    if (req(p.fechaNac)) {
+      e.fechaNac = 'La fecha de nacimiento es obligatoria';
+    } else if (new Date(p.fechaNac) > new Date()) {
+      e.fechaNac = 'La fecha no puede ser mayor a hoy';
+    }
+
+    if (req(p.sexo)) e.sexo = 'Selecciona el sexo';
+    if (!isTitular && req(p.parentesco)) e.parentesco = 'Selecciona el parentesco';
 
     return e;
   };
