@@ -281,7 +281,7 @@ export function FormularioConfigPanel() {
             </div>
 
             {loadState === 'loading' && (
-              <div className="flex items-center justify-center gap-3 py-20 text-slate-400">
+              <div className="flex items-center justify-center gap-3 py-20 text-slate-500">
                 <Loader2 size={20} className="animate-spin" /><span className="text-sm">Cargando configuración...</span>
               </div>
             )}
@@ -361,7 +361,7 @@ export function FormularioConfigPanel() {
                           {campos.map(campo => (
                             <SortableRow key={campo.key} id={campo.key} active={campo.activo}>
                               <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 hidden md:flex">
-                                <LayoutList size={18} className={campo.activo ? 'text-indigo-500' : 'text-slate-400'} />
+                                <LayoutList size={18} className={campo.activo ? 'text-indigo-500' : 'text-slate-500'} />
                               </div>
                               <div className="flex-1 min-w-0 pr-8 md:pr-0">
                                 <input
@@ -370,7 +370,7 @@ export function FormularioConfigPanel() {
                                   onChange={e => updateCampo(campo.key, 'label', e.target.value)}
                                 />
                                 <div className="flex items-center gap-2 mt-1">
-                                  <span className="text-xs text-slate-400 font-mono truncate">{campo.key}</span>
+                                  <span className="text-xs text-slate-500 font-mono truncate">{campo.key}</span>
                                   <span className="text-slate-300">•</span>
                                   <select
                                     className="text-xs font-medium text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-md px-1.5 py-0.5 border-none outline-none cursor-pointer transition-colors"
@@ -383,12 +383,12 @@ export function FormularioConfigPanel() {
                               </div>
                               <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 w-full md:w-auto overflow-x-auto justify-between md:justify-end mt-2 md:mt-0">
                                 <div className="flex flex-col items-center gap-1">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase">Activo</span>
+                                  <span className="text-[9px] font-bold text-slate-500 uppercase">Activo</span>
                                   <Toggle on={campo.activo} onChange={v => updateCampo(campo.key, 'activo', v)} />
                                 </div>
                                 <div className="w-px h-8 bg-slate-200" />
                                 <div className="flex flex-col items-center gap-1">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase">Oblig.</span>
+                                  <span className="text-[9px] font-bold text-slate-500 uppercase">Oblig.</span>
                                   <Toggle on={campo.obligatorio} onChange={v => updateCampo(campo.key, 'obligatorio', v)} disabled={!campo.activo} />
                                 </div>
                                 <div className="w-px h-8 bg-slate-200" />
@@ -436,7 +436,7 @@ export function FormularioConfigPanel() {
                           {secciones.map(sec => (
                             <SortableRow key={sec.key} id={sec.key} active={sec.activo}>
                               <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0 hidden md:flex">
-                                <Layers size={18} className={sec.activo ? 'text-indigo-500' : 'text-slate-400'} />
+                                <Layers size={18} className={sec.activo ? 'text-indigo-500' : 'text-slate-500'} />
                               </div>
                               <div className="flex-1 min-w-0 pr-8 md:pr-0">
                                 <input
@@ -445,7 +445,7 @@ export function FormularioConfigPanel() {
                                   onChange={e => updateSeccion(sec.key, 'label', e.target.value)}
                                 />
                                 <div className="flex items-center gap-3 mt-1">
-                                  <span className="text-xs text-slate-400 font-mono truncate">{sec.key}</span>
+                                  <span className="text-xs text-slate-500 font-mono truncate">{sec.key}</span>
                                   {sec.maxPersonas !== undefined && (
                                     <>
                                       <span className="text-slate-300">•</span>
@@ -464,7 +464,7 @@ export function FormularioConfigPanel() {
                               </div>
                               <div className="flex items-center gap-4 shrink-0 bg-slate-50 px-4 py-2 rounded-xl border border-slate-100 w-full md:w-auto justify-between md:justify-end mt-2 md:mt-0">
                                 <div className="flex flex-col items-center gap-1">
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase">Activo</span>
+                                  <span className="text-[9px] font-bold text-slate-500 uppercase">Activo</span>
                                   <Toggle on={sec.activo} onChange={v => updateSeccion(sec.key, 'activo', v)} />
                                 </div>
                                 <div className="w-px h-8 bg-slate-200" />
@@ -486,7 +486,7 @@ export function FormularioConfigPanel() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Mapeador de campos API</p>
-                        <p className="text-xs text-slate-400 mt-1">Traduce los campos del formulario al formato de la API destino.</p>
+                        <p className="text-xs text-slate-500 mt-1">Traduce los campos del formulario al formato de la API destino.</p>
                       </div>
                       <button onClick={addMapEntry} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600/10 text-indigo-700 text-xs font-bold hover:bg-indigo-600/20 transition-colors">
                         <Plus size={14} /> Nueva regla
@@ -494,7 +494,7 @@ export function FormularioConfigPanel() {
                     </div>
 
                     {apiMap.length === 0 && (
-                      <div className="text-center py-12 text-slate-400 text-sm rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50">
+                      <div className="text-center py-12 text-slate-500 text-sm rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50">
                         No hay mapeos. Los campos se enviarán con el nombre interno.<br/><span className="text-xs">Agrega reglas para transformar datos antes de enviarlos.</span>
                       </div>
                     )}
