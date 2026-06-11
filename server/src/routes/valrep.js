@@ -229,4 +229,42 @@ router.get('/list/:domain', async (req, res) => {
   }
 });
 
+// POST /api/valrep/validate-vehicle
+// Validar si el vehículo está asegurado proxying a sysip-nest-api
+router.post('/validate-vehicle', async (req, res) => {
+  try {
+    const { placa, serial } = req.body;
+    
+    // Default to QA api if not configured
+    const baseUrl = (process.env.NESTAPI_BASE_URL || process.env.LAMUNDIAL_BASE_URL || 'http://apiqa.exelixitech.com:3003').replace(/\/$/, '');
+    const url = `${baseUrl}/api/v1/externalChannels/validateEmissionAuto`;
+    
+    const payload = {
+      plan: 'RCVBAS', // Default para validación general
+      placa: placa || '',
+      serial_carroceria: serial || '',
+      serial_motor: serial || '',
+    };
+
+    const response = await axios.post(url, payload, {
+      headers: { 'Content-Type': 'application/json' },
+      validateStatus: () => true,
+    });
+
+    if (response.data && response.data.status === false) {
+      return res.status(400).json({ success: false, code: 'LAMUNDIAL_PLATE_ALREADY_INSURED', message: response.data.error || 'Vehículo ya asegurado' });
+    }
+
+    res.json({ success: true, message: 'Valid' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[valrep/validate-vehicle] error proxying to nest-api:`, msg);
+    res.status(502).json({
+      success: false,
+      error: 'Error validando vehículo en API central',
+      detail: msg,
+    });
+  }
+});
+
 module.exports = router;

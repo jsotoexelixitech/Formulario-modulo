@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { toast } from '../../store/toastStore';
 import { cn } from '../../lib/utils';
-import { catalogoApi, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
+import { catalogoApi, validateVehicle, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
 import type { VehicleData } from '../../types';
 import { useProductConfig } from '../../hooks/useProductConfig';
 
@@ -315,7 +315,7 @@ export function VehicleStep() {
   }, [categoriasUso]);
 
   // ── Validación ────────────────────────────────────────────────────────────
-  const validate = () => {
+  const validate = async () => {
     const e: VehicleErrors = {};
     const req  = (v?: string) => !(v ?? '').trim();
     const len  = (v?: string) => (v ?? '').trim().length;
@@ -371,8 +371,23 @@ export function VehicleStep() {
       void digs; // usado en validaciones adicionales si se requieren
     }
 
+    if (Object.keys(e).length > 0) {
+      setErrors(e);
+      return false;
+    }
+
+    // Validación asíncrona de póliza vigente
+    if (vehicle.placa && vehicle.serial) {
+      const res = await validateVehicle(vehicle.placa, vehicle.serial);
+      if (!res.success) {
+        toast.error('Vehículo asegurado', res.message || 'La placa o serial ya tienen póliza vigente.');
+        setErrors({ placa: 'Ya asegurado', serial: 'Ya asegurado' });
+        return false;
+      }
+    }
+
     setErrors(e);
-    return Object.keys(e).length === 0;
+    return true;
   };
   (window as unknown as Record<string, unknown>).__validateStep3 = validate;
 

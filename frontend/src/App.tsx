@@ -61,7 +61,7 @@ export default function App() {
     goTo(to);
   }
 
-  function handleNext() {
+  async function handleNext() {
     if (localStep === 2) {
       const validate = (window as unknown as Record<string, unknown>).__validateStep2 as (() => boolean) | undefined;
       if (validate && !validate()) {
@@ -73,15 +73,13 @@ export default function App() {
       }
       navigate(3);
     } else {
-      const validate = (window as unknown as Record<string, unknown>).__validateStep3 as (() => boolean) | undefined;
-      if (validate && !validate()) {
-        toast.warning(
-          product.hasVehicle ? 'Datos del vehículo incompletos' : 'Datos de las personas incompletos',
-          product.hasVehicle
-            ? 'Completa placa, marca y modelo.'
-            : 'Completa correctamente los datos de todos los asegurados, beneficiarios y acepta los términos.',
-        );
-        return;
+      const validate = (window as unknown as Record<string, unknown>).__validateStep3 as (() => boolean | Promise<boolean>) | undefined;
+      if (validate) {
+        const isValid = await validate();
+        if (!isValid) {
+          // El propio validateStep3 muestra los errores/toasts pertinentes
+          return;
+        }
       }
       toast.success(
         '¡Formulario completado!',

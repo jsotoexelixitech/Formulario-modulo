@@ -480,3 +480,19 @@ export function getCiudades(cestado?: number | null): Promise<CatalogItem[]> {
 export function getValrepList(domain: string): Promise<CatalogItem[]> {
   return _fetchValrep(`/valrep/list/${domain.toUpperCase()}`);
 }
+
+/**
+ * Valida en Sis2000 si un vehículo (por placa y serial) ya posee una póliza vigente.
+ */
+export async function validateVehicle(placa: string, serial: string): Promise<{ success: boolean; message: string }> {
+  try {
+    const res = await api.post('/valrep/validate-vehicle', { placa, serial });
+    return res.data;
+  } catch (err) {
+    const axErr = err as AxiosError<{ success: boolean; message: string }>;
+    if (axErr.response?.data) {
+      return axErr.response.data; // Return the 400 error data gracefully
+    }
+    throw err;
+  }
+}

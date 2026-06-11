@@ -110,6 +110,8 @@ export interface FuneralPerson {
   sexo: string;
   /** Código de parentesco La Mundial (1=Titular, 2=Cónyuge, 3=Hijo(a)…). */
   parentesco: string;
+  telefono?: string;
+  email?: string;
 }
 
 /**

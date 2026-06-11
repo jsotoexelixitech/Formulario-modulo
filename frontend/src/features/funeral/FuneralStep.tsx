@@ -17,8 +17,18 @@ function onlyLetters(v: string): string {
   return v.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
 }
 
+import { formatTelefono, isValidPhonePrefix } from '@exelixi/shared';
 
+/** Aplica máscara visual al teléfono: (0414) 123-4567 */
+function maskPhone(v: string | undefined): string {
+  if (!v) return '';
+  let d = formatTelefono(v);
+  if (d.length <= 4) return d;
+  if (d.length <= 7) return `(${d.slice(0, 4)}) ${d.slice(4)}`;
+  return `(${d.slice(0, 4)}) ${d.slice(4, 7)}-${d.slice(7, 11)}`;
+}
 
+const emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 interface PersonErrors {
   nombre?: string;
   apellido?: string;
@@ -26,6 +36,8 @@ interface PersonErrors {
   fechaNac?: string;
   sexo?: string;
   parentesco?: string;
+  telefono?: string;
+  email?: string;
 }
 
 /**
@@ -123,6 +135,29 @@ function PersonFields({
           onChange={(value) => onChange({ sexo: value })}
           placeholder="— Seleccionar —"
           loading={loading}
+          disabled={isReadOnly}
+        />
+      </Field>
+
+      <Field label="Teléfono (Opcional)" error={errors.telefono} hint="Ej. 04121234567">
+        <Input
+          value={maskPhone(person.telefono)}
+          onChange={(e) => onChange({ telefono: formatTelefono(e.target.value) })}
+          placeholder="(0412) 123-4567"
+          type="tel"
+          inputMode="numeric"
+          maxLength={15}
+          disabled={isReadOnly}
+        />
+      </Field>
+
+      <Field label="Correo (Opcional)" error={errors.email}>
+        <Input
+          value={person.email ?? ''}
+          onChange={(e) => onChange({ email: e.target.value })}
+          placeholder="correo@ejemplo.com"
+          type="email"
+          inputMode="email"
           disabled={isReadOnly}
         />
       </Field>
@@ -273,6 +308,18 @@ export function FuneralStep() {
 
     if (req(p.sexo)) e.sexo = 'Selecciona el sexo';
     if (!isTitular && req(p.parentesco)) e.parentesco = 'Selecciona el parentesco';
+
+    if (p.telefono) {
+      if (digs(p.telefono) !== 11) {
+        e.telefono = 'El teléfono debe tener exactamente 11 dígitos (ej. 04121234567)';
+      } else if (!isValidPhonePrefix(p.telefono)) {
+        e.telefono = 'El prefijo debe ser válido en Venezuela (ej. 0414, 0412, 0212)';
+      }
+    }
+
+    if (p.email && !emailRe.test(p.email)) {
+      e.email = 'Ingresa un correo válido (ej. usuario@dominio.com)';
+    }
 
     return e;
   };
