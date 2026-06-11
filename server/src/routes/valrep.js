@@ -235,24 +235,36 @@ router.post('/validate-vehicle', async (req, res) => {
   try {
     const { placa, serial } = req.body;
     
-    // Default to QA api if not configured
-    const baseUrl = (process.env.NESTAPI_BASE_URL || process.env.LAMUNDIAL_BASE_URL || 'http://apiqa.exelixitech.com:3003').replace(/\/$/, '');
+    // sysip-nest-api (localhost:3002) es la puerta de entrada a La Mundial (Sis2000 SP)
+    const baseUrl = (process.env.SYSIP_API_URL || 'http://localhost:3002').replace(/\/$/, '');
     const url = `${baseUrl}/api/v1/externalChannels/validateEmissionAuto`;
     
     const payload = {
-      plan: 'RCVBAS', // Default para validación general
+      plan: 'RCVBAS',
       placa: placa || '',
       serial_carroceria: serial || '',
       serial_motor: serial || '',
     };
 
+    console.log(`[valrep/validate-vehicle] calling La Mundial via sysip-nest-api: ${url}`, payload);
+
     const response = await axios.post(url, payload, {
       headers: { 'Content-Type': 'application/json' },
       validateStatus: () => true,
+      timeout: 10000,
     });
 
-    if (response.data && response.data.status === false) {
-      return res.status(400).json({ success: false, code: 'LAMUNDIAL_PLATE_ALREADY_INSURED', message: response.data.error || 'Vehículo ya asegurado' });
+    const data = response.data;
+    console.log('[valrep/validate-vehicle] sysip-nest-api response:', JSON.stringify(data));
+
+    // sysip-nest-api responde: { status: false, error: '...' } cuando el vehículo ya está asegurado
+    const alreadyInsured = data && (data.status === false || (data.error && data.status !== true));
+    if (alreadyInsured) {
+      return res.status(400).json({
+        success: false,
+        code: 'LAMUNDIAL_PLATE_ALREADY_INSURED',
+        message: data.error || 'Este vehículo ya cuenta con una póliza vigente en La Mundial.',
+      });
     }
 
     res.json({ success: true, message: 'Valid' });
