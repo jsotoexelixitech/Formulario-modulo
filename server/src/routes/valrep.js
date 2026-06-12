@@ -235,8 +235,8 @@ router.post('/validate-vehicle', async (req, res) => {
   try {
     const { placa, serial } = req.body;
     
-    // Apuntamos directamente a La Mundial en lugar del proxy local para que use la misma BD de pruebas
-    const baseUrl = (process.env.LAMUNDIAL_BASE_URL || 'http://192.168.10.213:3000').replace(/\/$/, '');
+    // sysip-nest-api (localhost:3002) es la puerta de entrada a La Mundial (Sis2000 SP)
+    const baseUrl = (process.env.SYSIP_API_URL || 'http://localhost:3002').replace(/\/$/, '');
     const url = `${baseUrl}/api/v1/external/validateEmissionAuto`;
     
     const payload = {
@@ -246,13 +246,10 @@ router.post('/validate-vehicle', async (req, res) => {
       serial_motor: serial || '',
     };
 
-    console.log(`[valrep/validate-vehicle] calling La Mundial directly: ${url}`, payload);
+    console.log(`[valrep/validate-vehicle] calling La Mundial via sysip-nest-api: ${url}`, payload);
 
     const response = await axios.post(url, payload, {
-      headers: { 
-        'Content-Type': 'application/json',
-        'apikey': process.env.LAMUNDIAL_APIKEY || ''
-      },
+      headers: { 'Content-Type': 'application/json' },
       validateStatus: () => true,
       timeout: 10000,
     });
