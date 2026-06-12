@@ -237,7 +237,7 @@ router.post('/validate-vehicle', async (req, res) => {
     
     // sysip-nest-api (localhost:3002) es la puerta de entrada a La Mundial (Sis2000 SP)
     const baseUrl = (process.env.SYSIP_API_URL || 'http://localhost:3002').replace(/\/$/, '');
-    const url = `${baseUrl}/api/v1/externalChannels/validateEmissionAuto`;
+    const url = `${baseUrl}/api/v1/external/validateEmissionAuto`;
     
     const payload = {
       plan: 'RCVBAS',
