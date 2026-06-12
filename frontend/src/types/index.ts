@@ -75,6 +75,13 @@ export type PersonData = {
   relacion?: string;
   telefono?: string;
   email?: string;
+  sexo?: string;
+  estadoCivil?: string;
+  estado?: string;
+  cestado?: number;
+  ciudad?: string;
+  cciudad?: number;
+  direccion?: string;
 };
 
 export interface Plan {
@@ -94,13 +101,7 @@ export interface Plan {
 
 export type PaymentMethod = 'card' | 'transfer' | 'mobile' | 'otp';
 
-/**
- * Persona (asegurado o beneficiario) del producto Funerario.
- * Mapea a los campos de la API de Personas de La Mundial:
- *  - tipoDoc          → icedula_* (V, E, J, G)
- *  - identificacion   → xrif_*
- *  - parentesco       → nparentesco_* (1=Titular, 2=Cónyuge, 3=Hijo…)
- */
+/** Persona (asegurado/beneficiario) del producto Funerario. */
 export interface FuneralPerson {
   tipoDoc: string;
   identificacion: string;
@@ -114,22 +115,13 @@ export interface FuneralPerson {
   email?: string;
 }
 
-/**
- * Datos del producto Funerario (personas). Se llena en el paso 3 cuando el
- * producto activo es `funerario`, en lugar de los datos de vehículo.
- */
+/** Datos del producto Funerario (personas). Se usa cuando product = 'funerario'. */
 export interface FuneralData {
-  /** Personas aseguradas. El primer elemento es el titular (parentesco=1). */
   asegurados: FuneralPerson[];
-  /** Beneficiarios de la póliza (opcional según el plan). */
   beneficiarios: FuneralPerson[];
-  /** Frecuencia de pago (A, S, C, T, M). */
   frecuencia: string;
-  /** Declara haber sido diagnosticado con alguna enfermedad. */
   diagnosticoEnfermedad: boolean;
-  /** Descripción de la enfermedad (si diagnosticoEnfermedad = true). */
   descripcionEnfermedad: string;
-  /** Acepta términos y condiciones (obligatorio para emitir). */
   aceptaTerminos: boolean;
 }
 

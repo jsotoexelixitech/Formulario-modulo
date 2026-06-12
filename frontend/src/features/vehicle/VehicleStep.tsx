@@ -1,19 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
-import { Field, Input, Select } from '../../components/ui/FormField';
+import { Field, Input, Select, Textarea } from '../../components/ui/FormField';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SectionCard } from '../emission/EmissionStep';
+import { useCatalogs, useCiudades } from '../../hooks/useCatalogs';
+import { SearchSelect } from '../../components/ui/SearchSelect';
+import { IdentityInput } from '../../components/ui/IdentityInput';
+import { formatTelefono } from '@exelixi/shared';
 import {
   Car, UserCog, Sparkles, ScanLine, ShieldCheck,
   Loader2, AlertTriangle,
 } from 'lucide-react';
 import { toast } from '../../store/toastStore';
 import { cn } from '../../lib/utils';
-import { catalogoApi, validateVehicle, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
+import { catalogoApi, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
 import type { VehicleData } from '../../types';
-import { useProductConfig } from '../../hooks/useProductConfig';
-
-const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
 const COLOR_SWATCHES: Record<string, string> = {
   blanco: '#F8FAFC', negro: '#0F172A', gris: '#94A3B8', plateado: '#CBD5E1',
@@ -72,6 +73,14 @@ interface VehicleErrors {
   cond_nombre?: string;
   cond_apellido?: string;
   cond_licencia?: string;
+  cond_identificacion?: string;
+  cond_telefono?: string;
+  cond_email?: string;
+  cond_sexo?: string;
+  cond_estadoCivil?: string;
+  cond_estado?: string;
+  cond_ciudad?: string;
+  cond_direccion?: string;
 }
 
 // ── Hook catálogo INMA ────────────────────────────────────────────────────────
@@ -137,6 +146,8 @@ export function VehicleStep() {
 
   const [errors, setErrors] = useState<VehicleErrors>({});
   const [verified, setVerified] = useState(false);
+  const catalogs = useCatalogs();
+  const conductorCiudades = useCiudades(conductor.cestado);
 
   // Rango de años del catálogo INMA
   const [anios, setAnios] = useState<number[]>([]);
@@ -144,17 +155,6 @@ export function VehicleStep() {
   // Refs para controlar el auto-select por OCR (no sobrescribir selección manual)
   const autoSelectedMarca  = useRef(false);
   const autoSelectedModelo = useRef(false);
-
-  const producto = new URLSearchParams(window.location.search).get('product') as 'rcv' | 'funerario' ?? 'rcv';
-  const { config } = useProductConfig(EMPRESA_ID, producto, 'formulario');
-  const isSeccionActiva = (seccion: string) => {
-    if (!config?.secciones) return true;
-    if (Array.isArray(config.secciones)) {
-      const found = config.secciones.find((s: any) => s.key === seccion);
-      return found ? found.activo : false;
-    }
-    return config.secciones[seccion]?.activo ?? true;
-  };
 
   const {
     marcas, modelos, versiones, categoriasUso,
@@ -252,8 +252,6 @@ export function VehicleStep() {
     if (!y || y < 1990) return;
     if (!vehicle.marca || !vehicle.modelo) return;
     if (vehicle.cmarca && vehicle.cmodelo) return; // ya tenemos códigos
-    // Con OCR: esperar a que cargue el listado de modelos (evita fijar "BR" vía /resolver)
-    if (ocrCert?.modelo && vehicle.cmarca && !vehicle.cmodelo) return;
 
     let cancelled = false;
     catalogoApi.resolver(y, vehicle.marca, vehicle.modelo)
@@ -315,7 +313,7 @@ export function VehicleStep() {
   }, [categoriasUso]);
 
   // ── Validación ────────────────────────────────────────────────────────────
-  const validate = async () => {
+  const validate = () => {
     const e: VehicleErrors = {};
     const req  = (v?: string) => !(v ?? '').trim();
     const len  = (v?: string) => (v ?? '').trim().length;
@@ -367,27 +365,19 @@ export function VehicleStep() {
       if (!licencia) {
         e.cond_licencia = 'El número de licencia es obligatorio';
       }
+      if (req(conductor.identificacion)) e.cond_identificacion = 'La identificación es obligatoria';
+      if (req(conductor.telefono))       e.cond_telefono       = 'El teléfono es obligatorio';
+      if (req(conductor.sexo))           e.cond_sexo           = 'El sexo es obligatorio';
+      if (req(conductor.estadoCivil))    e.cond_estadoCivil    = 'El estado civil es obligatorio';
+      if (req(conductor.estado))         e.cond_estado         = 'El estado es obligatorio';
+      if (req(conductor.ciudad))         e.cond_ciudad         = 'La ciudad es obligatoria';
+      if (req(conductor.direccion))      e.cond_direccion      = 'La dirección es obligatoria';
 
       void digs; // usado en validaciones adicionales si se requieren
     }
 
-    if (Object.keys(e).length > 0) {
-      setErrors(e);
-      return false;
-    }
-
-    // Validación asíncrona de póliza vigente
-    if (vehicle.placa && vehicle.serial) {
-      const res = await validateVehicle(vehicle.placa, vehicle.serial);
-      if (!res.success) {
-        toast.error('Vehículo asegurado', res.message || 'La placa o serial ya tienen póliza vigente.');
-        setErrors({ placa: 'Ya asegurado', serial: 'Ya asegurado' });
-        return false;
-      }
-    }
-
     setErrors(e);
-    return true;
+    return Object.keys(e).length === 0;
   };
   (window as unknown as Record<string, unknown>).__validateStep3 = validate;
 
@@ -812,30 +802,74 @@ export function VehicleStep() {
       </SectionCard>
 
       {/* ── Conductor habitual ─────────────────────────────────────────────────── */}
-      {isSeccionActiva('conductor') && (
-        <SectionCard Icon={UserCog} title="¿Hay otro conductor?" description="Si alguien más conduce este vehículo con frecuencia, regístralo aquí">
-          <ToggleSwitch
-            checked={hasDriver} onChange={setHasDriver}
-            label="Sí, hay otra persona que lo maneja"
-            description="Puede ser un familiar, empleado o cualquier persona que utilice el vehículo con regularidad."
-          />
-          {hasDriver && (
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
-              <Field label="Nombre del conductor *" error={errors.cond_nombre}>
-                <Input
-                  value={conductor.nombre}
-                  onChange={(e) => setConductor({ nombre: e.target.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '') })}
-                  placeholder="Nombre"
+      <SectionCard Icon={UserCog} title="¿Hay otro conductor?" description="Si alguien más conduce este vehículo con frecuencia, regístralo aquí">
+        <ToggleSwitch
+          checked={hasDriver} onChange={setHasDriver}
+          label="Sí, hay otra persona que lo maneja"
+          description="Puede ser un familiar, empleado o cualquier persona que utilice el vehículo con regularidad."
+        />
+        {hasDriver && (
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+              <Field label="Cédula o documento *" error={errors.cond_identificacion}>
+                <IdentityInput
+                  tipoDoc={conductor.tipoDoc ?? 'V'}
+                  identificacion={conductor.identificacion}
+                  onTipoDocChange={(v) => setConductor({ tipoDoc: v })}
+                  onIdentificacionChange={(v) => setConductor({ identificacion: v })}
                 />
               </Field>
-              <Field label="Apellido del conductor *" error={errors.cond_apellido}>
-                <Input
-                  value={conductor.apellido}
-                  onChange={(e) => setConductor({ apellido: e.target.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '') })}
-                  placeholder="Apellido"
+              <div className="hidden sm:block"></div>
+              <Field label="Nombre *" error={errors.cond_nombre}>
+                <Input value={conductor.nombre} onChange={(e) => setConductor({ nombre: String(e.target.value).replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '') })} placeholder="Nombre" />
+              </Field>
+              <Field label="Apellido *" error={errors.cond_apellido}>
+                <Input value={conductor.apellido} onChange={(e) => setConductor({ apellido: String(e.target.value).replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '') })} placeholder="Apellido" />
+              </Field>
+              <Field label="Teléfono *" error={errors.cond_telefono}>
+                <Input value={conductor.telefono ?? ''} onChange={(e) => setConductor({ telefono: formatTelefono(e.target.value) })} placeholder="04121234567" type="tel" maxLength={11} />
+              </Field>
+              <Field label="Correo electrónico" error={errors.cond_email}>
+                <Input value={conductor.email ?? ''} onChange={(e) => setConductor({ email: e.target.value })} placeholder="correo@ejemplo.com" type="email" />
+              </Field>
+              <Field label="Estado *" error={errors.cond_estado}>
+                <SearchSelect
+                  value={conductor.cestado}
+                  options={catalogs.estados.map((s) => ({ value: String(s.code), label: s.label }))}
+                  onChange={(code, label) => setConductor({ estado: label, cestado: code ? Number(code) : undefined, ciudad: '', cciudad: undefined })}
+                  placeholder="Escribe para buscar estado..." loading={catalogs.loading}
                 />
               </Field>
-              <Field label="Número de licencia de conducir *" error={errors.cond_licencia}>
+              <Field label="Ciudad *" error={errors.cond_ciudad} hint={conductor.cestado ? '' : 'Selecciona primero el estado'}>
+                <SearchSelect
+                  value={conductor.cciudad}
+                  options={conductorCiudades.ciudades.map((c) => ({ value: String(c.code), label: c.label }))}
+                  onChange={(code, label) => setConductor({ ciudad: label, cciudad: code ? Number(code) : undefined })}
+                  placeholder={conductor.cestado ? 'Escribe para buscar ciudad...' : 'Selecciona primero el estado'}
+                  disabled={!conductor.cestado} loading={conductorCiudades.loading}
+                />
+              </Field>
+              <Field label="Fecha de nacimiento *">
+                <Input value={conductor.fechaNac ?? ''} onChange={(e) => setConductor({ fechaNac: e.target.value })} type="date" />
+              </Field>
+              <Field label="Sexo *" error={errors.cond_sexo}>
+                <SearchSelect
+                  value={conductor.sexo}
+                  options={catalogs.sexos.length > 0 ? catalogs.sexos.map((s) => ({ value: String(s.label), label: s.label })) : [{ value: 'Femenino', label: 'Femenino' }, { value: 'Masculino', label: 'Masculino' }]}
+                  onChange={(value) => setConductor({ sexo: value })} placeholder="— Seleccionar —" loading={catalogs.loading}
+                />
+              </Field>
+              <Field label="Estado civil *" error={errors.cond_estadoCivil}>
+                <SearchSelect
+                  value={conductor.estadoCivil}
+                  options={catalogs.estadosCivil.length > 0 ? catalogs.estadosCivil.map((s) => ({ value: String(s.label), label: s.label })) : [{ value: 'Soltero(a)', label: 'Soltero(a)' }, { value: 'Casado(a)', label: 'Casado(a)' }, { value: 'Divorciado(a)', label: 'Divorciado(a)' }, { value: 'Viudo(a)', label: 'Viudo(a)' }]}
+                  onChange={(value) => setConductor({ estadoCivil: value })} placeholder="— Seleccionar —" loading={catalogs.loading}
+                />
+              </Field>
+              <div className="hidden sm:block"></div>
+              <Field label="Dirección *" error={errors.cond_direccion} full>
+                <Textarea value={conductor.direccion ?? ''} onChange={(e) => setConductor({ direccion: e.target.value })} placeholder="Dirección completa" rows={2} />
+              </Field>
+              <Field label="Número de licencia de conducir *" error={errors.cond_licencia} full>
                 <Input
                   value={conductor.licencia ?? ''}
                   onChange={(e) => setConductor({ licencia: e.target.value.toUpperCase() })}
@@ -843,25 +877,9 @@ export function VehicleStep() {
                   className="uppercase font-mono tracking-wider"
                 />
               </Field>
-              <Field label="¿Qué relación tiene contigo?">
-                <Select
-                  value={conductor.parentesco ?? ''}
-                  onChange={(e) => setConductor({ parentesco: e.target.value })}
-                >
-                  <option value="">— Opcional —</option>
-                  <option value="Conyuge">Cónyuge</option>
-                  <option value="Hijo">Hijo / Hija</option>
-                  <option value="Padre">Padre / Madre</option>
-                  <option value="Hermano">Hermano / Hermana</option>
-                  <option value="Empleado">Empleado / Chofer</option>
-                  <option value="Amigo">Amigo / Conocido</option>
-                  <option value="Otro">Otro parentesco</option>
-                </Select>
-              </Field>
-            </div>
-          )}
-        </SectionCard>
-      )}
+          </div>
+        )}
+      </SectionCard>
     </div>
   );
 }

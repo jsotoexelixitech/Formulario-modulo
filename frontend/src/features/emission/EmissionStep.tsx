@@ -1,11 +1,13 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useState, useRef } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
 import { Field, Input, Textarea } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { useCatalogs, useCiudades } from '../../hooks/useCatalogs';
-import { User, Wallet, ShieldAlert } from 'lucide-react';
+import { User, UserPlus, Heart, Wallet, ShieldAlert } from 'lucide-react';
+import { formatTelefono, isValidPhonePrefix } from '@exelixi/shared';
+
 
 export function SectionCard({
   title,
@@ -69,45 +71,42 @@ interface ValidationErrors {
   estado?: string;
   ciudad?: string;
   direccion?: string;
-  // Asegurado
-  aseg_nombre?: string;
-  aseg_apellido?: string;
-  aseg_identificacion?: string;
   // Pagador
   pag_nombre?: string;
   pag_apellido?: string;
   pag_identificacion?: string;
   pag_telefono?: string;
   pag_email?: string;
+  // Asegurado
+  aseg_nombre?: string;
+  aseg_apellido?: string;
+  aseg_identificacion?: string;
+  aseg_telefono?: string;
+  aseg_email?: string;
+  aseg_sexo?: string;
+  aseg_estadoCivil?: string;
+  aseg_estado?: string;
+  aseg_ciudad?: string;
+  aseg_direccion?: string;
   // Beneficiario
   benef_nombre?: string;
   benef_apellido?: string;
   benef_identificacion?: string;
-  benef_parentesco?: string;
+  benef_telefono?: string;
+  benef_email?: string;
+  benef_sexo?: string;
+  benef_estadoCivil?: string;
+  benef_estado?: string;
+  benef_ciudad?: string;
+  benef_direccion?: string;
 }
 
 const emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-import { formatTelefono, isValidPhonePrefix } from '@exelixi/shared';
-
-
-/** Aplica máscara visual al teléfono: (0414) 123-4567 */
-function maskPhone(v: string | undefined): string {
-  if (!v) return '';
-  let d = formatTelefono(v);
-  if (d.length <= 4) return d;
-  if (d.length <= 7) return `(${d.slice(0, 4)}) ${d.slice(4)}`;
-  return `(${d.slice(0, 4)}) ${d.slice(4, 7)}-${d.slice(7, 11)}`;
-}
 
 /** Solo letras, tildes, ñ y espacios */
 function onlyLetters(v: string): string {
   return v.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
 }
-
-import { useProductConfig } from '../../hooks/useProductConfig';
-
-const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
 export function EmissionStep() {
   const {
@@ -116,43 +115,15 @@ export function EmissionStep() {
     asegurado, setAsegurado,
     differentPayer, setDifferentPayer,
     pagador, setPagador,
-    hasBeneficiary,
-    beneficiario,
+    hasBeneficiary, setHasBeneficiary,
+    beneficiario, setBeneficiario,
   } = useWizardStore();
 
   const catalogs = useCatalogs();
   const ciudadesState = useCiudades(tomador.cestado);
+  const aseguradoCiudades = useCiudades(asegurado.cestado);
+  const beneficiarioCiudades = useCiudades(beneficiario.cestado);
   const [errors, setErrors] = useState<ValidationErrors>({});
-
-  const producto = new URLSearchParams(window.location.search).get('product') as 'rcv' | 'funerario' ?? 'rcv';
-  const { config } = useProductConfig(EMPRESA_ID, producto, 'formulario');
-
-  const isActivo = (campo: string) => {
-    if (!config?.campos) return true;
-    if (Array.isArray(config.campos)) {
-      const found = config.campos.find((c: any) => c.key === campo);
-      return found ? found.activo : false;
-    }
-    return config.campos[campo]?.activo ?? true;
-  };
-
-  const isObligatorio = (campo: string) => {
-    if (!config?.campos) return true;
-    if (Array.isArray(config.campos)) {
-      const found = config.campos.find((c: any) => c.key === campo);
-      return found ? found.obligatorio : false;
-    }
-    return config.campos[campo]?.obligatorio ?? true;
-  };
-
-  const isSeccionActiva = (seccion: string) => {
-    if (!config?.secciones) return true;
-    if (Array.isArray(config.secciones)) {
-      const found = config.secciones.find((s: any) => s.key === seccion);
-      return found ? found.activo : false;
-    }
-    return config.secciones[seccion]?.activo ?? true;
-  };
 
   const validate = () => {
     const e: ValidationErrors = {};
@@ -160,108 +131,87 @@ export function EmissionStep() {
     const len  = (v?: string) => (v ?? '').trim().length;
     const digs = (v?: string) => (v ?? '').replace(/\D/g, '').length;
 
-    const check = (campo: string, validator: () => void) => {
-      if (isActivo(campo)) {
-        validator();
-      }
-    };
-
     // ── Tomador ───────────────────────────────────────────────────────────
-    check('identificacion', () => {
-      if (req(tomador.identificacion)) {
-        if (isObligatorio('identificacion')) e.identificacion = 'La identificación es obligatoria';
-      } else if (digs(tomador.identificacion) < 6) {
-        e.identificacion = 'La identificación debe tener al menos 6 dígitos';
-      } else if (digs(tomador.identificacion) > 9) {
-        e.identificacion = 'La identificación no puede tener más de 9 dígitos';
-      }
-    });
+    if (req(tomador.identificacion)) {
+      e.identificacion = 'La identificación es obligatoria';
+    } else if (digs(tomador.identificacion) < 6) {
+      e.identificacion = 'La identificación debe tener al menos 6 dígitos';
+    } else if (digs(tomador.identificacion) > 9) {
+      e.identificacion = 'La identificación no puede tener más de 9 dígitos';
+    }
 
-    check('nombre', () => {
-      if (req(tomador.nombre)) {
-        if (isObligatorio('nombre')) e.nombre = 'El nombre es obligatorio';
-      } else if (len(tomador.nombre) < 2) {
-        e.nombre = 'El nombre debe tener al menos 2 caracteres';
-      } else if (len(tomador.nombre) > 50) {
-        e.nombre = 'El nombre no puede superar 50 caracteres';
-      }
-    });
+    if (req(tomador.nombre)) {
+      e.nombre = 'El nombre es obligatorio';
+    } else if (len(tomador.nombre) < 2) {
+      e.nombre = 'El nombre debe tener al menos 2 caracteres';
+    } else if (len(tomador.nombre) > 50) {
+      e.nombre = 'El nombre no puede superar 50 caracteres';
+    }
 
-    check('apellido', () => {
-      if (req(tomador.apellido)) {
-        if (isObligatorio('apellido')) e.apellido = 'El apellido es obligatorio';
-      } else if (len(tomador.apellido) < 2) {
-        e.apellido = 'El apellido debe tener al menos 2 caracteres';
-      } else if (len(tomador.apellido) > 50) {
-        e.apellido = 'El apellido no puede superar 50 caracteres';
-      }
-    });
+    if (req(tomador.apellido)) {
+      e.apellido = 'El apellido es obligatorio';
+    } else if (len(tomador.apellido) < 2) {
+      e.apellido = 'El apellido debe tener al menos 2 caracteres';
+    } else if (len(tomador.apellido) > 50) {
+      e.apellido = 'El apellido no puede superar 50 caracteres';
+    }
 
-    check('sexo', () => { if (req(tomador.sexo) && isObligatorio('sexo')) e.sexo = 'Selecciona el sexo'; });
-    check('estadoCivil', () => { if (req(tomador.estadoCivil) && isObligatorio('estadoCivil')) e.estadoCivil = 'Selecciona el estado civil'; });
+    if (req(tomador.sexo))       e.sexo        = 'Selecciona el sexo';
+    if (req(tomador.estadoCivil)) e.estadoCivil = 'Selecciona el estado civil';
 
-    check('telefono', () => {
-      if (req(tomador.telefono)) {
-        if (isObligatorio('telefono')) e.telefono = 'El teléfono es obligatorio';
-      } else if (digs(tomador.telefono) !== 11) {
-        e.telefono = 'El teléfono debe tener exactamente 11 dígitos (ej. 04121234567)';
-      } else if (!isValidPhonePrefix(tomador.telefono || '')) {
-        e.telefono = 'El prefijo debe ser válido en Venezuela (ej. 0414, 0412, 0212)';
-      }
-    });
+    if (req(tomador.telefono)) {
+      e.telefono = 'El teléfono es obligatorio';
+    } else if (digs(tomador.telefono) !== 11) {
+      e.telefono = 'El teléfono debe tener exactamente 11 dígitos (ej. 04121234567)';
+    } else if (!isValidPhonePrefix(tomador.telefono || '')) {
+      e.telefono = 'El prefijo debe ser válido en Venezuela (ej. 0414, 0412, 0212)';
+    }
 
-    check('email', () => {
-      if (req(tomador.email)) {
-        if (isObligatorio('email')) e.email = 'El correo electrónico es obligatorio';
-      } else if (len(tomador.email) < 5) {
-        e.email = 'El correo debe tener al menos 5 caracteres';
-      } else if (len(tomador.email) > 50) {
-        e.email = 'El correo no puede superar 50 caracteres';
-      } else if (!emailRe.test(tomador.email.trim())) {
-        e.email = 'Ingresa un correo válido (ej. usuario@dominio.com)';
-      }
-    });
+    if (req(tomador.email)) {
+      e.email = 'El correo electrónico es obligatorio';
+    } else if (len(tomador.email) < 5) {
+      e.email = 'El correo debe tener al menos 5 caracteres';
+    } else if (len(tomador.email) > 50) {
+      e.email = 'El correo no puede superar 50 caracteres';
+    } else if (!emailRe.test(tomador.email.trim())) {
+      e.email = 'Ingresa un correo válido (ej. usuario@dominio.com)';
+    }
 
-    check('email2', () => {
-      if (req(tomador.email2)) {
-        if (isObligatorio('email2')) e.email2 = 'Confirma tu correo electrónico';
-      } else if (!emailRe.test(tomador.email2.trim())) {
-        e.email2 = 'Ingresa un correo válido para confirmar';
-      } else if (tomador.email.trim() !== tomador.email2.trim()) {
-        e.email2 = 'Los correos no coinciden';
-      }
-    });
+    if (req(tomador.email2)) {
+      e.email2 = 'Confirma tu correo electrónico';
+    } else if (!emailRe.test(tomador.email2.trim())) {
+      e.email2 = 'Ingresa un correo válido para confirmar';
+    } else if (tomador.email.trim() !== tomador.email2.trim()) {
+      e.email2 = 'Los correos no coinciden';
+    }
 
-    check('fechaNac', () => {
-      if (req(tomador.fechaNac)) {
-        if (isObligatorio('fechaNac')) e.fechaNac = 'La fecha de nacimiento es obligatoria';
-      } else if (new Date(tomador.fechaNac) > new Date()) {
-        e.fechaNac = 'La fecha de nacimiento no puede ser mayor a hoy';
-      }
-    });
+    if (req(tomador.fechaNac)) e.fechaNac = 'La fecha de nacimiento es obligatoria';
+    if (req(tomador.estado))   e.estado   = 'El estado es obligatorio';
+    if (req(tomador.ciudad))   e.ciudad   = 'La ciudad es obligatoria';
 
-    check('estado', () => { if (req(tomador.estado) && isObligatorio('estado')) e.estado = 'El estado es obligatorio'; });
-    check('ciudad', () => { if (req(tomador.ciudad) && isObligatorio('ciudad')) e.ciudad = 'La ciudad es obligatoria'; });
-
-    check('direccion', () => {
-      if (req(tomador.direccion)) {
-        if (isObligatorio('direccion')) e.direccion = 'La dirección es obligatoria';
-      } else if (len(tomador.direccion) < 5) {
-        e.direccion = 'La dirección debe tener al menos 5 caracteres';
-      } else if (len(tomador.direccion) > 200) {
-        e.direccion = 'La dirección no puede superar 200 caracteres';
-      }
-    });
+    if (req(tomador.direccion)) {
+      e.direccion = 'La dirección es obligatoria';
+    } else if (len(tomador.direccion) < 5) {
+      e.direccion = 'La dirección debe tener al menos 5 caracteres';
+    } else if (len(tomador.direccion) > 200) {
+      e.direccion = 'La dirección no puede superar 200 caracteres';
+    }
 
     // ── Asegurado (solo si está habilitado) ───────────────────────────────
-    if (isSeccionActiva('asegurado') && !sameInsured) {
+    if (!sameInsured) {
       if (req(asegurado.nombre))         e.aseg_nombre         = 'El nombre es obligatorio';
       if (req(asegurado.apellido))       e.aseg_apellido       = 'El apellido es obligatorio';
       if (req(asegurado.identificacion)) e.aseg_identificacion = 'La identificación es obligatoria';
+      if (req(asegurado.telefono))       e.aseg_telefono       = 'El teléfono es obligatorio';
+      if (req(asegurado.sexo))           e.aseg_sexo           = 'El sexo es obligatorio';
+      if (req(asegurado.estadoCivil))    e.aseg_estadoCivil    = 'El estado civil es obligatorio';
+      if (req(asegurado.estado))         e.aseg_estado         = 'El estado es obligatorio';
+      if (req(asegurado.ciudad))         e.aseg_ciudad         = 'La ciudad es obligatoria';
+      if (req(asegurado.direccion))      e.aseg_direccion      = 'La dirección es obligatoria';
     }
 
     // ── Pagador (solo si NO eres quien paga) ──────────────────────────────
-    if (isSeccionActiva('pagador') && differentPayer) {
+    if (differentPayer) {
       if (req(pagador.nombre)) {
         e.pag_nombre = 'El nombre del pagador es obligatorio';
       } else if (len(pagador.nombre) < 2) {
@@ -295,34 +245,43 @@ export function EmissionStep() {
     }
 
     // ── Beneficiario (solo si está habilitado) ────────────────────────────
-    if (isSeccionActiva('beneficiario') && hasBeneficiary) {
+    if (hasBeneficiary) {
       if (req(beneficiario.nombre))         e.benef_nombre         = 'El nombre es obligatorio';
       if (req(beneficiario.apellido))       e.benef_apellido       = 'El apellido es obligatorio';
       if (req(beneficiario.identificacion)) e.benef_identificacion = 'La identificación es obligatoria';
-      if (req(beneficiario.parentesco))     e.benef_parentesco     = 'El parentesco es obligatorio';
+      if (req(beneficiario.telefono))       e.benef_telefono       = 'El teléfono es obligatorio';
+      if (req(beneficiario.sexo))           e.benef_sexo           = 'El sexo es obligatorio';
+      if (req(beneficiario.estadoCivil))    e.benef_estadoCivil    = 'El estado civil es obligatorio';
+      if (req(beneficiario.estado))         e.benef_estado         = 'El estado es obligatorio';
+      if (req(beneficiario.ciudad))         e.benef_ciudad         = 'La ciudad es obligatoria';
+      if (req(beneficiario.direccion))      e.benef_direccion      = 'La dirección es obligatoria';
     }
 
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  // ── Orden dinámico de campos ────────────────────────────────────────────
-  // Extraemos el orden directamente de la configuración (si es array) o de
-  // las claves (si es objeto legacy). Si no hay config, usamos un default.
-  let fieldOrder: string[] = [];
-  if (config?.campos) {
-    if (Array.isArray(config.campos)) {
-      fieldOrder = config.campos.map((c: any) => c.key);
-    } else {
-      fieldOrder = Object.keys(config.campos);
-    }
-  } else {
-    fieldOrder = [
+  // ── Orden fijo de campos ────────────────────────────────────────────────
+  // Se calcula UNA SOLA VEZ al montar (con datos OCR que ya estaban pre-
+  // cargados). De esta forma los campos nunca saltan de posición mientras
+  // el usuario escribe. Si el campo estaba lleno al abrir → va arriba;
+  // si estaba vacío → va abajo. Esa posición no vuelve a cambiar.
+  const has = (v?: string) => Boolean((v ?? '').trim());
+  const initialOrderRef = useRef<string[] | null>(null);
+  if (initialOrderRef.current === null) {
+    const ALL_KEYS = [
       'identificacion', 'nombre', 'apellido', 'telefono',
       'email', 'email2', 'fechaNac', 'sexo', 'estadoCivil',
       'estado', 'ciudad', 'direccion',
     ];
+    const filled  = ALL_KEYS.filter((k) => {
+      if (k === 'email2') return has(tomador.email);
+      return has((tomador as unknown as Record<string, string>)[k]);
+    });
+    const unfilled = ALL_KEYS.filter((k) => !filled.includes(k));
+    initialOrderRef.current = [...filled, ...unfilled];
   }
+  const fieldOrder = initialOrderRef.current;
 
   (window as unknown as Record<string, unknown>).__validateStep2 = validate;
 
@@ -361,12 +320,12 @@ export function EmissionStep() {
     telefono: (
       <Field label="Teléfono *" error={errors.telefono} hint="Exactamente 11 dígitos, ej. 04121234567">
         <Input
-          value={maskPhone(tomador.telefono)}
+          value={tomador.telefono}
           onChange={(e) => setTomador({ telefono: formatTelefono(e.target.value) })}
-          placeholder="(0412) 123-4567"
+          placeholder="04121234567"
           type="tel"
           inputMode="numeric"
-          maxLength={15}
+          maxLength={11}
         />
       </Field>
     ),
@@ -501,80 +460,11 @@ export function EmissionStep() {
           description="Necesitamos saber quién está contratando el seguro"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {fieldOrder.filter(k => isActivo(k)).map((key) => (
+            {fieldOrder.map((key) => (
               <Fragment key={key}>{tomadorFieldMap[key]}</Fragment>
             ))}
           </div>
         </SectionCard>
-
-        {/* Asegurado Titular */}
-        {isSeccionActiva('asegurado') && (
-          <SectionCard
-            Icon={User}
-            title="¿Quién es el asegurado titular?"
-            description="La persona a la que protegerá la póliza."
-          >
-            <ToggleSwitch
-              checked={sameInsured}
-              onChange={(v) => setSameInsured(v)}
-              label="Yo seré el asegurado titular"
-              description="Usaremos los datos personales que llenaste arriba."
-            />
-            {!sameInsured && (
-              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
-                <Field label="Nombre *" error={errors.aseg_nombre}>
-                  <Input
-                    value={asegurado.nombre}
-                    onChange={(e) => setAsegurado({ nombre: onlyLetters(e.target.value) })}
-                    placeholder="Nombre"
-                  />
-                </Field>
-                <Field label="Apellido *" error={errors.aseg_apellido}>
-                  <Input
-                    value={asegurado.apellido}
-                    onChange={(e) => setAsegurado({ apellido: onlyLetters(e.target.value) })}
-                    placeholder="Apellido"
-                  />
-                </Field>
-                <Field label="Cédula o documento *" error={errors.aseg_identificacion}>
-                  <IdentityInput
-                    tipoDoc={asegurado.tipoDoc ?? 'V'}
-                    identificacion={asegurado.identificacion}
-                    onTipoDocChange={(v) => setAsegurado({ tipoDoc: v })}
-                    onIdentificacionChange={(v) => setAsegurado({ identificacion: v })}
-                  />
-                </Field>
-                <Field label="Fecha de nacimiento (Opcional)">
-                  <Input
-                    value={asegurado.fechaNac ?? ''}
-                    onChange={(e) => setAsegurado({ fechaNac: e.target.value })}
-                    type="date"
-                    max={new Date().toISOString().split('T')[0]}
-                  />
-                </Field>
-                <Field label="Teléfono (Opcional)" hint="Ej. 04121234567">
-                  <Input
-                    value={maskPhone(asegurado.telefono)}
-                    onChange={(e) => setAsegurado({ telefono: formatTelefono(e.target.value) })}
-                    placeholder="(0412) 123-4567"
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={15}
-                  />
-                </Field>
-                <Field label="Correo (Opcional)">
-                  <Input
-                    value={asegurado.email ?? ''}
-                    onChange={(e) => setAsegurado({ email: e.target.value })}
-                    placeholder="correo@ejemplo.com"
-                    type="email"
-                    inputMode="email"
-                  />
-                </Field>
-              </div>
-            )}
-          </SectionCard>
-        )}
 
         {/* Persona Políticamente Expuesta — declaración legal requerida por La Mundial */}
         <SectionCard
@@ -596,7 +486,6 @@ export function EmissionStep() {
         </SectionCard>
 
         {/* Pagador */}
-        {isSeccionActiva('pagador') && (
         <SectionCard
           Icon={Wallet}
           title="¿Eres quien paga la póliza?"
@@ -635,12 +524,12 @@ export function EmissionStep() {
               </Field>
               <Field label="Teléfono del pagador *" error={errors.pag_telefono} hint="Solo dígitos, ej. 04121234567">
                 <Input
-                  value={maskPhone(pagador.telefono)}
+                  value={pagador.telefono ?? ''}
                   onChange={(e) => setPagador({ telefono: formatTelefono(e.target.value) })}
-                  placeholder="(0412) 123-4567"
+                  placeholder="04121234567"
                   type="tel"
                   inputMode="numeric"
-                  maxLength={15}
+                  maxLength={11}
                 />
               </Field>
               <Field label="Correo electrónico (opcional)" error={errors.pag_email} full>
@@ -655,9 +544,162 @@ export function EmissionStep() {
             </div>
           )}
         </SectionCard>
+
+        {true && (
+        <SectionCard
+          Icon={UserPlus}
+          title="Datos de la persona que será asegurada (Titular)"
+          description="Completa la información de la persona asegurada."
+        >
+          <ToggleSwitch
+            checked={!sameInsured}
+            onChange={(v) => setSameInsured(!v)}
+            label="¿La persona que pagará la Póliza es diferente a la que será asegurada?"
+          />
+
+          {!sameInsured && (
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+              <Field label="Cédula o documento *" error={errors.aseg_identificacion}>
+                <IdentityInput
+                  tipoDoc={asegurado.tipoDoc ?? 'V'}
+                  identificacion={asegurado.identificacion}
+                  onTipoDocChange={(v) => setAsegurado({ tipoDoc: v })}
+                  onIdentificacionChange={(v) => setAsegurado({ identificacion: v })}
+                />
+              </Field>
+              <div className="hidden sm:block"></div>
+              <Field label="Nombre *" error={errors.aseg_nombre}>
+                <Input value={asegurado.nombre} onChange={(e) => setAsegurado({ nombre: onlyLetters(e.target.value) })} placeholder="Nombre" />
+              </Field>
+              <Field label="Apellido *" error={errors.aseg_apellido}>
+                <Input value={asegurado.apellido} onChange={(e) => setAsegurado({ apellido: onlyLetters(e.target.value) })} placeholder="Apellido" />
+              </Field>
+              <Field label="Teléfono *" error={errors.aseg_telefono}>
+                <Input value={asegurado.telefono ?? ''} onChange={(e) => setAsegurado({ telefono: formatTelefono(e.target.value) })} placeholder="04121234567" type="tel" maxLength={11} />
+              </Field>
+              <Field label="Correo electrónico" error={errors.aseg_email}>
+                <Input value={asegurado.email ?? ''} onChange={(e) => setAsegurado({ email: e.target.value })} placeholder="correo@ejemplo.com" type="email" />
+              </Field>
+              <Field label="Estado donde vive *" error={errors.aseg_estado}>
+                <SearchSelect
+                  value={asegurado.cestado}
+                  options={catalogs.estados.map((s) => ({ value: String(s.code), label: s.label }))}
+                  onChange={(code, label) => setAsegurado({ estado: label, cestado: code ? Number(code) : undefined, ciudad: '', cciudad: undefined })}
+                  placeholder="Escribe para buscar estado..." loading={catalogs.loading}
+                />
+              </Field>
+              <Field label="Ciudad donde vive *" error={errors.aseg_ciudad} hint={asegurado.cestado ? '' : 'Selecciona primero el estado'}>
+                <SearchSelect
+                  value={asegurado.cciudad}
+                  options={aseguradoCiudades.ciudades.map((c) => ({ value: String(c.code), label: c.label }))}
+                  onChange={(code, label) => setAsegurado({ ciudad: label, cciudad: code ? Number(code) : undefined })}
+                  placeholder={asegurado.cestado ? 'Escribe para buscar ciudad...' : 'Selecciona primero el estado'}
+                  disabled={!asegurado.cestado} loading={aseguradoCiudades.loading}
+                />
+              </Field>
+              <Field label="Fecha de nacimiento *">
+                <Input value={asegurado.fechaNac ?? ''} onChange={(e) => setAsegurado({ fechaNac: e.target.value })} type="date" />
+              </Field>
+              <Field label="Sexo *" error={errors.aseg_sexo}>
+                <SearchSelect
+                  value={asegurado.sexo}
+                  options={catalogs.sexos.length > 0 ? catalogs.sexos.map((s) => ({ value: String(s.label), label: s.label })) : [{ value: 'Femenino', label: 'Femenino' }, { value: 'Masculino', label: 'Masculino' }]}
+                  onChange={(value) => setAsegurado({ sexo: value })} placeholder="— Seleccionar —" loading={catalogs.loading}
+                />
+              </Field>
+              <Field label="Estado civil *" error={errors.aseg_estadoCivil}>
+                <SearchSelect
+                  value={asegurado.estadoCivil}
+                  options={catalogs.estadosCivil.length > 0 ? catalogs.estadosCivil.map((s) => ({ value: String(s.label), label: s.label })) : [{ value: 'Soltero(a)', label: 'Soltero(a)' }, { value: 'Casado(a)', label: 'Casado(a)' }, { value: 'Divorciado(a)', label: 'Divorciado(a)' }, { value: 'Viudo(a)', label: 'Viudo(a)' }]}
+                  onChange={(value) => setAsegurado({ estadoCivil: value })} placeholder="— Seleccionar —" loading={catalogs.loading}
+                />
+              </Field>
+              <div className="hidden sm:block"></div>
+              <Field label="Dirección *" error={errors.aseg_direccion} full>
+                <Textarea value={asegurado.direccion ?? ''} onChange={(e) => setAsegurado({ direccion: e.target.value })} placeholder="Dirección completa" rows={2} />
+              </Field>
+            </div>
+          )}
+        </SectionCard>
         )}
 
+        {true && (
+        <SectionCard
+          Icon={Heart}
+          title="Datos del Beneficiario Preferencial"
+          description="Persona que recibe beneficios en caso de siniestro"
+        >
+          <ToggleSwitch
+            checked={hasBeneficiary}
+            onChange={setHasBeneficiary}
+            label="¿Desea agregar un beneficiario preferencial a la póliza?"
+          />
 
+          {hasBeneficiary && (
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+              <Field label="Cédula o documento *" error={errors.benef_identificacion}>
+                <IdentityInput
+                  tipoDoc={beneficiario.tipoDoc ?? 'V'}
+                  identificacion={beneficiario.identificacion}
+                  onTipoDocChange={(v) => setBeneficiario({ tipoDoc: v })}
+                  onIdentificacionChange={(v) => setBeneficiario({ identificacion: v })}
+                />
+              </Field>
+              <div className="hidden sm:block"></div>
+              <Field label="Nombre *" error={errors.benef_nombre}>
+                <Input value={beneficiario.nombre} onChange={(e) => setBeneficiario({ nombre: onlyLetters(e.target.value) })} placeholder="Nombre" />
+              </Field>
+              <Field label="Apellido *" error={errors.benef_apellido}>
+                <Input value={beneficiario.apellido} onChange={(e) => setBeneficiario({ apellido: onlyLetters(e.target.value) })} placeholder="Apellido" />
+              </Field>
+              <Field label="Teléfono *" error={errors.benef_telefono}>
+                <Input value={beneficiario.telefono ?? ''} onChange={(e) => setBeneficiario({ telefono: formatTelefono(e.target.value) })} placeholder="04121234567" type="tel" maxLength={11} />
+              </Field>
+              <Field label="Correo electrónico" error={errors.benef_email}>
+                <Input value={beneficiario.email ?? ''} onChange={(e) => setBeneficiario({ email: e.target.value })} placeholder="correo@ejemplo.com" type="email" />
+              </Field>
+              <Field label="Estado *" error={errors.benef_estado}>
+                <SearchSelect
+                  value={beneficiario.cestado}
+                  options={catalogs.estados.map((s) => ({ value: String(s.code), label: s.label }))}
+                  onChange={(code, label) => setBeneficiario({ estado: label, cestado: code ? Number(code) : undefined, ciudad: '', cciudad: undefined })}
+                  placeholder="Escribe para buscar estado..." loading={catalogs.loading}
+                />
+              </Field>
+              <Field label="Ciudad *" error={errors.benef_ciudad} hint={beneficiario.cestado ? '' : 'Selecciona primero el estado'}>
+                <SearchSelect
+                  value={beneficiario.cciudad}
+                  options={beneficiarioCiudades.ciudades.map((c) => ({ value: String(c.code), label: c.label }))}
+                  onChange={(code, label) => setBeneficiario({ ciudad: label, cciudad: code ? Number(code) : undefined })}
+                  placeholder={beneficiario.cestado ? 'Escribe para buscar ciudad...' : 'Selecciona primero el estado'}
+                  disabled={!beneficiario.cestado} loading={beneficiarioCiudades.loading}
+                />
+              </Field>
+              <Field label="Fecha de nacimiento *">
+                <Input value={beneficiario.fechaNac ?? ''} onChange={(e) => setBeneficiario({ fechaNac: e.target.value })} type="date" />
+              </Field>
+              <Field label="Sexo *" error={errors.benef_sexo}>
+                <SearchSelect
+                  value={beneficiario.sexo}
+                  options={catalogs.sexos.length > 0 ? catalogs.sexos.map((s) => ({ value: String(s.label), label: s.label })) : [{ value: 'Femenino', label: 'Femenino' }, { value: 'Masculino', label: 'Masculino' }]}
+                  onChange={(value) => setBeneficiario({ sexo: value })} placeholder="— Seleccionar —" loading={catalogs.loading}
+                />
+              </Field>
+              <Field label="Estado civil *" error={errors.benef_estadoCivil}>
+                <SearchSelect
+                  value={beneficiario.estadoCivil}
+                  options={catalogs.estadosCivil.length > 0 ? catalogs.estadosCivil.map((s) => ({ value: String(s.label), label: s.label })) : [{ value: 'Soltero(a)', label: 'Soltero(a)' }, { value: 'Casado(a)', label: 'Casado(a)' }, { value: 'Divorciado(a)', label: 'Divorciado(a)' }, { value: 'Viudo(a)', label: 'Viudo(a)' }]}
+                  onChange={(value) => setBeneficiario({ estadoCivil: value })} placeholder="— Seleccionar —" loading={catalogs.loading}
+                />
+              </Field>
+              <div className="hidden sm:block"></div>
+              <Field label="Dirección *" error={errors.benef_direccion} full>
+                <Textarea value={beneficiario.direccion ?? ''} onChange={(e) => setBeneficiario({ direccion: e.target.value })} placeholder="Dirección completa" rows={2} />
+              </Field>
+            </div>
+          )}
+        </SectionCard>
+        )}
       </div>
     </div>
   );
