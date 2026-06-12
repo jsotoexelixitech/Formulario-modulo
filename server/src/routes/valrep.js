@@ -257,13 +257,21 @@ router.post('/validate-vehicle', async (req, res) => {
     const data = response.data;
     console.log('[valrep/validate-vehicle] sysip-nest-api response:', JSON.stringify(data));
 
-    // sysip-nest-api responde: { status: false, error: '...' } cuando el vehículo ya está asegurado
-    const alreadyInsured = data && (data.status === false || (data.error && data.status !== true));
-    if (alreadyInsured) {
+    // sysip-nest-api responde con status: false para validaciones rechazadas o errores 400
+    const failedValidation = data && (data.status === false || (data.error && data.status !== true));
+    if (failedValidation) {
+      // Extraemos el mensaje real (ej. "La placa no debe exceder 7 caracteres") si existe
+      let errorMessage = 'Este vehículo ya cuenta con una póliza vigente en La Mundial.';
+      if (data.message) {
+        errorMessage = Array.isArray(data.message) ? data.message[0] : data.message;
+      } else if (data.error) {
+        errorMessage = data.error;
+      }
+
       return res.status(400).json({
         success: false,
         code: 'LAMUNDIAL_PLATE_ALREADY_INSURED',
-        message: data.error || 'Este vehículo ya cuenta con una póliza vigente en La Mundial.',
+        message: errorMessage,
       });
     }
 
