@@ -313,7 +313,7 @@ export function VehicleStep() {
   }, [categoriasUso]);
 
   // ── Validación ────────────────────────────────────────────────────────────
-  const validate = () => {
+  const validate = async () => {
     const e: VehicleErrors = {};
     const req  = (v?: string) => !(v ?? '').trim();
     const len  = (v?: string) => (v ?? '').trim().length;
@@ -377,7 +377,26 @@ export function VehicleStep() {
     }
 
     setErrors(e);
-    return Object.keys(e).length === 0;
+    
+    if (Object.keys(e).length > 0) {
+      return false;
+    }
+
+    // Validación remota
+    try {
+      const { validateVehicle } = await import('../../lib/api');
+      toast.info('Validando vehículo', 'Verificando con La Mundial...', 2000);
+      const res = await validateVehicle(vehicle.placa || '', vehicle.serial || '');
+      if (!res.success) {
+        toast.error('Atención', res.message || 'El vehículo no puede ser asegurado.', 6000);
+        return false;
+      }
+    } catch (err: any) {
+      toast.error('Error', 'No se pudo validar el vehículo con La Mundial.');
+      return false;
+    }
+
+    return true;
   };
   (window as unknown as Record<string, unknown>).__validateStep3 = validate;
 
