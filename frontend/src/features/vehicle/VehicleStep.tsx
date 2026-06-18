@@ -62,6 +62,8 @@ function findBestMatch<T>(
   return partial.reduce((best, cur) => (val(cur).length > val(best).length ? cur : best));
 }
 
+const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 interface VehicleErrors {
   placa?: string;
   año?: string;
@@ -372,7 +374,21 @@ export function VehicleStep() {
         e.cond_licencia = 'La licencia no puede superar 20 caracteres';
       }
       if (req(conductor.identificacion)) e.cond_identificacion = 'La identificación es obligatoria';
-      if (req(conductor.telefono))       e.cond_telefono       = 'El teléfono es obligatorio';
+
+      if (req(conductor.telefono)) {
+        e.cond_telefono = 'El teléfono es obligatorio';
+      } else if (digs(conductor.telefono) !== 11) {
+        e.cond_telefono = 'El teléfono debe tener exactamente 11 dígitos';
+      } else if (!isValidPhonePrefix(conductor.telefono || '')) {
+        e.cond_telefono = 'El prefijo debe ser válido en Venezuela';
+      }
+
+      if (req(conductor.email)) {
+        e.cond_email = 'El correo electrónico es obligatorio';
+      } else if (!emailRe.test((conductor.email || '').trim())) {
+        e.cond_email = 'Ingresa un correo válido';
+      }
+
       if (req(conductor.sexo))           e.cond_sexo           = 'El sexo es obligatorio';
       if (req(conductor.estadoCivil))    e.cond_estadoCivil    = 'El estado civil es obligatorio';
       if (req(conductor.estado))         e.cond_estado         = 'El estado es obligatorio';
