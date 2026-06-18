@@ -19,6 +19,10 @@ datos del tomador, del asegurado y del vehículo.
 ### Integración con otros módulos
 Los datos rellenados en este módulo alimentan el **Módulo Emisión** (cotización y emisión de póliza)
 y el **Módulo Pagos** (datos del tomador para la transacción).
+
+### Autenticación (OAuth 2.0)
+Este módulo está protegido. Debe incluir un **Access Token** en la cabecera HTTP \`Authorization: Bearer <token>\`.
+El token se obtiene intercambiando su **API Key** en el endpoint \`/api/access/token\` del servidor central (Nexus API).
       `.trim(),
       contact: {
         name: 'Exelixi / La Mundial de Seguros',
@@ -33,7 +37,20 @@ y el **Módulo Pagos** (datos del tomador para la transacción).
       { name: 'Catálogo Valrep', description: 'Listas de referencia de La Mundial (estados, ciudades, sexo…)' },
       { name: 'Sistema',         description: 'Estado del servicio' },
     ],
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
     components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Ingrese su Access Token temporal (obtenido desde Nexus API vía /api/access/token)',
+        },
+      },
       schemas: {
         CatalogItem: {
           type: 'object',
