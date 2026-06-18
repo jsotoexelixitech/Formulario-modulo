@@ -395,10 +395,12 @@ export function VehicleStep() {
       const res = await validateVehicle(vehicle.placa || '', vehicle.serial || '');
       if (!res.success) {
         toast.error('Atención', res.message || 'El vehículo no puede ser asegurado.', 6000);
+        setErrors({ ...e, placa: res.message, serial: res.message });
         return false;
       }
     } catch (err: any) {
       toast.error('Error', 'No se pudo validar el vehículo con La Mundial.');
+      setErrors({ ...e, placa: 'No se pudo validar', serial: 'No se pudo validar' });
       return false;
     }
 
