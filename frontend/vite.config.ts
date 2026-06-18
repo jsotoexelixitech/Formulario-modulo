@@ -11,6 +11,8 @@ export default defineConfig(({ mode }) => {
   const proxy = {
     '/api': { target: 'http://localhost:4002', changeOrigin: true },
     '/files': { target: 'http://localhost:4002', changeOrigin: true },
+    '/docs': { target: 'http://localhost:4002', changeOrigin: true },
+    '/docs.json': { target: 'http://localhost:4002', changeOrigin: true },
   }
 
   return {
