@@ -1,8 +1,7 @@
 /**
  * /api/valrep — Catálogos de estados, ciudades y dominios.
  *
- * Fuente: sysip-nest-api (puerto 3002) que actúa como proxy centralizado a Sis2000.
- * Este módulo NO se conecta directamente a Sis2000.
+ * Fuente: sysip-nest-api (puerto 3002) — API central de Exelixi.
  *
  * Endpoints expuestos:
  *   GET /api/valrep/state          → estados (→ sysip-nest-api GET /api/v1/valrep/states)

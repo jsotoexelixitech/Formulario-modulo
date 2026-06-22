@@ -1,8 +1,7 @@
 /**
  * Rutas de catálogos INMA (vehículos) — Módulo Formulario.
  *
- * Fuente: sysip-nest-api (puerto 3002) que actúa como proxy centralizado a Sis2000.
- * Este módulo NO se conecta directamente a Sis2000.
+ * Fuente: sysip-nest-api (puerto 3002) — API central de Exelixi.
  *
  * Cascada: anios → marcas (por año) → modelos → versiones → categorias-uso.
  *
