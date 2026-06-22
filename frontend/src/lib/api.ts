@@ -243,6 +243,8 @@ export interface VerifyMobilePaymentPayload {
   amount: number;
   /** Fecha y hora del pago en ISO 8601 (ej. "2025-12-02T13:30:00") */
   paidOn: string;
+  /** Cédula o RIF del pagador */
+  cci_rif?: string;
 }
 
 export interface VerifyMobilePaymentResponse {

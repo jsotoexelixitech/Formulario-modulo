@@ -78,6 +78,7 @@ export function PaymentStep() {
   const [montoPagoM,   setMontoM]    = useState('');
   const [fechaPagoM,   setFechaM]    = useState('');
   const [horaPagoM,    setHoraM]     = useState('');
+  const [cedulaPago,   setCedulaPago]= useState('');
 
   const [verifyStatus, setVerifyStatus] = useState<VerifyStatus>('idle');
   const [verifyResult, setVerifyResult] = useState<VerifyMobilePaymentResponse | null>(null);
@@ -156,6 +157,7 @@ export function PaymentStep() {
   const movErrors = {
     banco    : !bankCode                                          ? 'Selecciona el banco'                : '',
     telefono : telefonoPago.length > 0 && !/^04\d{9}$/.test(telefonoPago) ? 'Formato inválido: 04XXXXXXXXX' : !telefonoPago ? 'El teléfono es obligatorio' : '',
+    cedula   : cedulaPago.length > 0 && !/^[VEJPGvejpg]-?\d+$/.test(cedulaPago) ? 'Formato inválido (Ej: V-12345678)' : !cedulaPago ? 'La cédula/RIF es obligatoria' : '',
     monto    : !montoPagoM                                        ? 'El monto es obligatorio'            : isNaN(parseFloat(montoPagoM)) || parseFloat(montoPagoM) <= 0 ? 'Monto inválido' : '',
     fecha    : !fechaPagoM                                        ? 'La fecha es obligatoria'            : '',
     hora     : !horaPagoM                                        ? 'La hora es obligatoria'             : '',
@@ -177,6 +179,7 @@ export function PaymentStep() {
         bankCode,
         amount            : parseFloat(montoPagoM),
         paidOn,
+        cci_rif           : cedulaPago.toUpperCase(),
       });
 
       setVerifyResult(result);
@@ -432,6 +435,14 @@ export function PaymentStep() {
                   value={fechaPagoM}
                   onChange={(e) => { setFechaM(e.target.value); setVerifyStatus('idle'); }}
                   max={TODAY_ISO}
+                />
+              </Field>
+
+              <Field label="Cédula/RIF del titular de la cuenta" hint="Ej: V-12345678" error={movErrors.cedula}>
+                <Input
+                  value={cedulaPago}
+                  onChange={(e) => { setCedulaPago(e.target.value.toUpperCase().replace(/[^VEJPG0-9-]/g, '')); setVerifyStatus('idle'); }}
+                  placeholder="V-12345678"
                 />
               </Field>
 
