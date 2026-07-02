@@ -18,7 +18,12 @@ const router = express.Router();
 const SYSIP_BASE = (process.env.SYSIP_API_URL || 'http://localhost:3002').replace(/\/$/, '');
 const TIMEOUT    = parseInt(process.env.LAMUNDIAL_TIMEOUT_MS, 10) || 15_000;
 
-const LAMUNDIAL_BASE = (process.env.LAMUNDIAL_BASE_URL || 'https://qaapisys2000.lamundialdeseguros.com').replace(/\/$/, '');
+// Base dedicada para valrep/list — independiente de LAMUNDIAL_BASE_URL
+// (que apunta al upstream de cotización/INMA y puede ser otro host)
+const LAMUNDIAL_BASE = (
+  process.env.LAMUNDIAL_VALREP_URL ||
+  'https://qaapisys2000.lamundialdeseguros.com'
+).replace(/\/$/, '');
 // La API de La Mundial GET /api/v1/valrep/list/:tipo solo admite estos dominios
 const LAMUNDIAL_LIST_DOMAINS = ['SEXO', 'EDOCIVIL', 'PARENTESCOS'];
 
