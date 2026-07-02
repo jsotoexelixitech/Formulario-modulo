@@ -1,12 +1,13 @@
 /**
  * /api/valrep — Catálogos de estados, ciudades y dominios.
  *
- * Fuente: sysip-nest-api (puerto 3002) — API central de Exelixi.
- *
  * Endpoints expuestos:
  *   GET /api/valrep/state          → estados (→ sysip-nest-api GET /api/v1/valrep/states)
  *   GET /api/valrep/city?cestado=N → ciudades (→ sysip-nest-api GET /api/v1/valrep/cities)
- *   GET /api/valrep/list/:domain   → lista genérica (→ sysip-nest-api POST /api/v1/valrep/getLists)
+ *   GET /api/valrep/list/:domain   → lista genérica:
+ *     · SEXO | EDOCIVIL | PARENTESCOS → La Mundial GET /api/v1/valrep/list/{domain}
+ *       (fallback: sysip-nest-api POST /api/v1/valrep/getLists)
+ *     · FRECUENCIAS | MATIPCANAL     → sysip-nest-api POST /api/v1/valrep/getLists
  *   POST /api/valrep/validate-vehicle → validar si vehículo ya está asegurado
  */
 const express = require('express');
@@ -17,10 +18,70 @@ const router = express.Router();
 const SYSIP_BASE = (process.env.SYSIP_API_URL || 'http://localhost:3002').replace(/\/$/, '');
 const TIMEOUT    = parseInt(process.env.LAMUNDIAL_TIMEOUT_MS, 10) || 15_000;
 
+const LAMUNDIAL_BASE = (process.env.LAMUNDIAL_BASE_URL || 'https://qaapisys2000.lamundialdeseguros.com').replace(/\/$/, '');
+// La API de La Mundial GET /api/v1/valrep/list/:tipo solo admite estos dominios
+const LAMUNDIAL_LIST_DOMAINS = ['SEXO', 'EDOCIVIL', 'PARENTESCOS'];
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function logError(tag, err) {
   console.error(`[valrep/${tag}]`, err?.response?.status, err?.message);
+}
+
+/**
+ * Obtiene una lista desde La Mundial GET /api/v1/valrep/list/{domain}.
+ * PARENTESCOS responde { cparen, xparentesco, bunavez }; el resto { cvalor, xdescripcion }.
+ * @param {string} domain Dominio permitido (SEXO | EDOCIVIL | PARENTESCOS)
+ * @returns {Promise<Array<{code: string, label: string, bunavez?: boolean}>>}
+ */
+async function getListFromLaMundial(domain) {
+  const apikey = process.env.LAMUNDIAL_APIKEY || '';
+  const { data, status } = await axios.get(`${LAMUNDIAL_BASE}/api/v1/valrep/list/${domain}`, {
+    headers: { Accept: 'application/json', ...(apikey ? { apikey } : {}) },
+    timeout: TIMEOUT,
+    validateStatus: () => true,
+  });
+
+  if (status >= 400 || !data?.status) {
+    throw new Error(`La Mundial HTTP ${status}: ${data?.message || JSON.stringify(data)}`);
+  }
+
+  const raw = Array.isArray(data.data) ? data.data : [];
+  if (!raw.length) throw new Error('La Mundial devolvió lista vacía');
+
+  return raw
+    .map((row) => {
+      if (domain === 'PARENTESCOS') {
+        return {
+          code: String(row.cparen ?? ''),
+          label: String(row.xparentesco ?? ''),
+          bunavez: row.bunavez === true,
+        };
+      }
+      return {
+        code: String(row.cvalor ?? ''),
+        label: String(row.xdescripcion ?? ''),
+      };
+    })
+    .filter((it) => it.code !== '' && it.label !== '');
+}
+
+/**
+ * Obtiene una lista desde sysip-nest-api POST /api/v1/valrep/getLists.
+ * @param {string} domain Dominio del catálogo
+ * @returns {Promise<Array<{code: string, label: string}>>}
+ */
+async function getListFromSysip(domain) {
+  const { data } = await axios.post(
+    `${SYSIP_BASE}/api/v1/valrep/getLists`,
+    { cdominio: domain, xtipo_orden: 'ASC' },
+    { timeout: TIMEOUT },
+  );
+  // sysip-nest-api responde: { status: true, data: { listas: [...] } }
+  const raw = data?.data?.listas ?? [];
+  return raw
+    .map((i) => ({ code: String(i.cvalor ?? ''), label: String(i.xdescripcion ?? '') }))
+    .filter((it) => it.code !== '' && it.label !== '');
 }
 
 // ── GET /api/valrep/state ──────────────────────────────────────────────────────
@@ -99,16 +160,20 @@ router.get('/list/:domain', async (req, res) => {
   if (!ALLOWED.includes(domain)) {
     return res.status(400).json({ ok: false, error: `Dominio no permitido: ${domain}` });
   }
+
+  // 1. Fuente primaria: La Mundial GET /api/v1/valrep/list/:tipo (solo dominios soportados)
+  if (LAMUNDIAL_LIST_DOMAINS.includes(domain)) {
+    try {
+      const items = await getListFromLaMundial(domain);
+      return res.json({ ok: true, domain, source: 'lamundial', items });
+    } catch (err) {
+      logError(`list/${domain} lamundial`, err);
+    }
+  }
+
+  // 2. Fallback (o fuente única para FRECUENCIAS/MATIPCANAL): sysip-nest-api getLists
   try {
-    const { data } = await axios.post(
-      `${SYSIP_BASE}/api/v1/valrep/getLists`,
-      { cdominio: domain, xtipo_orden: 'ASC' },
-      { timeout: TIMEOUT },
-    );
-    // sysip-nest-api responde: { status: true, data: { listas: [...] } }
-    const raw   = data?.data?.listas ?? [];
-    const items = raw.map(i => ({ code: String(i.cvalor ?? ''), label: String(i.xdescripcion ?? '') }))
-                     .filter(it => it.code !== '' && it.label !== '');
+    const items = await getListFromSysip(domain);
     res.json({ ok: true, domain, source: 'sysip-nest-api', items });
   } catch (err) {
     logError(`list/${domain}`, err);
