@@ -50,11 +50,13 @@ export default function App() {
   }
 
   const { goTo } = useWizardStore();
-  const [localStep, setLocalStep] = useState<2 | 3>(2);
+  const step = useWizardStore((s) => s.step);
+  const [localStep, setLocalStep] = useState<2 | 3>(() => (step === 3 ? 3 : 2));
   const product = getProductConfig();
 
-  // Inicializa el store en el paso 2 para que el sidebar lo resalte correctamente
-  useEffect(() => { goTo(2); }, [goTo]);
+  useEffect(() => {
+    if (step === 2 || step === 3) setLocalStep(step);
+  }, [step]);
 
   function navigate(to: 2 | 3) {
     setLocalStep(to);
