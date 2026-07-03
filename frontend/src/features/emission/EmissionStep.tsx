@@ -172,7 +172,7 @@ export function EmissionStep() {
           placeholder="Apellido"
         />
       </Field>
-      <Field label="Teléfono *" error={errors[`${prefix}telefono`]} hint="Exactamente 11 dígitos, ej. 04121234567">
+      <Field label="Teléfono *" error={errors[`${prefix}telefono`]} hint="11 dígitos · Movilnet 0412/0416 · Movistar 0414/0424 · Digitel 0412/0422">
         <Input
           value={formatTelefono(person.telefono ?? '')}
           onChange={(e) => setPerson({ telefono: formatTelefono(e.target.value) })}
