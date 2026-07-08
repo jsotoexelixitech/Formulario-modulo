@@ -53,7 +53,6 @@ function PersonFields({
   parentescoOptions,
   sexoOptions,
   loading,
-  lockIdentificacion,
   onChange,
 }: {
   person: FuneralPerson;
@@ -62,23 +61,17 @@ function PersonFields({
   parentescoOptions: { value: string; label: string }[];
   sexoOptions: { value: string; label: string }[];
   loading: boolean;
-  /** Solo bloquea cédula/documento del titular (datos traídos del paso 2). */
-  lockIdentificacion?: boolean;
   onChange: (patch: Partial<FuneralPerson>) => void;
 }) {
-  const idLocked = lockIdentificacion ?? false;
-
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Field label="Identificación *" error={errors.identificacion}>
-        <div className={idLocked ? 'opacity-50 pointer-events-none' : ''}>
-          <IdentityInput
-            tipoDoc={person.tipoDoc || 'V'}
-            identificacion={person.identificacion}
-            onTipoDocChange={(v) => onChange({ tipoDoc: v })}
-            onIdentificacionChange={(v) => onChange({ identificacion: v })}
-          />
-        </div>
+        <IdentityInput
+          tipoDoc={person.tipoDoc || 'V'}
+          identificacion={person.identificacion}
+          onTipoDocChange={(v) => onChange({ tipoDoc: v })}
+          onIdentificacionChange={(v) => onChange({ identificacion: v })}
+        />
       </Field>
 
       <Field label="Parentesco *" error={errors.parentesco}>
@@ -357,7 +350,6 @@ export function FuneralStep() {
                 parentescoOptions={parentescoOptions}
                 sexoOptions={sexoOptions}
                 loading={catalogs.loading}
-                lockIdentificacion={idx === 0 && !differentPayer}
                 onChange={(patch) => updateAsegurado(idx, patch)}
               />
             </div>
