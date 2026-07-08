@@ -6,6 +6,7 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useProductConfig } from '../../hooks/useProductConfig';
+import { getProductId } from '../../lib/product';
 import { SectionCard } from '../emission/EmissionStep';
 import type { FuneralPerson } from '../../types';
 import { Users, Heart, ShieldAlert, Plus, Trash2 } from 'lucide-react';
@@ -51,7 +52,7 @@ function PersonFields({
   parentescoOptions,
   sexoOptions,
   loading,
-  isReadOnly,
+  lockIdentity,
   onChange,
 }: {
   person: FuneralPerson;
@@ -60,13 +61,16 @@ function PersonFields({
   parentescoOptions: { value: string; label: string }[];
   sexoOptions: { value: string; label: string }[];
   loading: boolean;
-  isReadOnly?: boolean;
+  /** Bloquea identidad del titular sincronizada desde el paso 2 (no aplica a teléfono/correo). */
+  lockIdentity?: boolean;
   onChange: (patch: Partial<FuneralPerson>) => void;
 }) {
+  const identityLocked = lockIdentity ?? false;
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Field label="Identificación *" error={errors.identificacion}>
-        <div className={isReadOnly ? "opacity-50 pointer-events-none" : ""}>
+        <div className={identityLocked ? 'opacity-50 pointer-events-none' : ''}>
           <IdentityInput
             tipoDoc={person.tipoDoc || 'V'}
             identificacion={person.identificacion}
@@ -86,7 +90,7 @@ function PersonFields({
             onChange={(value) => onChange({ parentesco: value })}
             placeholder="— Seleccionar —"
             loading={loading}
-            disabled={isReadOnly}
+            disabled={identityLocked}
           />
         )}
       </Field>
@@ -97,7 +101,7 @@ function PersonFields({
           onChange={(e) => onChange({ nombre: onlyLetters(e.target.value) })}
           placeholder="Nombre"
           autoComplete="given-name"
-          disabled={isReadOnly}
+          disabled={identityLocked}
         />
       </Field>
 
@@ -107,7 +111,7 @@ function PersonFields({
           onChange={(e) => onChange({ apellido: onlyLetters(e.target.value) })}
           placeholder="Apellido"
           autoComplete="family-name"
-          disabled={isReadOnly}
+          disabled={identityLocked}
         />
       </Field>
 
@@ -117,7 +121,7 @@ function PersonFields({
           onChange={(e) => onChange({ fechaNac: e.target.value })}
           type="date"
           max={new Date().toISOString().split('T')[0]}
-          disabled={isReadOnly}
+          disabled={identityLocked}
         />
       </Field>
 
@@ -135,7 +139,7 @@ function PersonFields({
           onChange={(value) => onChange({ sexo: value })}
           placeholder="— Seleccionar —"
           loading={loading}
-          disabled={isReadOnly}
+          disabled={identityLocked}
         />
       </Field>
 
@@ -147,7 +151,6 @@ function PersonFields({
           type="tel"
           inputMode="numeric"
           maxLength={15}
-          disabled={isReadOnly}
         />
       </Field>
 
@@ -158,7 +161,6 @@ function PersonFields({
           placeholder="correo@ejemplo.com"
           type="email"
           inputMode="email"
-          disabled={isReadOnly}
         />
       </Field>
     </div>
@@ -168,7 +170,7 @@ function PersonFields({
 export function FuneralStep() {
   const { tomador, funeral, setFuneral, differentPayer } = useWizardStore();
 
-  const producto = new URLSearchParams(window.location.search).get('product') as 'rcv' | 'funerario' ?? 'funerario';
+  const producto = getProductId();
   const { config } = useProductConfig(EMPRESA_ID, producto, 'formulario');
   const isSeccionActiva = (seccion: string) => {
     if (!config?.secciones) return true;
@@ -200,6 +202,8 @@ export function FuneralStep() {
           fechaNac: tomador.fechaNac,
           sexo: tomador.sexo,
           parentesco: '1',
+          telefono: nextAsegurados[0].telefono || tomador.telefono,
+          email: nextAsegurados[0].email || tomador.email,
         };
         setFuneral({ asegurados: nextAsegurados });
       }
@@ -266,6 +270,8 @@ export function FuneralStep() {
       fechaNac: tomador.fechaNac,
       sexo: tomador.sexo,
       parentesco: '1',
+      telefono: tomador.telefono,
+      email: tomador.email,
     });
   };
 
@@ -388,7 +394,7 @@ export function FuneralStep() {
                 parentescoOptions={parentescoOptions}
                 sexoOptions={sexoOptions}
                 loading={catalogs.loading}
-                isReadOnly={idx === 0 && !differentPayer}
+                lockIdentity={idx === 0 && !differentPayer}
                 onChange={(patch) => updateAsegurado(idx, patch)}
               />
             </div>
