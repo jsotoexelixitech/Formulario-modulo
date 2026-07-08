@@ -53,7 +53,7 @@ function PersonFields({
   parentescoOptions,
   sexoOptions,
   loading,
-  lockIdentity,
+  lockIdentificacion,
   onChange,
 }: {
   person: FuneralPerson;
@@ -62,16 +62,16 @@ function PersonFields({
   parentescoOptions: { value: string; label: string }[];
   sexoOptions: { value: string; label: string }[];
   loading: boolean;
-  /** Bloquea identidad del titular sincronizada desde el paso 2 (no aplica a teléfono/correo). */
-  lockIdentity?: boolean;
+  /** Solo bloquea cédula/documento del titular (datos traídos del paso 2). */
+  lockIdentificacion?: boolean;
   onChange: (patch: Partial<FuneralPerson>) => void;
 }) {
-  const identityLocked = lockIdentity ?? false;
+  const idLocked = lockIdentificacion ?? false;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Field label="Identificación *" error={errors.identificacion}>
-        <div className={identityLocked ? 'opacity-50 pointer-events-none' : ''}>
+        <div className={idLocked ? 'opacity-50 pointer-events-none' : ''}>
           <IdentityInput
             tipoDoc={person.tipoDoc || 'V'}
             identificacion={person.identificacion}
@@ -91,7 +91,6 @@ function PersonFields({
             onChange={(value) => onChange({ parentesco: value })}
             placeholder="— Seleccionar —"
             loading={loading}
-            disabled={identityLocked}
           />
         )}
       </Field>
@@ -102,7 +101,6 @@ function PersonFields({
           onChange={(e) => onChange({ nombre: onlyLetters(e.target.value) })}
           placeholder="Nombre"
           autoComplete="given-name"
-          disabled={identityLocked}
         />
       </Field>
 
@@ -112,7 +110,6 @@ function PersonFields({
           onChange={(e) => onChange({ apellido: onlyLetters(e.target.value) })}
           placeholder="Apellido"
           autoComplete="family-name"
-          disabled={identityLocked}
         />
       </Field>
 
@@ -122,7 +119,6 @@ function PersonFields({
           onChange={(e) => onChange({ fechaNac: e.target.value })}
           type="date"
           max={new Date().toISOString().split('T')[0]}
-          disabled={identityLocked}
         />
       </Field>
 
@@ -140,7 +136,6 @@ function PersonFields({
           onChange={(value) => onChange({ sexo: value })}
           placeholder="— Seleccionar —"
           loading={loading}
-          disabled={identityLocked}
         />
       </Field>
 
@@ -362,7 +357,7 @@ export function FuneralStep() {
                 parentescoOptions={parentescoOptions}
                 sexoOptions={sexoOptions}
                 loading={catalogs.loading}
-                lockIdentity={idx === 0 && !differentPayer}
+                lockIdentificacion={idx === 0 && !differentPayer}
                 onChange={(patch) => updateAsegurado(idx, patch)}
               />
             </div>
