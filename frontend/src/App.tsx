@@ -10,6 +10,7 @@ import { EmissionStep } from './features/emission/EmissionStep';
 import { VehicleStep } from './features/vehicle/VehicleStep';
 import { FuneralStep } from './features/funeral/FuneralStep';
 import { getProductConfig } from './lib/product';
+import { syncTitularFromTomador } from './lib/funeral-sync';
 import { toast } from './store/toastStore';
 import { ChevronLeft, ChevronRight, Sparkles, ShieldCheck, HelpCircle } from 'lucide-react';
 
@@ -72,6 +73,9 @@ export default function App() {
           'Completa nombre, apellido, teléfono, correo, fecha de nacimiento, sexo, estado y ciudad para continuar.',
         );
         return;
+      }
+      if (!product.hasVehicle) {
+        syncTitularFromTomador();
       }
       navigate(3);
     } else {

@@ -7,6 +7,7 @@ import { SearchSelect } from '../../components/ui/SearchSelect';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useProductConfig } from '../../hooks/useProductConfig';
 import { getProductId } from '../../lib/product';
+import { syncTitularFromTomador } from '../../lib/funeral-sync';
 import { SectionCard } from '../emission/EmissionStep';
 import type { FuneralPerson } from '../../types';
 import { Users, Heart, ShieldAlert, Plus, Trash2 } from 'lucide-react';
@@ -183,32 +184,9 @@ export function FuneralStep() {
 
   useEffect(() => {
     if (!differentPayer) {
-      const current = funeral.asegurados[0] || ({} as Partial<FuneralPerson>);
-      const needsSync =
-        current.identificacion !== tomador.identificacion ||
-        current.nombre !== tomador.nombre ||
-        current.apellido !== tomador.apellido ||
-        current.fechaNac !== tomador.fechaNac ||
-        current.sexo !== tomador.sexo;
-
-      if (needsSync) {
-        const nextAsegurados = [...funeral.asegurados];
-        nextAsegurados[0] = {
-          ...nextAsegurados[0],
-          tipoDoc: tomador.tipoDoc || 'V',
-          identificacion: tomador.identificacion,
-          nombre: tomador.nombre,
-          apellido: tomador.apellido,
-          fechaNac: tomador.fechaNac,
-          sexo: tomador.sexo,
-          parentesco: '1',
-          telefono: nextAsegurados[0].telefono || tomador.telefono,
-          email: nextAsegurados[0].email || tomador.email,
-        };
-        setFuneral({ asegurados: nextAsegurados });
-      }
+      syncTitularFromTomador();
     }
-  }, [differentPayer, tomador, funeral.asegurados, setFuneral]);
+  }, [differentPayer, tomador.identificacion, tomador.nombre, tomador.apellido, tomador.fechaNac, tomador.sexo, tomador.telefono, tomador.email]);
   const catalogs = useCatalogs();
   const [asegErrors, setAsegErrors] = useState<PersonErrors[]>([]);
   const [benefErrors, setBenefErrors] = useState<PersonErrors[]>([]);
@@ -262,17 +240,7 @@ export function FuneralStep() {
 
   // Copia los datos del tomador (paso 2) al titular (primer asegurado).
   const usarDatosTomador = () => {
-    updateAsegurado(0, {
-      tipoDoc: tomador.tipoDoc || 'V',
-      identificacion: tomador.identificacion,
-      nombre: tomador.nombre,
-      apellido: tomador.apellido,
-      fechaNac: tomador.fechaNac,
-      sexo: tomador.sexo,
-      parentesco: '1',
-      telefono: tomador.telefono,
-      email: tomador.email,
-    });
+    syncTitularFromTomador();
   };
 
   // ── Validación ──────────────────────────────────────────────────────────
