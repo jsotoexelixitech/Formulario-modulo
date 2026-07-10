@@ -107,3 +107,7 @@ export function getProductConfig(): ProductConfig {
 export function isFunerario(): boolean {
   return getProductId() === 'funerario';
 }
+
+export function isRcv(): boolean {
+  return getProductId() === 'rcv';
+}

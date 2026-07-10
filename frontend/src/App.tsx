@@ -9,7 +9,7 @@ import { Button } from './components/ui/Button';
 import { EmissionStep } from './features/emission/EmissionStep';
 import { VehicleStep } from './features/vehicle/VehicleStep';
 import { FuneralStep } from './features/funeral/FuneralStep';
-import { getProductConfig } from './lib/product';
+import { getProductConfig, isFunerario } from './lib/product';
 import { syncTitularFromTomador } from './lib/funeral-sync';
 import { toast } from './store/toastStore';
 import { ChevronLeft, ChevronRight, Sparkles, ShieldCheck, HelpCircle } from 'lucide-react';
@@ -74,7 +74,7 @@ export default function App() {
         );
         return;
       }
-      if (!product.hasVehicle) {
+      if (!isFunerario()) {
         syncTitularFromTomador();
       }
       navigate(3);
@@ -141,7 +141,7 @@ export default function App() {
             <section key={localStep} className="surface-card overflow-hidden step-enter">
               <div className="p-6 sm:p-8 lg:p-10">
                 {localStep === 2 && <EmissionStep />}
-                {localStep === 3 && (product.hasVehicle ? <VehicleStep /> : <FuneralStep />)}
+                {localStep === 3 && (isFunerario() ? <FuneralStep /> : <VehicleStep />)}
               </div>
 
               <div className="hidden md:flex items-center justify-between gap-4 px-8 lg:px-10 py-5 border-t border-slate-100/80 bg-gradient-to-b from-slate-50/50 to-white/40 backdrop-blur-sm">
