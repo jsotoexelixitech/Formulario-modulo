@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
-import { Field, Input, Textarea } from '../../components/ui/FormField';
+import { Field, Input } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
-import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { useCatalogs } from '../../hooks/useCatalogs';
 import { useProductConfig } from '../../hooks/useProductConfig';
@@ -10,7 +9,7 @@ import { getProductId } from '../../lib/product';
 import { syncTitularFromTomador } from '../../lib/funeral-sync';
 import { SectionCard } from '../emission/EmissionStep';
 import type { FuneralPerson } from '../../types';
-import { Users, Heart, ShieldAlert, Plus, Trash2 } from 'lucide-react';
+import { Users, Heart, Plus, Trash2 } from 'lucide-react';
 
 const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
@@ -178,7 +177,6 @@ export function FuneralStep() {
   const catalogs = useCatalogs();
   const [asegErrors, setAsegErrors] = useState<PersonErrors[]>([]);
   const [benefErrors, setBenefErrors] = useState<PersonErrors[]>([]);
-  const [decError, setDecError] = useState<{ terminos?: string; descripcion?: string }>({});
 
   const parentescoOptions =
     catalogs.parentescos.length > 0
@@ -289,19 +287,12 @@ export function FuneralStep() {
   const validate = (): boolean => {
     const aErr = funeral.asegurados.map((p, i) => validatePerson(p, i === 0));
     const bErr = funeral.beneficiarios.map((p) => validatePerson(p, false));
-    const dErr: { terminos?: string; descripcion?: string } = {};
-
-    if (!funeral.aceptaTerminos) dErr.terminos = 'Debes aceptar los términos y condiciones';
-    if (funeral.diagnosticoEnfermedad && !funeral.descripcionEnfermedad.trim()) {
-      dErr.descripcion = 'Describe la enfermedad diagnosticada';
-    }
 
     setAsegErrors(aErr);
     setBenefErrors(bErr);
-    setDecError(dErr);
 
     const hasPersonError = [...aErr, ...bErr].some((e) => Object.keys(e).length > 0);
-    return !hasPersonError && Object.keys(dErr).length === 0;
+    return !hasPersonError;
   };
 
   (window as unknown as Record<string, unknown>).__validateStep3 = validate;
@@ -414,46 +405,6 @@ export function FuneralStep() {
       </SectionCard>
       )}
 
-
-
-      {/* Declaraciones */}
-      <SectionCard
-        Icon={ShieldAlert}
-        title="Declaración de salud y términos"
-        description="Requerida por La Mundial de Seguros para la emisión de la póliza."
-      >
-        <div className="space-y-4">
-          <ToggleSwitch
-            checked={funeral.diagnosticoEnfermedad}
-            onChange={(v) => setFuneral({ diagnosticoEnfermedad: v })}
-            label="¿Has sido diagnosticado con alguna enfermedad?"
-            description="Si seleccionas sí, indícanos brevemente cuál."
-          />
-
-          {funeral.diagnosticoEnfermedad && (
-            <Field label="Describe la enfermedad *" error={decError.descripcion} full>
-              <Textarea
-                value={funeral.descripcionEnfermedad}
-                onChange={(e) => setFuneral({ descripcionEnfermedad: e.target.value })}
-                placeholder="Enfermedad, tratamiento, fecha de diagnóstico…"
-                rows={3}
-              />
-            </Field>
-          )}
-
-          <div className={decError.terminos ? 'rounded-xl ring-1 ring-rose-300 p-1' : ''}>
-            <ToggleSwitch
-              checked={funeral.aceptaTerminos}
-              onChange={(v) => setFuneral({ aceptaTerminos: v })}
-              label="Acepto los términos y condiciones"
-              description="Declaro que la información suministrada es verídica y acepto las condiciones de la póliza."
-            />
-          </div>
-          {decError.terminos && (
-            <p className="text-xs text-rose-500 font-medium">{decError.terminos}</p>
-          )}
-        </div>
-      </SectionCard>
     </div>
   );
 }

@@ -79,6 +79,8 @@ const defaultFuneral = (): FuneralData => ({
   diagnosticoEnfermedad: false,
   descripcionEnfermedad: '',
   aceptaTerminos: false,
+  healthAnswers: {},
+  healthQuestionnaireDone: false,
 });
 
 interface WizardActions {

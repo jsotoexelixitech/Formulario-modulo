@@ -138,6 +138,10 @@ export interface FuneralData {
   descripcionEnfermedad: string;
   /** Acepta términos y condiciones (obligatorio para emitir). */
   aceptaTerminos: boolean;
+  /** Respuestas del cuestionario de salud (paso emisión / modal). */
+  healthAnswers?: Record<string, unknown>;
+  /** true cuando el cuestionario fue completado. */
+  healthQuestionnaireDone?: boolean;
 }
 
 export interface VehicleData {
