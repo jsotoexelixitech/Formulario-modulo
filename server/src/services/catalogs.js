@@ -18,7 +18,7 @@ const {
   getInmaMarcas,
   getInmaModelos,
   getInmaVersiones,
-} = require('./sysipClient');
+} = require('./nestApiClient');
 
 // ── Catálogo estático corregido ────────────────────────────────────────────
 // cmarca / cmodelo / cversion → confirmados via POST /api/v1/inma/*
@@ -145,7 +145,7 @@ function resolveVehicleCodes(marcaTexto, modeloTexto) {
 }
 
 /**
- * Resuelve marca/modelo consultando sysip-nest-api (INMA / VInma).
+ * Resuelve marca/modelo consultando nest-api (INMA / VInma).
  * Más preciso que `resolveVehicleCodes` pero requiere llamada HTTP.
  *
  * @param {number} fano

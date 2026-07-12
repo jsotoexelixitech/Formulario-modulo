@@ -1,15 +1,15 @@
 /**
  * /api/valrep — Catálogos de estados, ciudades y dominios.
  *
- * Fuente única: sysip-nest-api (:3002).
+ * Fuente única: nest-api (:3002).
  */
 const express = require('express');
 const axios = require('axios');
-const { getValrepList, getBaseUrl, getTimeout } = require('../services/sysipClient');
+const { getValrepList, getBaseUrl, getTimeout } = require('../services/nestApiClient');
 
 const router = express.Router();
 
-const SYSIP_BASE = getBaseUrl();
+const NEST_API_BASE = getBaseUrl();
 const TIMEOUT = getTimeout();
 
 const ALLOWED = ['SEXO', 'EDOCIVIL', 'PARENTESCOS', 'FRECUENCIAS', 'MATIPCANAL'];
@@ -47,13 +47,13 @@ function logError(tag, err) {
 
 router.get('/state', async (_req, res) => {
   try {
-    const { data } = await axios.get(`${SYSIP_BASE}/api/v1/valrep/states`, { timeout: TIMEOUT });
+    const { data } = await axios.get(`${NEST_API_BASE}/api/v1/valrep/states`, { timeout: TIMEOUT });
     const states = data?.data?.states ?? [];
     const items = normalizeItems(states.map((s) => ({ code: s.cestado, label: s.xdescripcion_l })));
     if (!items.length) {
-      console.warn('[valrep/state] sysip devolvió 0 estados — verificar SYSIP_API_URL y BD maestados');
+      console.warn('[valrep/state] nest-api devolvió 0 estados — verificar NEST_API_URL y BD maestados');
     }
-    res.json({ ok: true, source: 'sysip-nest-api', items });
+    res.json({ ok: true, source: 'nest-api', items });
   } catch (err) {
     logError('state', err);
     res.status(502).json({ ok: false, error: 'No se pudo obtener estados' });
@@ -64,14 +64,14 @@ router.get('/city', async (req, res) => {
   const cestado = req.query.cestado ?? req.query.estado ?? null;
   try {
     const url = cestado
-      ? `${SYSIP_BASE}/api/v1/valrep/cities?cestado=${parseInt(cestado, 10)}`
-      : `${SYSIP_BASE}/api/v1/valrep/cities`;
+      ? `${NEST_API_BASE}/api/v1/valrep/cities?cestado=${parseInt(cestado, 10)}`
+      : `${NEST_API_BASE}/api/v1/valrep/cities`;
     const { data } = await axios.get(url, { timeout: TIMEOUT });
     const cities = data?.data?.cities ?? [];
     const items = normalizeItems(cities.map((c) => ({ code: c.cciudad, label: c.xdescripcion_l })));
     res.json({
       ok: true,
-      source: 'sysip-nest-api',
+      source: 'nest-api',
       cestado: cestado ? parseInt(cestado, 10) : null,
       items,
     });
@@ -90,10 +90,10 @@ router.get('/list/:domain', async (req, res) => {
   try {
     let items = await getValrepList(domain);
     if (!items.length && LIST_FALLBACKS[domain]) {
-      console.warn(`[valrep/list/${domain}] sysip vacío — usando fallback local`);
+      console.warn(`[valrep/list/${domain}] nest-api vacío — usando fallback local`);
       items = LIST_FALLBACKS[domain];
     }
-    res.json({ ok: true, domain, source: 'sysip-nest-api', items });
+    res.json({ ok: true, domain, source: 'nest-api', items });
   } catch (err) {
     logError(`list/${domain}`, err);
     if (LIST_FALLBACKS[domain]) {
@@ -106,7 +106,7 @@ router.get('/list/:domain', async (req, res) => {
 router.post('/validate-vehicle', async (req, res) => {
   try {
     const { placa, serial } = req.body;
-    const url = `${SYSIP_BASE}/api/v1/external/validateEmissionAuto`;
+    const url = `${NEST_API_BASE}/api/v1/external/validateEmissionAuto`;
     const payload = {
       plan: 'RCVBAS',
       placa: placa || '',
@@ -137,7 +137,7 @@ router.post('/validate-vehicle', async (req, res) => {
     res.json({ success: true, message: 'Valid' });
   } catch (err) {
     logError('validate-vehicle', err);
-    res.status(502).json({ success: false, error: 'Error validando vehículo en sysip-nest-api' });
+    res.status(502).json({ success: false, error: 'Error validando vehículo en nest-api' });
   }
 });
 

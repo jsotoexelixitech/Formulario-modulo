@@ -1,25 +1,26 @@
 /**
  * Rutas de catálogos INMA (vehículos) — Módulo Formulario.
  *
- * Fuente: sysip-nest-api (puerto 3002) — API central de Exelixi.
+ * Fuente: nest-api (puerto 3002) — API central de Exelixi.
  *
  * Cascada: anios → marcas (por año) → modelos → versiones → categorias-uso.
  *
  * Endpoints expuestos:
- *   GET  /api/catalogo/anios                              → sysip GET  /api/v1/inma/anios
- *   GET  /api/catalogo/marcas?fano=N                      → sysip POST /api/v1/inma/marcas
- *   GET  /api/catalogo/modelos?fano=N&cmarca=X            → sysip POST /api/v1/inma/modelo
- *   GET  /api/catalogo/versiones?fano=N&cmarca=X&cmodelo=Y → sysip POST /api/v1/inma/version
- *   GET  /api/catalogo/categorias-uso?...                 → sysip POST /api/v1/inma/categorias-uso
- *   GET  /api/catalogo/resolver?fano=N&marca=X&modelo=Y   → lógica local sobre marcas+modelos de sysip
+ *   GET  /api/catalogo/anios                              → nest-api GET  /api/v1/inma/anios
+ *   GET  /api/catalogo/marcas?fano=N                      → nest-api POST /api/v1/inma/marcas
+ *   GET  /api/catalogo/modelos?fano=N&cmarca=X            → nest-api POST /api/v1/inma/modelo
+ *   GET  /api/catalogo/versiones?fano=N&cmarca=X&cmodelo=Y → nest-api POST /api/v1/inma/version
+ *   GET  /api/catalogo/categorias-uso?...                 → nest-api POST /api/v1/inma/categorias-uso
+ *   GET  /api/catalogo/resolver?fano=N&marca=X&modelo=Y   → lógica local sobre marcas+modelos de nest-api
  */
 const express = require('express');
 const axios   = require('axios');
+const { getBaseUrl, getTimeout } = require('../services/nestApiClient');
 
 const router = express.Router();
 
-const SYSIP_BASE = (process.env.SYSIP_API_URL || 'http://localhost:3002').replace(/\/$/, '');
-const TIMEOUT    = parseInt(process.env.LAMUNDIAL_TIMEOUT_MS, 10) || 15_000;
+const NEST_API_BASE = getBaseUrl();
+const TIMEOUT    = getTimeout();
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -60,31 +61,31 @@ function findModeloMatch(modelos, modelo) {
   return candidates.reduce((best, cur) => label(cur).length > label(best).length ? cur : best);
 }
 
-// ── Helpers sysip-nest-api ─────────────────────────────────────────────────────
+// ── Helpers nest-api ───────────────────────────────────────────────────────────
 
 async function fetchAnios() {
-  const { data } = await axios.get(`${SYSIP_BASE}/api/v1/inma/anios`, { timeout: TIMEOUT });
+  const { data } = await axios.get(`${NEST_API_BASE}/api/v1/inma/anios`, { timeout: TIMEOUT });
   return data?.data ?? { min: 2000, max: new Date().getFullYear() + 1 };
 }
 
 async function fetchMarcas(fano) {
-  const { data } = await axios.post(`${SYSIP_BASE}/api/v1/inma/marcas`, { fano }, { timeout: TIMEOUT });
+  const { data } = await axios.post(`${NEST_API_BASE}/api/v1/inma/marcas`, { fano }, { timeout: TIMEOUT });
   return data?.data?.marcas ?? [];
 }
 
 async function fetchModelos(fano, cmarca) {
-  const { data } = await axios.post(`${SYSIP_BASE}/api/v1/inma/modelo`, { fano, cmarca }, { timeout: TIMEOUT });
+  const { data } = await axios.post(`${NEST_API_BASE}/api/v1/inma/modelo`, { fano, cmarca }, { timeout: TIMEOUT });
   return data?.data?.info ?? [];
 }
 
 async function fetchVersiones(fano, cmarca, cmodelo) {
-  const { data } = await axios.post(`${SYSIP_BASE}/api/v1/inma/version`, { fano, cmarca, cmodelo }, { timeout: TIMEOUT });
+  const { data } = await axios.post(`${NEST_API_BASE}/api/v1/inma/version`, { fano, cmarca, cmodelo }, { timeout: TIMEOUT });
   return data?.data?.info ?? [];
 }
 
 async function fetchCategoriasUso(fano, cmarca, cmodelo, cversion) {
   const { data } = await axios.post(
-    `${SYSIP_BASE}/api/v1/inma/categorias-uso`,
+    `${NEST_API_BASE}/api/v1/inma/categorias-uso`,
     { fano, cmarca, cmodelo, cversion },
     { timeout: TIMEOUT },
   );

@@ -1,10 +1,15 @@
 /**
- * Cliente HTTP hacia sysip-nest-api — catálogos INMA y valrep (sin La Mundial externa).
+ * Cliente HTTP hacia nest-api — catálogos INMA y valrep (sin La Mundial externa).
  */
 const axios = require('axios');
 
+/** @returns {string} Base URL de nest-api (:3002 en srv001). */
 function getBaseUrl() {
-  return (process.env.SYSIP_API_URL || 'http://127.0.0.1:3002').replace(/\/$/, '');
+  return (
+    process.env.NEST_API_URL ||
+    process.env.SYSIP_API_URL ||
+    'http://127.0.0.1:3002'
+  ).replace(/\/$/, '');
 }
 
 function getTimeout() {
