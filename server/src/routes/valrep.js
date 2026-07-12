@@ -14,6 +14,33 @@ const TIMEOUT = getTimeout();
 
 const ALLOWED = ['SEXO', 'EDOCIVIL', 'PARENTESCOS', 'FRECUENCIAS', 'MATIPCANAL'];
 
+const LIST_FALLBACKS = {
+  SEXO: [
+    { code: 'M', label: 'Masculino' },
+    { code: 'F', label: 'Femenino' },
+  ],
+  EDOCIVIL: [
+    { code: 'S', label: 'Soltero(a)' },
+    { code: 'C', label: 'Casado(a)' },
+    { code: 'D', label: 'Divorciado(a)' },
+    { code: 'V', label: 'Viudo(a)' },
+  ],
+  PARENTESCOS: [
+    { code: 'T', label: 'TITULAR' },
+    { code: 'C', label: 'CONYUGE' },
+    { code: 'H', label: 'HIJO(A)' },
+  ],
+};
+
+function normalizeItems(rows) {
+  return (rows ?? [])
+    .map((s) => ({
+      code: s.code ?? s.cestado ?? s.cciudad,
+      label: String(s.label ?? s.xdescripcion_l ?? '').trim(),
+    }))
+    .filter((it) => it.code != null && it.code !== '' && it.label !== '');
+}
+
 function logError(tag, err) {
   console.error(`[valrep/${tag}]`, err?.response?.status, err?.message);
 }
@@ -22,7 +49,10 @@ router.get('/state', async (_req, res) => {
   try {
     const { data } = await axios.get(`${SYSIP_BASE}/api/v1/valrep/states`, { timeout: TIMEOUT });
     const states = data?.data?.states ?? [];
-    const items = states.map((s) => ({ code: s.cestado, label: s.xdescripcion_l?.trim() }));
+    const items = normalizeItems(states.map((s) => ({ code: s.cestado, label: s.xdescripcion_l })));
+    if (!items.length) {
+      console.warn('[valrep/state] sysip devolvió 0 estados — verificar SYSIP_API_URL y BD maestados');
+    }
     res.json({ ok: true, source: 'sysip-nest-api', items });
   } catch (err) {
     logError('state', err);
@@ -38,7 +68,7 @@ router.get('/city', async (req, res) => {
       : `${SYSIP_BASE}/api/v1/valrep/cities`;
     const { data } = await axios.get(url, { timeout: TIMEOUT });
     const cities = data?.data?.cities ?? [];
-    const items = cities.map((c) => ({ code: c.cciudad, label: c.xdescripcion_l?.trim() }));
+    const items = normalizeItems(cities.map((c) => ({ code: c.cciudad, label: c.xdescripcion_l })));
     res.json({
       ok: true,
       source: 'sysip-nest-api',
@@ -58,10 +88,17 @@ router.get('/list/:domain', async (req, res) => {
   }
 
   try {
-    const items = await getValrepList(domain);
+    let items = await getValrepList(domain);
+    if (!items.length && LIST_FALLBACKS[domain]) {
+      console.warn(`[valrep/list/${domain}] sysip vacío — usando fallback local`);
+      items = LIST_FALLBACKS[domain];
+    }
     res.json({ ok: true, domain, source: 'sysip-nest-api', items });
   } catch (err) {
     logError(`list/${domain}`, err);
+    if (LIST_FALLBACKS[domain]) {
+      return res.json({ ok: true, domain, source: 'fallback', items: LIST_FALLBACKS[domain] });
+    }
     res.status(502).json({ ok: false, error: `No se pudo obtener la lista ${domain}` });
   }
 });

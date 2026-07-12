@@ -64,12 +64,15 @@ async function getCategoriasUso(fano, cmarca, cmodelo, cversion) {
 
 /** @returns {Promise<Array<{ code: string, label: string }>>} */
 async function getValrepList(domain) {
-  const { data } = await axios.post(
+  const response = await axios.post(
     `${getBaseUrl()}/api/v1/valrep/getLists`,
     { cdominio: domain, xtipo_orden: 'ASC' },
-    { timeout: getTimeout() },
+    { timeout: getTimeout(), validateStatus: () => true },
   );
-  const raw = data?.data?.listas ?? [];
+  if (response.status >= 400 || response.data?.status === false) {
+    throw new Error(response.data?.message || `HTTP ${response.status} getLists/${domain}`);
+  }
+  const raw = response.data?.data?.listas ?? [];
   return raw
     .map((i) => ({ code: String(i.cvalor ?? ''), label: String(i.xdescripcion ?? '') }))
     .filter((it) => it.code !== '' && it.label !== '');
