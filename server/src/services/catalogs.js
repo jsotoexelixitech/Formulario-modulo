@@ -14,7 +14,11 @@
  * usa `resolveVehicleCodesLive(fano, marcaTexto, modeloTexto)`.
  */
 
-const lamundialClient = require('./lamundialClient');
+const {
+  getInmaMarcas,
+  getInmaModelos,
+  getInmaVersiones,
+} = require('./sysipClient');
 
 // ── Catálogo estático corregido ────────────────────────────────────────────
 // cmarca / cmodelo / cversion → confirmados via POST /api/v1/inma/*
@@ -141,7 +145,7 @@ function resolveVehicleCodes(marcaTexto, modeloTexto) {
 }
 
 /**
- * Resuelve marca/modelo consultando el catálogo vivo de La Mundial.
+ * Resuelve marca/modelo consultando sysip-nest-api (INMA / VInma).
  * Más preciso que `resolveVehicleCodes` pero requiere llamada HTTP.
  *
  * @param {number} fano
@@ -152,20 +156,20 @@ function resolveVehicleCodes(marcaTexto, modeloTexto) {
 async function resolveVehicleCodesLive(fano, marcaTexto, modeloTexto) {
   try {
     // 1. Buscar cmarca
-    const marcas = await lamundialClient.getInmaMarcas(fano);
+    const marcas = await getInmaMarcas(fano);
     const mNorm  = norm(marcaTexto);
     const marca  = marcas.find((m) => norm(m.xmarca) === mNorm);
     if (!marca) return { ...DEFAULT_BRAND, fallback: true, fallbackReason: 'marca no encontrada en catálogo INMA' };
 
     // 2. Buscar cmodelo
-    const modelos = await lamundialClient.getInmaModelos(fano, marca.cmarca);
+    const modelos = await getInmaModelos(fano, marca.cmarca);
     const modNorm = norm(modeloTexto);
     const modelo  = modelos.find((m) => norm(m.xmodelo) === modNorm);
     if (!modelo) {
       // Marca encontrada, modelo no — primer modelo de la marca
       const primerModelo = modelos[0];
       if (!primerModelo) return { ...DEFAULT_BRAND, fallback: true, fallbackReason: 'sin modelos para esta marca' };
-      const versiones = await lamundialClient.getInmaVersiones(fano, marca.cmarca, primerModelo.cmodelo);
+      const versiones = await getInmaVersiones(fano, marca.cmarca, primerModelo.cmodelo);
       const cversion  = versiones[0]?.cversion ?? '01';
       return {
         cmarca: marca.cmarca, cmodelo: primerModelo.cmodelo, cversion,
@@ -175,7 +179,7 @@ async function resolveVehicleCodesLive(fano, marcaTexto, modeloTexto) {
     }
 
     // 3. Buscar primera versión del modelo
-    const versiones = await lamundialClient.getInmaVersiones(fano, marca.cmarca, modelo.cmodelo);
+    const versiones = await getInmaVersiones(fano, marca.cmarca, modelo.cmodelo);
     const cversion  = versiones[0]?.cversion ?? '01';
     return {
       cmarca: marca.cmarca, cmodelo: modelo.cmodelo, cversion,
