@@ -144,6 +144,7 @@ export function VehicleStep() {
     hasDriver, setHasDriver,
     conductor, setConductor,
     documents,
+    selectedPlan,
   } = useWizardStore();
 
   const [errors, setErrors] = useState<VehicleErrors>({});
@@ -404,18 +405,22 @@ export function VehicleStep() {
       return false;
     }
 
-    // Validación remota
+    // Validación remota (nest-api vía form-api)
     try {
       const { validateVehicle } = await import('../../lib/api');
-      toast.info('Validando vehículo', 'Verificando con La Mundial...', 2000);
-      const res = await validateVehicle(vehicle.placa || '', vehicle.serial || '');
+      toast.info('Validando vehículo', 'Verificando placa y serial...', 2000);
+      const res = await validateVehicle(vehicle.placa || '', vehicle.serial || '', {
+        serialMotor: vehicle.serialMotor,
+        plan: selectedPlan?.cplan,
+      });
       if (!res.success) {
-        toast.error('Atención', res.message || 'El vehículo no puede ser asegurado.', 6000);
-        setErrors({ ...e, placa: res.message, serial: res.message });
+        const msg = res.message || 'El vehículo no puede ser asegurado.';
+        toast.error('Atención', msg, 6000);
+        setErrors({ ...e, placa: msg, serial: msg });
         return false;
       }
-    } catch (err: any) {
-      toast.error('Error', 'No se pudo validar el vehículo con La Mundial.');
+    } catch {
+      toast.error('Error', 'No se pudo validar el vehículo. Inténtalo de nuevo.');
       setErrors({ ...e, placa: 'No se pudo validar', serial: 'No se pudo validar' });
       return false;
     }

@@ -5,7 +5,7 @@
  */
 const express = require('express');
 const axios = require('axios');
-const { getValrepList, getBaseUrl, getTimeout } = require('../services/nestApiClient');
+const { getValrepList, getBaseUrl, getTimeout, validateEmissionAutoViaNestApi } = require('../services/nestApiClient');
 
 const router = express.Router();
 
@@ -105,37 +105,22 @@ router.get('/list/:domain', async (req, res) => {
 
 router.post('/validate-vehicle', async (req, res) => {
   try {
-    const { placa, serial } = req.body;
-    const url = `${NEST_API_BASE}/api/v1/external/validateEmissionAuto`;
-    const payload = {
-      plan: 'RCVBAS',
-      placa: placa || '',
-      serial_carroceria: serial || '',
-      serial_motor: serial || '',
-    };
-
-    const response = await axios.post(url, payload, {
-      headers: { 'Content-Type': 'application/json' },
-      validateStatus: () => true,
-      timeout: 10_000,
+    const { placa, serial, serialMotor, plan } = req.body ?? {};
+    const result = await validateEmissionAutoViaNestApi({
+      plan: plan || process.env.LAMUNDIAL_PLAN_DEFAULT || 'RCVBAS',
+      placa,
+      serial_carroceria: serial,
+      serial_motor: serialMotor || serial,
     });
-
-    const d = response.data;
-    const failed = d && (d.status === false || (d.error && d.status !== true));
-    if (failed) {
-      let errorMessage = 'Este vehículo ya cuenta con una póliza vigente.';
-      if (d.message) errorMessage = Array.isArray(d.message) ? d.message[0] : d.message;
-      else if (d.error) errorMessage = d.error;
-
+    res.json(result);
+  } catch (err) {
+    if (err.code === 'PLATE_ALREADY_INSURED') {
       return res.status(400).json({
         success: false,
-        code: 'PLATE_ALREADY_INSURED',
-        message: errorMessage,
+        code: err.code,
+        message: err.message || 'Este vehículo ya cuenta con una póliza vigente.',
       });
     }
-
-    res.json({ success: true, message: 'Valid' });
-  } catch (err) {
     logError('validate-vehicle', err);
     res.status(502).json({ success: false, error: 'Error validando vehículo en nest-api' });
   }

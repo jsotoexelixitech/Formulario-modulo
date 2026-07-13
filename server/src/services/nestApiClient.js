@@ -16,6 +16,74 @@ function getTimeout() {
   return parseInt(process.env.LAMUNDIAL_TIMEOUT_MS, 10) || 15_000;
 }
 
+function getApiKey() {
+  return (
+    process.env.NEST_API_KEY ||
+    process.env.SYSIP_API_KEY ||
+    process.env.LAMUNDIAL_APIKEY ||
+    process.env.LAMUNDIAL_EMISSION_APIKEY ||
+    ''
+  ).trim();
+}
+
+function buildHeaders(extra = {}) {
+  const headers = { 'Content-Type': 'application/json', ...extra };
+  const apikey = getApiKey();
+  if (apikey) headers.apikey = apikey;
+  return headers;
+}
+
+function mapValidatePlateError(message) {
+  const lower = String(message || '').toLowerCase();
+  if (
+    lower.includes('exist') ||
+    lower.includes('vigente') ||
+    lower.includes('póliza rel') ||
+    lower.includes('poliza rel') ||
+    lower.includes('serial carrocer')
+  ) {
+    return 'PLATE_ALREADY_INSURED';
+  }
+  return 'VALIDATE_EMISSION_ERROR';
+}
+
+/** Valida placa/serial contra nest-api (speeValidateAutomovilGeneral). */
+async function validateEmissionAutoViaNestApi(params) {
+  const url = `${getBaseUrl()}/api/v1/external/validateEmissionAuto`;
+  const plan = params.plan || process.env.LAMUNDIAL_PLAN_DEFAULT || 'RCVBAS';
+  const payload = {
+    plan,
+    placa: String(params.placa || '').trim(),
+    serial_carroceria: String(params.serial_carroceria || '').trim(),
+    serial_motor: String(params.serial_motor || params.serial_carroceria || '').trim(),
+  };
+
+  const response = await axios.post(url, payload, {
+    headers: buildHeaders(),
+    timeout: getTimeout(),
+    validateStatus: () => true,
+  });
+
+  const body = response.data ?? {};
+  const failed =
+    response.status >= 400 ||
+    body.status === false ||
+    (body.error && body.status !== true);
+
+  if (!failed) {
+    return {
+      success: true,
+      message: body.message || 'Vehículo válido para emisión.',
+    };
+  }
+
+  const rawMsg = body.error || body.message || `HTTP ${response.status}`;
+  const errorMessage = Array.isArray(rawMsg) ? rawMsg[0] : String(rawMsg);
+  const err = new Error(errorMessage);
+  err.code = mapValidatePlateError(errorMessage);
+  throw err;
+}
+
 /** @returns {Promise<{ min: number, max: number }>} */
 async function getInmaAnios() {
   const { data } = await axios.get(`${getBaseUrl()}/api/v1/inma/anios`, { timeout: getTimeout() });
@@ -86,6 +154,9 @@ async function getValrepList(domain) {
 module.exports = {
   getBaseUrl,
   getTimeout,
+  getApiKey,
+  buildHeaders,
+  validateEmissionAutoViaNestApi,
   getInmaAnios,
   getInmaMarcas,
   getInmaModelos,

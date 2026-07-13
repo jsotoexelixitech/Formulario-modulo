@@ -487,14 +487,23 @@ export function getValrepList(domain: string): Promise<CatalogItem[]> {
 /**
  * Valida en Sis2000 si un vehículo (por placa y serial) ya posee una póliza vigente.
  */
-export async function validateVehicle(placa: string, serial: string): Promise<{ success: boolean; message: string }> {
+export async function validateVehicle(
+  placa: string,
+  serial: string,
+  options?: { plan?: string; serialMotor?: string },
+): Promise<{ success: boolean; message: string; code?: string }> {
   try {
-    const res = await api.post('/valrep/validate-vehicle', { placa, serial });
+    const res = await api.post('/valrep/validate-vehicle', {
+      placa,
+      serial,
+      serialMotor: options?.serialMotor,
+      plan: options?.plan,
+    });
     return res.data;
   } catch (err) {
-    const axErr = err as AxiosError<{ success: boolean; message: string }>;
+    const axErr = err as AxiosError<{ success: boolean; message: string; code?: string }>;
     if (axErr.response?.data) {
-      return axErr.response.data; // Return the 400 error data gracefully
+      return axErr.response.data;
     }
     throw err;
   }
