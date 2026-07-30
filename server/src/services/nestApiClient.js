@@ -142,6 +142,23 @@ async function getCategoriasUso(fano, cmarca, cmodelo, cversion) {
   return data?.data?.categorias_uso ?? [];
 }
 
+/** @returns {Promise<Array<{ cestado: number, xdescripcion_l: string }>>} */
+async function getValrepStates() {
+  const { data } = await axios.get(`${getBaseUrl()}/api/v1/valrep/states`, await axiosOpts());
+  return data?.data?.states ?? [];
+}
+
+/** @returns {Promise<Array<{ cciudad: number, xdescripcion_l: string }>>} */
+async function getValrepCities(cestado) {
+  const base = `${getBaseUrl()}/api/v1/valrep/cities`;
+  const url =
+    cestado != null && cestado !== ''
+      ? `${base}?cestado=${parseInt(String(cestado), 10)}`
+      : base;
+  const { data } = await axios.get(url, await axiosOpts());
+  return data?.data?.cities ?? [];
+}
+
 /** @returns {Promise<Array<{ code: string, label: string }>>} */
 async function getValrepList(domain) {
   const response = await axios.post(
@@ -167,5 +184,7 @@ module.exports = {
   getInmaModelos,
   getInmaVersiones,
   getCategoriasUso,
+  getValrepStates,
+  getValrepCities,
   getValrepList,
 };

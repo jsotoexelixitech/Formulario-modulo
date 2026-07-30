@@ -4,13 +4,14 @@
  * Fuente única: nest-api (:3002).
  */
 const express = require('express');
-const axios = require('axios');
-const { getValrepList, getBaseUrl, getTimeout, validateEmissionAutoViaNestApi } = require('../services/nestApiClient');
+const {
+  getValrepList,
+  getValrepStates,
+  getValrepCities,
+  validateEmissionAutoViaNestApi,
+} = require('../services/nestApiClient');
 
 const router = express.Router();
-
-const NEST_API_BASE = getBaseUrl();
-const TIMEOUT = getTimeout();
 
 const ALLOWED = ['SEXO', 'EDOCIVIL', 'PARENTESCOS', 'FRECUENCIAS', 'MATIPCANAL'];
 
@@ -47,11 +48,10 @@ function logError(tag, err) {
 
 router.get('/state', async (_req, res) => {
   try {
-    const { data } = await axios.get(`${NEST_API_BASE}/api/v1/valrep/states`, { timeout: TIMEOUT });
-    const states = data?.data?.states ?? [];
+    const states = await getValrepStates();
     const items = normalizeItems(states.map((s) => ({ code: s.cestado, label: s.xdescripcion_l })));
     if (!items.length) {
-      console.warn('[valrep/state] nest-api devolvió 0 estados — verificar NEST_API_URL y BD maestados');
+      console.warn('[valrep/state] nest-api devolvió 0 estados — verificar NEST_API_URL y NEST_API_KEY');
     }
     res.json({ ok: true, source: 'nest-api', items });
   } catch (err) {
@@ -63,11 +63,7 @@ router.get('/state', async (_req, res) => {
 router.get('/city', async (req, res) => {
   const cestado = req.query.cestado ?? req.query.estado ?? null;
   try {
-    const url = cestado
-      ? `${NEST_API_BASE}/api/v1/valrep/cities?cestado=${parseInt(cestado, 10)}`
-      : `${NEST_API_BASE}/api/v1/valrep/cities`;
-    const { data } = await axios.get(url, { timeout: TIMEOUT });
-    const cities = data?.data?.cities ?? [];
+    const cities = await getValrepCities(cestado);
     const items = normalizeItems(cities.map((c) => ({ code: c.cciudad, label: c.xdescripcion_l })));
     res.json({
       ok: true,
@@ -105,12 +101,11 @@ router.get('/list/:domain', async (req, res) => {
 
 router.post('/validate-vehicle', async (req, res) => {
   try {
-    const { placa, serial, serialMotor, plan } = req.body ?? {};
+    const { placa, serial, plan } = req.body ?? {};
     const result = await validateEmissionAutoViaNestApi({
       plan: plan || process.env.LAMUNDIAL_PLAN_DEFAULT || 'RCVBAS',
       placa,
       serial_carroceria: serial,
-      serial_motor: serialMotor || serial,
     });
     res.json(result);
   } catch (err) {
