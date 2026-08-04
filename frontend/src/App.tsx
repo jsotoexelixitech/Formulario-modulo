@@ -21,13 +21,13 @@ type StepMeta = { eyebrow: string; title: string; sub: string };
 function buildExelixiWizardSnapshot(): Partial<ExelixiWizardHandoff> {
   const snap = useWizardStore.getState();
   return {
-    tomador: snap.tomador as ExelixiWizardHandoff['tomador'],
+    tomador: snap.tomador,
     sameInsured: snap.sameInsured,
-    asegurado: snap.asegurado as ExelixiWizardHandoff['asegurado'],
+    asegurado: snap.asegurado,
     hasBeneficiary: snap.hasBeneficiary,
-    beneficiario: snap.beneficiario as ExelixiWizardHandoff['beneficiario'],
-    vehicle: snap.vehicle as ExelixiWizardHandoff['vehicle'],
-    funeral: snap.funeral as ExelixiWizardHandoff['funeral'],
+    beneficiario: snap.beneficiario,
+    vehicle: snap.vehicle,
+    funeral: snap.funeral,
     ocrDone: snap.ocrDone,
   };
 }
