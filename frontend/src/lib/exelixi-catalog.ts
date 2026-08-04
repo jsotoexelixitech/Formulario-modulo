@@ -109,7 +109,7 @@ export interface ExelixiCatalogProductView {
 }
 
 export function getExelixiCatalogProductView(): ExelixiCatalogProductView | null {
-  const builder = readStoredBuilderProduct();
+  const builder = readStoredBuilderProduct() ?? readOcrHandoff()?.product ?? null;
   if (!builder) return null;
 
   const hasVehicle = branchHasVehicle(builder.branch);
@@ -200,4 +200,37 @@ export function applyExelixiOcrHandoff(
   setters.setOcrDone(true);
   setters.goTo(2);
   return true;
+}
+
+/** Siguiente paso: módulo emisión (planes product-emission). */
+export function getEmisionContinueUrl(): string {
+  const configured = import.meta.env.VITE_EMISION_CONTINUE_BASE as string | undefined;
+  const base = (configured?.replace(/\/$/, '') || '/emision').replace(/\/$/, '');
+  const params = new URLSearchParams({ flow: 'exelixi-catalog' });
+
+  try {
+    const current = new URL(window.location.href);
+    const sid = current.searchParams.get('sid');
+    const nexusToken =
+      current.searchParams.get('nexus_token')
+      || sessionStorage.getItem('nexus_access_token_formulario');
+    if (sid) params.set('sid', sid);
+    if (nexusToken) params.set('nexus_token', nexusToken);
+  } catch {
+    /* ignore */
+  }
+
+  return `${base}/?${params.toString()}`;
+}
+
+/** Avanza al módulo emisión en flujo Exélixi (bridge o redirect directo). */
+export function continueToEmisionModule(): void {
+  persistExelixiCatalogFlow();
+
+  if (typeof window.__bridgeAdvance === 'function') {
+    void window.__bridgeAdvance({ exelixiCatalogFlow: true });
+    return;
+  }
+
+  window.location.href = getEmisionContinueUrl();
 }

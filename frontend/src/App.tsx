@@ -10,6 +10,7 @@ import { EmissionStep } from './features/emission/EmissionStep';
 import { VehicleStep } from './features/vehicle/VehicleStep';
 import { FuneralStep } from './features/funeral/FuneralStep';
 import { getProductConfig, isFunerario, skipsPersonasStep, usesFuneralStep, usesVehicleStep } from './lib/product';
+import { continueToEmisionModule } from './lib/exelixi-catalog';
 import { syncTitularFromTomador } from './lib/funeral-sync';
 import { toast } from './store/toastStore';
 import { ChevronLeft, ChevronRight, Sparkles, ShieldCheck, HelpCircle } from 'lucide-react';
@@ -106,7 +107,7 @@ export default function App() {
           '¡Formulario completado!',
           'Datos del cliente guardados correctamente.',
         );
-        window.__bridgeAdvance?.();
+        continueToEmisionModule();
         return;
       }
       navigate(3);
@@ -125,8 +126,11 @@ export default function App() {
           ? 'Datos del cliente y vehículo guardados correctamente.'
           : 'Datos del cliente y las personas guardados correctamente.',
       );
-      // Si el bridge está activo (flujo completo en cadena), avanzar al siguiente módulo
-      window.__bridgeAdvance?.();
+      if (product.exelixiCatalog) {
+        continueToEmisionModule();
+      } else {
+        window.__bridgeAdvance?.();
+      }
     }
   }
 

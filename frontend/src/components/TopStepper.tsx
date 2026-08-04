@@ -32,22 +32,33 @@ export function TopStepper() {
     requiredDocTypes: getDefaultRequiredDocs(product.id),
   };
 
-  const STEPS = [
-    { n: 1, label: 'Documentos', Icon: FileText },
-    { n: 2, label: product.hasVehicle ? 'Emisión' : 'Tomador', Icon: UserCog },
-    product.hasVehicle
-      ? { n: 3, label: 'Vehículo', Icon: Car }
-      : { n: 3, label: 'Asegurado', Icon: Users },
-    { n: 4, label: 'Plan', Icon: ShieldCheck },
-    { n: 5, label: 'Pago', Icon: CreditCard },
-  ];
+  const STEPS = product.exelixiCatalog
+    ? [
+        { n: 2, label: 'Cliente', Icon: UserCog },
+        ...(product.hasVehicle
+          ? [{ n: 3, label: 'Vehículo', Icon: Car }]
+          : product.useFuneralStep
+            ? [{ n: 3, label: 'Personas', Icon: Users }]
+            : []),
+      ]
+    : [
+        { n: 1, label: 'Documentos', Icon: FileText },
+        { n: 2, label: product.hasVehicle ? 'Emisión' : 'Tomador', Icon: UserCog },
+        product.hasVehicle
+          ? { n: 3, label: 'Vehículo', Icon: Car }
+          : { n: 3, label: 'Asegurado', Icon: Users },
+        { n: 4, label: 'Plan', Icon: ShieldCheck },
+        { n: 5, label: 'Pago', Icon: CreditCard },
+      ];
 
   function canGoTo(target: number): boolean {
     return canNavigateToStep(step, target, navSnapshot);
   }
 
   async function goToStep(target: number) {
-    if (navigating || target === step || target < 1 || target > 5) return;
+    if (navigating || target === step) return;
+    if (product.exelixiCatalog && (target < 2 || target > 3)) return;
+    if (!product.exelixiCatalog && (target < 1 || target > 5)) return;
 
     if (!canGoTo(target)) {
       const reason = getNavigationBlockReason(step, target, navSnapshot);
@@ -70,8 +81,11 @@ export function TopStepper() {
   }
 
   const prevStep = getPreviousAllowedStep(step);
+  const maxStep = product.exelixiCatalog
+    ? (STEPS[STEPS.length - 1]?.n ?? 2)
+    : 5;
   const canPrev = prevStep != null && !navigating && canGoTo(prevStep);
-  const canNext = step < 5 && !navigating && canGoTo(step + 1);
+  const canNext = step < maxStep && !navigating && canGoTo(step + 1);
 
   return (
     <div className="hidden lg:block w-full mb-8 animate-fade-in">
