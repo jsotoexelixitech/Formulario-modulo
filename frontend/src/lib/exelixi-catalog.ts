@@ -206,7 +206,7 @@ export function applyExelixiOcrHandoff(
 export function getEmisionContinueUrl(): string {
   const configured = import.meta.env.VITE_EMISION_CONTINUE_BASE as string | undefined;
   const base = (configured?.replace(/\/$/, '') || '/emision').replace(/\/$/, '');
-  const params = new URLSearchParams({ flow: 'exelixi-catalog' });
+  const params = new URLSearchParams({ flow: 'exelixi-catalog', wizardStep: '4' });
 
   try {
     const current = new URL(window.location.href);
