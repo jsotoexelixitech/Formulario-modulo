@@ -14,6 +14,7 @@ import {
 import { toast } from '../../store/toastStore';
 import { cn } from '../../lib/utils';
 import { catalogoApi, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
+import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import type { VehicleData } from '../../types';
 
 const COLOR_SWATCHES: Record<string, string> = {
@@ -405,23 +406,25 @@ export function VehicleStep() {
       return false;
     }
 
-    // Validación remota (nest-api vía form-api)
-    try {
-      const { validateVehicle } = await import('../../lib/api');
-      toast.info('Validando vehículo', 'Verificando placa y serial...', 2000);
-      const res = await validateVehicle(vehicle.placa || '', vehicle.serial || '', {
-        plan: selectedPlan?.cplan,
-      });
-      if (!res.success) {
-        const msg = res.message || 'El vehículo no puede ser asegurado.';
-        toast.error('Atención', msg, 6000);
-        setErrors({ ...e, placa: msg, serial: msg });
+    // Validación remota La Mundial (nest-api) — no aplica en flujo Exélixi genérico
+    if (!isExelixiCatalogFlow()) {
+      try {
+        const { validateVehicle } = await import('../../lib/api');
+        toast.info('Validando vehículo', 'Verificando placa y serial...', 2000);
+        const res = await validateVehicle(vehicle.placa || '', vehicle.serial || '', {
+          plan: selectedPlan?.cplan,
+        });
+        if (!res.success) {
+          const msg = res.message || 'El vehículo no puede ser asegurado.';
+          toast.error('Atención', msg, 6000);
+          setErrors({ ...e, placa: msg, serial: msg });
+          return false;
+        }
+      } catch {
+        toast.error('Error', 'No se pudo validar el vehículo. Inténtalo de nuevo.');
+        setErrors({ ...e, placa: 'No se pudo validar', serial: 'No se pudo validar' });
         return false;
       }
-    } catch {
-      toast.error('Error', 'No se pudo validar el vehículo. Inténtalo de nuevo.');
-      setErrors({ ...e, placa: 'No se pudo validar', serial: 'No se pudo validar' });
-      return false;
     }
 
     return true;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getEstados, getCiudades, getValrepList, type CatalogItem } from '../lib/api';
+import { isExelixiCatalogFlow } from '../lib/exelixi-catalog';
 
 export interface Catalogs {
   estados     : CatalogItem[];
@@ -33,6 +34,18 @@ const LIST_FALLBACKS: Record<string, CatalogItem[]> = {
   ],
 };
 
+/** Catálogos locales — flujo Exélixi genérico (sin valrep La Mundial). */
+function exelixiLocalCatalogs(): Catalogs {
+  return {
+    estados: [],
+    sexos: LIST_FALLBACKS.SEXO,
+    estadosCivil: LIST_FALLBACKS.EDOCIVIL,
+    parentescos: LIST_FALLBACKS.PARENTESCOS,
+    loading: false,
+    error: null,
+  };
+}
+
 async function loadList(domain: keyof typeof LIST_FALLBACKS): Promise<CatalogItem[]> {
   try {
     return await getValrepList(domain);
@@ -43,13 +56,21 @@ async function loadList(domain: keyof typeof LIST_FALLBACKS): Promise<CatalogIte
 }
 
 /**
- * Carga catálogos valrep en paralelo. Cada lista es independiente: un fallo
- * en PARENTESCOS no debe vaciar estados/ciudades en el formulario.
+ * Carga catálogos valrep en paralelo (solo flujo La Mundial).
+ * En Exélixi catálogo genérico usa listas locales — sin llamadas a valrep.
  */
 export function useCatalogs(): Catalogs {
-  const [cats, setCats] = useState<Catalogs>(EMPTY);
+  const exelixiFlow = isExelixiCatalogFlow();
+  const [cats, setCats] = useState<Catalogs>(() =>
+    exelixiFlow ? exelixiLocalCatalogs() : EMPTY,
+  );
 
   useEffect(() => {
+    if (exelixiFlow) {
+      setCats(exelixiLocalCatalogs());
+      return;
+    }
+
     let cancelled = false;
 
     (async () => {
@@ -82,7 +103,7 @@ export function useCatalogs(): Catalogs {
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [exelixiFlow]);
 
   return cats;
 }
@@ -94,13 +115,15 @@ export interface CiudadesState {
 }
 
 /**
- * Carga las ciudades correspondientes al estado seleccionado.
+ * Carga las ciudades correspondientes al estado seleccionado (La Mundial).
+ * En Exélixi catálogo no consulta valrep.
  */
 export function useCiudades(cestado?: number | null): CiudadesState {
+  const exelixiFlow = isExelixiCatalogFlow();
   const [state, setState] = useState<CiudadesState>({ ciudades: [], loading: false, error: null });
 
   useEffect(() => {
-    if (!cestado) {
+    if (exelixiFlow || !cestado) {
       setState({ ciudades: [], loading: false, error: null });
       return;
     }
@@ -117,7 +140,7 @@ export function useCiudades(cestado?: number | null): CiudadesState {
       });
 
     return () => { cancelled = true; };
-  }, [cestado]);
+  }, [cestado, exelixiFlow]);
 
   return state;
 }
