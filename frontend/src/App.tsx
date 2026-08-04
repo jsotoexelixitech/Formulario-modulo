@@ -9,7 +9,7 @@ import { Button } from './components/ui/Button';
 import { EmissionStep } from './features/emission/EmissionStep';
 import { VehicleStep } from './features/vehicle/VehicleStep';
 import { FuneralStep } from './features/funeral/FuneralStep';
-import { getProductConfig, isFunerario } from './lib/product';
+import { getProductConfig, isFunerario, skipsPersonasStep, usesFuneralStep, usesVehicleStep } from './lib/product';
 import { syncTitularFromTomador } from './lib/funeral-sync';
 import { toast } from './store/toastStore';
 import { ChevronLeft, ChevronRight, Sparkles, ShieldCheck, HelpCircle } from 'lucide-react';
@@ -43,6 +43,30 @@ const STEP_META_BY_PRODUCT: Record<'rcv' | 'funerario', Record<2 | 3, StepMeta>>
   },
 };
 
+function getStepMeta(product: ReturnType<typeof getProductConfig>, localStep: 2 | 3): StepMeta {
+  if (product.exelixiCatalog) {
+    if (localStep === 2) {
+      return {
+        eyebrow: 'Paso 02 · Cliente',
+        title: 'Información del cliente',
+        sub: 'Verifica los datos del OCR y completa lo que falte.',
+      };
+    }
+    if (product.hasVehicle) {
+      return {
+        eyebrow: 'Paso 03 · Vehículo',
+        title: 'Datos del vehículo',
+        sub: 'Información del vehículo a asegurar.',
+      };
+    }
+    if (product.useFuneralStep) {
+      return STEP_META_BY_PRODUCT.funerario[3];
+    }
+    return STEP_META_BY_PRODUCT.rcv[2];
+  }
+  return STEP_META_BY_PRODUCT[product.id][localStep];
+}
+
 import { FormularioConfigPanel } from './config/FormularioConfigPanel';
 
 export default function App() {
@@ -74,8 +98,16 @@ export default function App() {
         );
         return;
       }
-      if (!isFunerario()) {
+      if (!isFunerario() && !usesFuneralStep()) {
         syncTitularFromTomador();
+      }
+      if (skipsPersonasStep()) {
+        toast.success(
+          '¡Formulario completado!',
+          'Datos del cliente guardados correctamente.',
+        );
+        window.__bridgeAdvance?.();
+        return;
       }
       navigate(3);
     } else {
@@ -98,7 +130,7 @@ export default function App() {
     }
   }
 
-  const meta = STEP_META_BY_PRODUCT[product.id][localStep];
+  const meta = getStepMeta(product, localStep);
 
   return (
     <div className="min-h-screen relative">
@@ -141,7 +173,7 @@ export default function App() {
             <section key={localStep} className="surface-card overflow-hidden step-enter">
               <div className="p-6 sm:p-8 lg:p-10">
                 {localStep === 2 && <EmissionStep />}
-                {localStep === 3 && (isFunerario() ? <FuneralStep /> : <VehicleStep />)}
+                {localStep === 3 && (usesFuneralStep() ? <FuneralStep /> : usesVehicleStep() ? <VehicleStep /> : null)}
               </div>
 
               <div className="hidden md:flex items-center justify-between gap-4 px-8 lg:px-10 py-5 border-t border-slate-100/80 bg-gradient-to-b from-slate-50/50 to-white/40 backdrop-blur-sm">

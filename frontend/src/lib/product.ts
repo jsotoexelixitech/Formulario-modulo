@@ -9,6 +9,7 @@
  * Si no se especifica, el producto por defecto es `rcv` (comportamiento previo).
  */
 import type { ProductId } from '../types';
+import { getExelixiCatalogProductView, isExelixiCatalogFlow } from './exelixi-catalog';
 
 export interface ProductConfig {
   id: ProductId;
@@ -16,10 +17,15 @@ export interface ProductConfig {
   label: string;
   /** Nombre completo del producto (ej. "Seguro Funerario"). */
   fullLabel: string;
-  /** Ramo La Mundial asociado (RCV=18, Funerario=9). */
+  /** Ramo La Mundial asociado (RCV=18, Funerario=9). 0 en flujo Exélixi genérico. */
   cramo: number;
   /** True si el flujo incluye datos de vehículo (RCV). */
   hasVehicle: boolean;
+  /** Flujo genérico Exélixi (catálogo product-builder + product-emission). */
+  exelixiCatalog?: boolean;
+  builderProductId?: string;
+  useFuneralStep?: boolean;
+  skipPersonasStep?: boolean;
 }
 
 export const PRODUCTS: Record<ProductId, ProductConfig> = {
@@ -100,8 +106,40 @@ export function getProductId(): ProductId {
   return 'rcv';
 }
 
+/** Config efectiva: Exélixi catálogo → product-builder; si no, rcv/funerario La Mundial. */
 export function getProductConfig(): ProductConfig {
+  if (isExelixiCatalogFlow()) {
+    const catalog = getExelixiCatalogProductView();
+    if (catalog) {
+      return {
+        id: 'rcv',
+        label: catalog.label,
+        fullLabel: catalog.fullLabel,
+        cramo: 0,
+        hasVehicle: catalog.hasVehicle,
+        exelixiCatalog: true,
+        builderProductId: catalog.builderProductId,
+        useFuneralStep: catalog.useFuneralStep,
+        skipPersonasStep: catalog.skipPersonasStep,
+      };
+    }
+  }
   return PRODUCTS[getProductId()];
+}
+
+export function usesFuneralStep(): boolean {
+  const cfg = getProductConfig();
+  if (cfg.exelixiCatalog) return Boolean(cfg.useFuneralStep);
+  return isFunerario();
+}
+
+export function usesVehicleStep(): boolean {
+  return getProductConfig().hasVehicle;
+}
+
+export function skipsPersonasStep(): boolean {
+  const cfg = getProductConfig();
+  return Boolean(cfg.exelixiCatalog && cfg.skipPersonasStep);
 }
 
 export function isFunerario(): boolean {

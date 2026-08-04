@@ -410,7 +410,6 @@ export function VehicleStep() {
       const { validateVehicle } = await import('../../lib/api');
       toast.info('Validando vehículo', 'Verificando placa y serial...', 2000);
       const res = await validateVehicle(vehicle.placa || '', vehicle.serial || '', {
-        serialMotor: vehicle.serialMotor,
         plan: selectedPlan?.cplan,
       });
       if (!res.success) {

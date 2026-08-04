@@ -1,10 +1,20 @@
-import { StrictMode } from 'react'
+import { StrictMode, useEffect, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { FormularioConfigPanel } from './config/FormularioConfigPanel.tsx'
 import './lib/bridge'
 import { NexusGuard } from './nexus/NexusGuard'
+import { applyExelixiOcrHandoff } from './lib/exelixi-catalog'
+import { useWizardStore } from './store/wizardStore'
+
+function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const { setDocState, setTomador, setVehicle, setOcrDone, goTo } = useWizardStore.getState();
+    applyExelixiOcrHandoff({ setDocState, setTomador, setVehicle, setOcrDone, goTo });
+  }, []);
+  return children;
+}
 
 // Enrutamiento simple: /config → panel de configuración, resto → app normal.
 const isConfigRoute = window.location.pathname === '/config';
@@ -15,7 +25,9 @@ createRoot(document.getElementById('root')!).render(
       ? <FormularioConfigPanel />
       : (
         <NexusGuard recheckInterval={30}>
-          <App />
+          <ExelixiHandoffBootstrap>
+            <App />
+          </ExelixiHandoffBootstrap>
         </NexusGuard>
       )
     }
