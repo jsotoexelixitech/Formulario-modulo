@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getEstados, getCiudades, getValrepList, type CatalogItem } from '../lib/api';
 import { isExelixiCatalogFlow } from '../lib/exelixi-catalog';
+import { EXELIXI_VENEZUELA_ESTADOS } from '../lib/exelixi-local-catalog';
 
 export interface Catalogs {
   estados     : CatalogItem[];
@@ -37,7 +38,7 @@ const LIST_FALLBACKS: Record<string, CatalogItem[]> = {
 /** Catálogos locales — flujo Exélixi genérico (sin valrep La Mundial). */
 function exelixiLocalCatalogs(): Catalogs {
   return {
-    estados: [],
+    estados: EXELIXI_VENEZUELA_ESTADOS,
     sexos: LIST_FALLBACKS.SEXO,
     estadosCivil: LIST_FALLBACKS.EDOCIVIL,
     parentescos: LIST_FALLBACKS.PARENTESCOS,

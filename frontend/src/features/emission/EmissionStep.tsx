@@ -4,7 +4,9 @@ import { Field, Input, Textarea } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SearchSelect } from '../../components/ui/SearchSelect';
+import { PersonLocationFields } from '../../components/PersonLocationFields';
 import { useCatalogs, useCiudades } from '../../hooks/useCatalogs';
+import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { User, Heart, ShieldAlert, FileText } from 'lucide-react';
 import { formatTelefono, isValidPhonePrefix } from '@exelixi/shared';
 
@@ -77,6 +79,7 @@ export function EmissionStep() {
   } = useWizardStore();
 
   const catalogs = useCatalogs();
+  const exelixiFlow = isExelixiCatalogFlow();
   const ciudadesState = useCiudades(tomador.cestado);
   const aseguradoCiudades = useCiudades(asegurado.cestado);
   const beneficiarioCiudades = useCiudades(beneficiario.cestado);
@@ -191,41 +194,16 @@ export function EmissionStep() {
           inputMode="email"
         />
       </Field>
-      <Field label="Estado *" error={errors[`${prefix}estado`]}>
-        <SearchSelect
-          value={person.cestado}
-          options={catalogs.estados.map((s) => ({ value: String(s.code), label: s.label }))}
-          onChange={(code, label) => {
-            setPerson({
-              estado : label,
-              cestado: code ? Number(code) : undefined,
-              ciudad : '',
-              cciudad: undefined,
-            });
-          }}
-          placeholder="Seleccione Estado"
-          loading={catalogs.loading}
-        />
-      </Field>
-      <Field
-        label="Ciudad *"
-        error={errors[`${prefix}ciudad`]}
-        hint={person.cestado ? 'Escribe para filtrar la ciudad' : 'Selecciona primero el estado'}
-      >
-        <SearchSelect
-          value={person.cciudad}
-          options={ciuState.ciudades.map((c: any) => ({ value: String(c.code), label: c.label }))}
-          onChange={(code, label) => {
-            setPerson({
-              ciudad : label,
-              cciudad: code ? Number(code) : undefined,
-            });
-          }}
-          placeholder={person.cestado ? 'Seleccione Ciudad' : 'Selecciona primero el estado'}
-          disabled={!person.cestado}
-          loading={ciuState.loading}
-        />
-      </Field>
+      <PersonLocationFields
+        person={person}
+        setPerson={setPerson}
+        prefix={prefix}
+        errors={errors}
+        estados={catalogs.estados}
+        ciuState={ciuState}
+        catalogsLoading={catalogs.loading}
+        exelixiFlow={exelixiFlow}
+      />
       <Field label="Fecha de Nac. *" error={errors[`${prefix}fechaNac`]}>
         <Input
           value={person.fechaNac ?? ''}

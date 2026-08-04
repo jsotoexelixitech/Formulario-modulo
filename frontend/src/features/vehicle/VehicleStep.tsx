@@ -4,6 +4,7 @@ import { Field, Input, Select, Textarea } from '../../components/ui/FormField';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SectionCard } from '../emission/EmissionStep';
 import { useCatalogs, useCiudades } from '../../hooks/useCatalogs';
+import { PersonLocationFields } from '../../components/PersonLocationFields';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { IdentityInput } from '../../components/ui/IdentityInput';
 import { formatTelefono, isValidPhonePrefix } from '@exelixi/shared';
@@ -151,6 +152,7 @@ export function VehicleStep() {
   const [errors, setErrors] = useState<VehicleErrors>({});
   const [verified, setVerified] = useState(false);
   const catalogs = useCatalogs();
+  const exelixiFlow = isExelixiCatalogFlow();
   const conductorCiudades = useCiudades(conductor.cestado);
 
   // Rango de años del catálogo INMA
@@ -881,23 +883,16 @@ export function VehicleStep() {
               <Field label="Correo electrónico *" error={errors.cond_email}>
                 <Input value={conductor.email ?? ''} onChange={(e) => setConductor({ email: e.target.value })} placeholder="correo@ejemplo.com" type="email" inputMode="email" />
               </Field>
-              <Field label="Estado *" error={errors.cond_estado}>
-                <SearchSelect
-                  value={conductor.cestado}
-                  options={catalogs.estados.map((s) => ({ value: String(s.code), label: s.label }))}
-                  onChange={(code, label) => setConductor({ estado: label, cestado: code ? Number(code) : undefined, ciudad: '', cciudad: undefined })}
-                  placeholder="Escribe para buscar estado..." loading={catalogs.loading}
-                />
-              </Field>
-              <Field label="Ciudad *" error={errors.cond_ciudad} hint={conductor.cestado ? '' : 'Selecciona primero el estado'}>
-                <SearchSelect
-                  value={conductor.cciudad}
-                  options={conductorCiudades.ciudades.map((c) => ({ value: String(c.code), label: c.label }))}
-                  onChange={(code, label) => setConductor({ ciudad: label, cciudad: code ? Number(code) : undefined })}
-                  placeholder={conductor.cestado ? 'Escribe para buscar ciudad...' : 'Selecciona primero el estado'}
-                  disabled={!conductor.cestado} loading={conductorCiudades.loading}
-                />
-              </Field>
+              <PersonLocationFields
+                person={conductor}
+                setPerson={setConductor}
+                prefix="cond_"
+                errors={errors as Record<string, string | undefined>}
+                estados={catalogs.estados}
+                ciuState={conductorCiudades}
+                catalogsLoading={catalogs.loading}
+                exelixiFlow={exelixiFlow}
+              />
               <Field label="Fecha de nacimiento *">
                 <Input value={conductor.fechaNac ?? ''} onChange={(e) => setConductor({ fechaNac: e.target.value })} type="date" />
               </Field>
