@@ -11,11 +11,26 @@ import { VehicleStep } from './features/vehicle/VehicleStep';
 import { FuneralStep } from './features/funeral/FuneralStep';
 import { getProductConfig, isFunerario, skipsPersonasStep, usesFuneralStep, usesVehicleStep } from './lib/product';
 import { continueToEmisionModule } from './lib/exelixi-catalog';
+import type { ExelixiWizardHandoff } from './lib/exelixi-wizard-handoff';
 import { syncTitularFromTomador } from './lib/funeral-sync';
 import { toast } from './store/toastStore';
 import { ChevronLeft, ChevronRight, Sparkles, ShieldCheck, HelpCircle } from 'lucide-react';
 
 type StepMeta = { eyebrow: string; title: string; sub: string };
+
+function buildExelixiWizardSnapshot(): Partial<ExelixiWizardHandoff> {
+  const snap = useWizardStore.getState();
+  return {
+    tomador: snap.tomador as ExelixiWizardHandoff['tomador'],
+    sameInsured: snap.sameInsured,
+    asegurado: snap.asegurado as ExelixiWizardHandoff['asegurado'],
+    hasBeneficiary: snap.hasBeneficiary,
+    beneficiario: snap.beneficiario as ExelixiWizardHandoff['beneficiario'],
+    vehicle: snap.vehicle as ExelixiWizardHandoff['vehicle'],
+    funeral: snap.funeral as ExelixiWizardHandoff['funeral'],
+    ocrDone: snap.ocrDone,
+  };
+}
 
 const STEP_META_BY_PRODUCT: Record<'rcv' | 'funerario', Record<2 | 3, StepMeta>> = {
   rcv: {
@@ -107,7 +122,7 @@ export default function App() {
           '¡Formulario completado!',
           'Datos del cliente guardados correctamente.',
         );
-        continueToEmisionModule();
+        continueToEmisionModule(buildExelixiWizardSnapshot());
         return;
       }
       navigate(3);
@@ -127,7 +142,7 @@ export default function App() {
           : 'Datos del cliente y las personas guardados correctamente.',
       );
       if (product.exelixiCatalog) {
-        continueToEmisionModule();
+        continueToEmisionModule(buildExelixiWizardSnapshot());
       } else {
         window.__bridgeAdvance?.();
       }

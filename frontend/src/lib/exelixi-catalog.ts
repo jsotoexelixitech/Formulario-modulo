@@ -1,3 +1,4 @@
+import { mergeExelixiWizardHandoff, type ExelixiWizardHandoff } from './exelixi-wizard-handoff';
 import type { DocType, DocumentState, TomadorData, VehicleData } from '../types';
 import {
   EXELIXI_OCR_HANDOFF_KEY,
@@ -72,6 +73,8 @@ export function isExelixiCatalogFlow(): boolean {
     const params = new URLSearchParams(window.location.search);
     const product = params.get('product');
     if (product === 'rcv' || product === 'funerario') return false;
+    const stored = sessionStorage.getItem('exelixi_product');
+    if (stored === 'rcv' || stored === 'funerario') return false;
     if (params.get('flow') === 'exelixi-catalog') return true;
     if (isExelixiCatalogEntryPath()) return true;
   } catch {
@@ -80,7 +83,7 @@ export function isExelixiCatalogFlow(): boolean {
   return false;
 }
 
-/** Sincroniza ?flow=exelixi-catalog en la URL tras hidratar sesión bridge (metadata, no sessionStorage). */
+/** Sincroniza ?flow=exelixi-catalog solo si no es La Mundial (rcv/funerario). */
 export function ensureExelixiFlowQueryParam(active: boolean): void {
   if (!active || isExelixiCatalogFlow()) return;
   try {
@@ -88,6 +91,8 @@ export function ensureExelixiFlowQueryParam(active: boolean): void {
     if (url.searchParams.get('product') === 'rcv' || url.searchParams.get('product') === 'funerario') {
       return;
     }
+    const stored = sessionStorage.getItem('exelixi_product');
+    if (stored === 'rcv' || stored === 'funerario') return;
     url.searchParams.set('flow', 'exelixi-catalog');
     window.history.replaceState({}, '', url.toString());
   } catch {
@@ -239,7 +244,11 @@ export function getEmisionContinueUrl(): string {
 }
 
 /** Avanza al módulo emisión en flujo Exélixi (bridge o redirect con ?flow=exelixi-catalog). */
-export function continueToEmisionModule(): void {
+export function continueToEmisionModule(snapshot?: Partial<ExelixiWizardHandoff>): void {
+  if (snapshot) {
+    mergeExelixiWizardHandoff(snapshot);
+  }
+
   if (typeof window.__bridgeAdvance === 'function') {
     void window.__bridgeAdvance({ exelixiCatalogFlow: true });
     return;
