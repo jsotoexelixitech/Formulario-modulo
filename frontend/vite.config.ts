@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => {
     '/files': { target: 'http://localhost:4002', changeOrigin: true },
     '/docs': { target: 'http://localhost:4002', changeOrigin: true },
     '/docs.json': { target: 'http://localhost:4002', changeOrigin: true },
-  })
+  }, env.VITE_DEPLOY_PREFIX)
 
   return {
     base,
