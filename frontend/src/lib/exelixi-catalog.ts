@@ -71,11 +71,10 @@ export function isExelixiCatalogFlowHint(hints?: {
 export function isExelixiCatalogFlow(): boolean {
   try {
     const params = new URLSearchParams(window.location.search);
+    // ?flow=exelixi-catalog manda — igual que ?product=rcv para La Mundial.
+    if (params.get('flow') === 'exelixi-catalog') return true;
     const product = params.get('product');
     if (product === 'rcv' || product === 'funerario') return false;
-    const stored = sessionStorage.getItem('exelixi_product');
-    if (stored === 'rcv' || stored === 'funerario') return false;
-    if (params.get('flow') === 'exelixi-catalog') return true;
     if (isExelixiCatalogEntryPath()) return true;
   } catch {
     /* ignore */
@@ -83,7 +82,7 @@ export function isExelixiCatalogFlow(): boolean {
   return false;
 }
 
-/** Sincroniza ?flow=exelixi-catalog solo si no es La Mundial (rcv/funerario). */
+/** Sincroniza ?flow=exelixi-catalog en la URL — nunca sobre URLs La Mundial (?product=). */
 export function ensureExelixiFlowQueryParam(active: boolean): void {
   if (!active || isExelixiCatalogFlow()) return;
   try {
@@ -91,8 +90,6 @@ export function ensureExelixiFlowQueryParam(active: boolean): void {
     if (url.searchParams.get('product') === 'rcv' || url.searchParams.get('product') === 'funerario') {
       return;
     }
-    const stored = sessionStorage.getItem('exelixi_product');
-    if (stored === 'rcv' || stored === 'funerario') return;
     url.searchParams.set('flow', 'exelixi-catalog');
     window.history.replaceState({}, '', url.toString());
   } catch {
