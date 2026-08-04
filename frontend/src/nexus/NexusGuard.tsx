@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { verifyNexusAccess, resolveNexusApiUrl, type NexusVerifyResult } from './nexus-core';
 import { persistProductFromHints } from '../lib/product';
-import { isExelixiCatalogFlowHint, persistExelixiCatalogFlow } from '../lib/exelixi-catalog';
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 interface NexusContextValue {
@@ -131,33 +130,12 @@ export function NexusGuard({ children, recheckInterval = 30 }: NexusGuardProps) 
     if (!isMounted.current) return;
     if (result.active) {
       if (result.submodulo) {
-        const exelixiFromUrl = (() => {
-          try {
-            return new URLSearchParams(window.location.search).get('flow') === 'exelixi-catalog';
-          } catch { return false; }
-        })();
-        const exelixiSession = (() => {
-          try { return sessionStorage.getItem('exelixi_catalog_flow') === '1'; } catch { return false; }
-        })();
-
-        if (
-          isExelixiCatalogFlowHint({
-            url: result.submodulo.url,
-            nombre: result.submodulo.nombre,
-            moduloNombre: result.submodulo.moduloNombre,
-          })
-        ) {
-          persistExelixiCatalogFlow();
-        }
-
-        if (!exelixiFromUrl && !exelixiSession) {
-          persistProductFromHints({
-            url: result.submodulo.url,
-            nombre: result.submodulo.nombre,
-            moduloNombre: result.submodulo.moduloNombre,
-            product: result.product,
-          });
-        }
+        persistProductFromHints({
+          url: result.submodulo.url,
+          nombre: result.submodulo.nombre,
+          moduloNombre: result.submodulo.moduloNombre,
+          product: result.product,
+        });
       }
       setState({ status: 'active', empresa: result.empresa, submodulo: result.submodulo });
     } else {
