@@ -32,14 +32,18 @@ export function TopStepper() {
     requiredDocTypes: getDefaultRequiredDocs(product.id),
   };
 
+  // Misma visual que RCV: stepper completo también en Exélixi (paridad de flujo).
   const STEPS = product.exelixiCatalog
     ? [
+        { n: 1, label: 'Documentos', Icon: FileText },
         { n: 2, label: 'Cliente', Icon: UserCog },
         ...(product.hasVehicle
           ? [{ n: 3, label: 'Vehículo', Icon: Car }]
           : product.useFuneralStep
             ? [{ n: 3, label: 'Personas', Icon: Users }]
             : []),
+        { n: 4, label: 'Plan', Icon: ShieldCheck },
+        { n: 5, label: 'Pago', Icon: CreditCard },
       ]
     : [
         { n: 1, label: 'Documentos', Icon: FileText },
@@ -51,13 +55,28 @@ export function TopStepper() {
         { n: 5, label: 'Pago', Icon: CreditCard },
       ];
 
+  /** Pasos que este módulo renderiza localmente en flujo Exélixi. */
+  const EXELIXI_LOCAL_STEPS = [2, 3];
+
+  function bridgeNavAvailable(): boolean {
+    return Boolean(window.__bridgeNavigateStep ?? window.__bridge?.navigateToStep);
+  }
+
+  function allowedExelixiTarget(target: number): boolean {
+    if (!STEPS.some((s) => s.n === target)) return false;
+    // Pasos de otros módulos solo navegables con la cadena (bridge) activa.
+    if (!EXELIXI_LOCAL_STEPS.includes(target) && !bridgeNavAvailable()) return false;
+    return true;
+  }
+
   function canGoTo(target: number): boolean {
+    if (product.exelixiCatalog && !allowedExelixiTarget(target)) return false;
     return canNavigateToStep(step, target, navSnapshot);
   }
 
   async function goToStep(target: number) {
     if (navigating || target === step) return;
-    if (product.exelixiCatalog && (target < 2 || target > 3)) return;
+    if (product.exelixiCatalog && !allowedExelixiTarget(target)) return;
     if (!product.exelixiCatalog && (target < 1 || target > 5)) return;
 
     if (!canGoTo(target)) {

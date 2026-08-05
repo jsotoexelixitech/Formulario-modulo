@@ -3,23 +3,39 @@ import { useWizardStore } from '../store/wizardStore';
 import { getProductConfig } from '../lib/product';
 import { publicAsset } from '../lib/app-base';
 
-const TOTAL_STEPS = 5;
-
 export function TopProgressBar() {
   const step = useWizardStore((s) => s.step);
-  const segments = Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1);
-  const safeStep = Math.min(step, TOTAL_STEPS);
   const product = getProductConfig();
-  
-  const MOBILE_LABELS: Record<number, string> = {
-    1: 'Documentos',
-    2: product.hasVehicle ? 'Emisión' : 'Tomador',
-    3: product.hasVehicle ? 'Vehículo' : 'Asegurado',
-    4: 'Plan',
-    5: 'Pago',
-    6: 'Listo',
-  };
-  
+  const exelixiFlow = Boolean(product.exelixiCatalog);
+
+  // Exélixi omite el paso 3 cuando el producto no tiene vehículo ni personas.
+  const stepNumbers = exelixiFlow
+    ? [1, 2, ...(product.hasVehicle || product.useFuneralStep ? [3] : []), 4, 5]
+    : [1, 2, 3, 4, 5];
+  const TOTAL_STEPS = stepNumbers.length;
+  const safeStep = Math.max(
+    1,
+    stepNumbers.filter((n) => n <= Math.min(step, 5)).length,
+  );
+
+  const MOBILE_LABELS: Record<number, string> = exelixiFlow
+    ? {
+        1: 'Documentos',
+        2: 'Cliente',
+        3: product.hasVehicle ? 'Vehículo' : 'Personas',
+        4: 'Plan',
+        5: 'Pago',
+        6: 'Listo',
+      }
+    : {
+        1: 'Documentos',
+        2: product.hasVehicle ? 'Emisión' : 'Tomador',
+        3: product.hasVehicle ? 'Vehículo' : 'Asegurado',
+        4: 'Plan',
+        5: 'Pago',
+        6: 'Listo',
+      };
+
   const label = MOBILE_LABELS[step] ?? '';
 
   return (
@@ -38,11 +54,11 @@ export function TopProgressBar() {
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white" />
             </div>
             <div className="min-w-0">
-              <p className="font-wordmark text-indigo-700 text-[0.95rem] leading-none truncate">
-                La Mundial
+              <p className={`text-[0.95rem] leading-none truncate ${exelixiFlow ? 'font-display font-bold text-indigo-700' : 'font-wordmark text-indigo-700'}`}>
+                {exelixiFlow ? 'Exélixi' : 'La Mundial'}
               </p>
-              <p className="text-[0.55rem] text-fuchsia-500 font-bold leading-tight tracking-[0.18em] uppercase mt-0.5">
-                de Seguros
+              <p className={`text-[0.55rem] font-bold leading-tight tracking-[0.18em] uppercase mt-0.5 ${exelixiFlow ? 'text-indigo-500' : 'text-fuchsia-500'}`}>
+                {exelixiFlow ? 'Catálogo genérico' : 'de Seguros'}
               </p>
             </div>
           </div>
@@ -63,9 +79,9 @@ export function TopProgressBar() {
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 pb-2.5 pt-2.5 lg:py-3">
           <div className="flex gap-1.5 h-1">
-            {segments.map((n) => {
-              const isComplete = n < Math.min(step, TOTAL_STEPS + 1);
-              const isActive = n === step && step <= TOTAL_STEPS;
+            {stepNumbers.map((n) => {
+              const isComplete = n < step;
+              const isActive = n === step && step <= 5;
               const isUpcoming = n > step;
 
               return (
@@ -80,7 +96,7 @@ export function TopProgressBar() {
                     />
                   )}
                   {isActive && <div className="absolute inset-0 shimmer-line rounded-full" />}
-                  {isUpcoming && step > TOTAL_STEPS && (
+                  {isUpcoming && step > 5 && (
                     <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 rounded-full" />
                   )}
                 </div>
