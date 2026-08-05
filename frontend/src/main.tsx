@@ -6,7 +6,11 @@ import { FormularioConfigPanel } from './config/FormularioConfigPanel.tsx'
 import './lib/bridge'
 import { NexusGuard } from './nexus/NexusGuard'
 import { applyExelixiOcrHandoff } from './lib/exelixi-catalog'
+import { applyExelixiBranding } from './lib/exelixi-branding'
 import { useWizardStore } from './store/wizardStore'
+
+// Identidad Exélixi (colores + favicon) solo si el flujo activo es el catálogo.
+applyExelixiBranding('Formulario');
 
 function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
   useEffect(() => {
