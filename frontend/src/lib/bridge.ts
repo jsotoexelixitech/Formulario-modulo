@@ -221,8 +221,8 @@ function makeBridge(): BridgeAPI {
 
     // Incluye nexus_token para que módulos posteriores puedan autenticarse
     const nexusToken =
-      getNexusTokenFromUrl() ||
-      sessionStorage.getItem(getModuleTokenKey());
+      sessionStorage.getItem(getModuleTokenKey()) ||
+      getNexusTokenFromUrl();
     if (nexusToken) out.nexus_token = nexusToken;
     return out;
   };
@@ -258,8 +258,12 @@ function makeBridge(): BridgeAPI {
         // token en la URL — evita sobreescribir con el token de otro módulo
         const urlToken = getNexusTokenFromUrl();
         const sessionToken = r.data.data.nexus_token;
-        if (!urlToken && sessionToken && typeof sessionToken === 'string') {
-          sessionStorage.setItem(getModuleTokenKey(), sessionToken);
+        const moduleKey = getModuleTokenKey();
+        const stored = sessionStorage.getItem(moduleKey);
+        if (sessionToken && typeof sessionToken === 'string' && !stored) {
+          sessionStorage.setItem(moduleKey, sessionToken);
+        } else if (!stored && urlToken) {
+          sessionStorage.setItem(moduleKey, urlToken);
         }
         // Propaga el producto (rcv | funerario) entre módulos: getProductConfig()
         // lo lee desde sessionStorage, así no depende de que la URL lo arrastre.
