@@ -14,7 +14,7 @@ import { continueToEmisionModule } from './lib/exelixi-catalog';
 import type { ExelixiWizardHandoff } from './lib/exelixi-wizard-handoff';
 import { syncTitularFromTomador } from './lib/funeral-sync';
 import { toast } from './store/toastStore';
-import { ChevronLeft, ChevronRight, Sparkles, ShieldCheck, HelpCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles, ShieldCheck } from 'lucide-react';
 
 type StepMeta = { eyebrow: string; title: string; sub: string };
 
@@ -179,6 +179,7 @@ export default function App() {
                     {meta.sub}
                   </p>
                 </div>
+                {/* TEMP: CTA ayuda oculta hasta nuevo aviso
                 <a
                   href="mailto:soporte@lamundialdeseguros.com?subject=Suscripci%C3%B3n%20RCV%20-%20Soporte"
                   className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 rounded-full glass-light text-slate-600 hover:text-indigo-600 text-xs font-bold transition-all hover:-translate-y-0.5"
@@ -186,6 +187,7 @@ export default function App() {
                   <HelpCircle size={13} />
                   ¿Necesitas ayuda?
                 </a>
+                */}
               </div>
             </header>
 
