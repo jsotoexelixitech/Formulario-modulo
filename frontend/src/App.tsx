@@ -9,8 +9,9 @@ import { Button } from './components/ui/Button';
 import { EmissionStep } from './features/emission/EmissionStep';
 import { VehicleStep } from './features/vehicle/VehicleStep';
 import { FuneralStep } from './features/funeral/FuneralStep';
-import { getProductConfig, isFunerario, skipsPersonasStep, usesFuneralStep, usesVehicleStep } from './lib/product';
+import { getProductConfig, isFunerario, isRcv, skipsPersonasStep, usesFuneralStep, usesVehicleStep } from './lib/product';
 import { continueToEmisionModule } from './lib/exelixi-catalog';
+import { continueToEmisionCotizador, isCotizadorFlow } from './lib/cotizador-flow';
 import type { ExelixiWizardHandoff } from './lib/exelixi-wizard-handoff';
 import { syncTitularFromTomador } from './lib/funeral-sync';
 import { toast } from './store/toastStore';
@@ -30,6 +31,11 @@ function buildExelixiWizardSnapshot(): Partial<ExelixiWizardHandoff> {
     funeral: snap.funeral,
     ocrDone: snap.ocrDone,
   };
+}
+
+function buildCotizadorSnapshot(): Partial<ExelixiWizardHandoff> {
+  const snap = useWizardStore.getState();
+  return { vehicle: snap.vehicle, ocrDone: true };
 }
 
 const STEP_META_BY_PRODUCT: Record<'rcv' | 'funerario', Record<2 | 3, StepMeta>> = {
@@ -92,7 +98,8 @@ export default function App() {
 
   const { goTo } = useWizardStore();
   const step = useWizardStore((s) => s.step);
-  const [localStep, setLocalStep] = useState<2 | 3>(() => (step === 3 ? 3 : 2));
+  const cotizadorRcv = isCotizadorFlow() && isRcv();
+  const [localStep, setLocalStep] = useState<2 | 3>(() => (cotizadorRcv || step === 3 ? 3 : 2));
   const product = getProductConfig();
 
   useEffect(() => {
@@ -105,6 +112,17 @@ export default function App() {
   }
 
   async function handleNext() {
+    if (cotizadorRcv) {
+      const validate = (window as unknown as Record<string, unknown>).__validateStep3 as (() => boolean | Promise<boolean>) | undefined;
+      if (validate) {
+        const isValid = await validate();
+        if (!isValid) return;
+      }
+      toast.success('Datos del vehículo guardados', 'Consultando planes RCV disponibles…');
+      continueToEmisionCotizador(buildCotizadorSnapshot());
+      return;
+    }
+
     if (localStep === 2) {
       const validate = (window as unknown as Record<string, unknown>).__validateStep2 as (() => boolean) | undefined;
       if (validate && !validate()) {
@@ -149,7 +167,13 @@ export default function App() {
     }
   }
 
-  const meta = getStepMeta(product, localStep);
+  const meta = cotizadorRcv
+    ? {
+        eyebrow: 'Paso 01 · Vehículo',
+        title: 'Datos del vehículo',
+        sub: 'Ingresa la información del vehículo para cotizar los planes RCV disponibles.',
+      }
+    : getStepMeta(product, localStep);
 
   return (
     <div className="min-h-screen relative">
@@ -184,8 +208,8 @@ export default function App() {
 
             <section key={localStep} className="surface-card overflow-hidden step-enter">
               <div className="p-6 sm:p-8 lg:p-10">
-                {localStep === 2 && <EmissionStep />}
-                {localStep === 3 && (usesFuneralStep() ? <FuneralStep /> : usesVehicleStep() ? <VehicleStep /> : null)}
+                {!cotizadorRcv && localStep === 2 && <EmissionStep />}
+                {(cotizadorRcv || localStep === 3) && (usesFuneralStep() ? <FuneralStep /> : usesVehicleStep() ? <VehicleStep /> : null)}
               </div>
 
               <div className="hidden md:flex items-center justify-between gap-4 px-8 lg:px-10 py-5 border-t border-slate-100/80 bg-gradient-to-b from-slate-50/50 to-white/40 backdrop-blur-sm">
@@ -194,14 +218,14 @@ export default function App() {
                   <span className="font-medium">Cifrado de extremo a extremo · TLS 1.3</span>
                 </div>
                 <div className="flex gap-3">
-                  {localStep === 3 && (
+                  {!cotizadorRcv && localStep === 3 && (
                     <Button variant="secondary" onClick={() => navigate(2)}>
                       <ChevronLeft size={15} />
                       Atrás
                     </Button>
                   )}
                   <Button variant="primary" onClick={handleNext} className="min-w-[180px]">
-                    {localStep === 3 ? 'Guardar datos' : 'Continuar'}
+                    {cotizadorRcv ? 'Ver planes' : localStep === 3 ? 'Guardar datos' : 'Continuar'}
                     <ChevronRight size={15} />
                   </Button>
                 </div>
@@ -214,14 +238,14 @@ export default function App() {
 
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 py-3 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
         <div className="flex gap-2">
-          {localStep === 3 && (
+          {!cotizadorRcv && localStep === 3 && (
             <Button variant="secondary" className="flex-1" onClick={() => navigate(2)}>
               <ChevronLeft size={15} />
               Atrás
             </Button>
           )}
           <Button variant="primary" className="flex-1" onClick={handleNext}>
-            {localStep === 3 ? 'Guardar' : 'Continuar'}
+            {cotizadorRcv ? 'Ver planes' : localStep === 3 ? 'Guardar' : 'Continuar'}
           </Button>
         </div>
       </div>

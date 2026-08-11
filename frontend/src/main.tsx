@@ -6,8 +6,10 @@ import { FormularioConfigPanel } from './config/FormularioConfigPanel.tsx'
 import './lib/bridge'
 import { NexusGuard } from './nexus/NexusGuard'
 import { applyExelixiOcrHandoff } from './lib/exelixi-catalog'
+import { isCotizadorFlow } from './lib/cotizador-flow'
 import { applyExelixiBranding } from './lib/exelixi-branding'
 import { useWizardStore } from './store/wizardStore'
+import { isRcv } from './lib/product'
 
 // Identidad Exélixi (colores + favicon) solo si el flujo activo es el catálogo.
 applyExelixiBranding('Formulario');
@@ -15,6 +17,11 @@ applyExelixiBranding('Formulario');
 function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
   useEffect(() => {
     const { setDocState, setTomador, setVehicle, setOcrDone, goTo } = useWizardStore.getState();
+    if (isCotizadorFlow() && isRcv()) {
+      setOcrDone(true);
+      goTo(3);
+      return;
+    }
     applyExelixiOcrHandoff({ setDocState, setTomador, setVehicle, setOcrDone, goTo });
   }, []);
   return children;

@@ -1,15 +1,18 @@
 import { useWizardStore } from '../store/wizardStore';
 
 import { getProductConfig } from '../lib/product';
+import { isCotizadorFlow } from '../lib/cotizador-flow';
 import { publicAsset } from '../lib/app-base';
 
 export function TopProgressBar() {
   const step = useWizardStore((s) => s.step);
   const product = getProductConfig();
   const exelixiFlow = Boolean(product.exelixiCatalog);
+  const cotizadorRcv = isCotizadorFlow() && product.id === 'rcv';
 
-  // Exélixi omite el paso 3 cuando el producto no tiene vehículo ni personas.
-  const stepNumbers = exelixiFlow
+  const stepNumbers = cotizadorRcv
+    ? [3, 4]
+    : exelixiFlow
     ? [1, 2, ...(product.hasVehicle || product.useFuneralStep ? [3] : []), 4, 5]
     : [1, 2, 3, 4, 5];
   const TOTAL_STEPS = stepNumbers.length;
@@ -18,7 +21,9 @@ export function TopProgressBar() {
     stepNumbers.filter((n) => n <= Math.min(step, 5)).length,
   );
 
-  const MOBILE_LABELS: Record<number, string> = exelixiFlow
+  const MOBILE_LABELS: Record<number, string> = cotizadorRcv
+    ? { 3: 'Vehículo', 4: 'Plan' }
+    : exelixiFlow
     ? {
         1: 'Documentos',
         2: 'Cliente',
