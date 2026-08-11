@@ -16,6 +16,7 @@ import { toast } from '../../store/toastStore';
 import { cn } from '../../lib/utils';
 import { catalogoApi, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
+import { isCotizadorFlow } from '../../lib/cotizador-flow';
 import type { VehicleData } from '../../types';
 
 const COLOR_SWATCHES: Record<string, string> = {
@@ -153,6 +154,7 @@ export function VehicleStep() {
   const [verified, setVerified] = useState(false);
   const catalogs = useCatalogs();
   const exelixiFlow = isExelixiCatalogFlow();
+  const cotizadorRcv = isCotizadorFlow();
   const conductorCiudades = useCiudades(conductor.cestado);
 
   // Rango de años del catálogo INMA
@@ -353,7 +355,7 @@ export function VehicleStep() {
       e.serial = 'El serial debe tener al menos 10 caracteres';
     }
 
-    if (hasDriver) {
+    if (hasDriver && !cotizadorRcv) {
       const nombre   = (conductor.nombre   ?? '').trim();
       const apellido = (conductor.apellido ?? '').trim();
       const licencia = (conductor.licencia ?? '').trim();
@@ -853,7 +855,7 @@ export function VehicleStep() {
         </div>
       </SectionCard>
 
-      {/* ── Conductor habitual ─────────────────────────────────────────────────── */}
+      {!cotizadorRcv && (
       <SectionCard Icon={UserCog} title="¿Hay otro conductor?" description="Si alguien más conduce este vehículo con frecuencia, regístralo aquí">
         <ToggleSwitch
           checked={hasDriver} onChange={setHasDriver}
@@ -926,6 +928,7 @@ export function VehicleStep() {
           </div>
         )}
       </SectionCard>
+      )}
     </div>
   );
 }
