@@ -19,6 +19,9 @@ function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
     const { setDocState, setTomador, setVehicle, setOcrDone, goTo } = useWizardStore.getState();
     if (isCotizadorFlow() && isRcv()) {
       setOcrDone(true);
+      if (!useWizardStore.getState().vehicle.tipoPlaca) {
+        useWizardStore.getState().setVehicle({ tipoPlaca: 'nacional' });
+      }
       goTo(3);
       return;
     }

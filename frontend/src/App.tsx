@@ -171,7 +171,7 @@ export default function App() {
     ? {
         eyebrow: 'Paso 01 · Vehículo',
         title: 'Datos del vehículo',
-        sub: 'Ingresa la información del vehículo para cotizar los planes RCV disponibles.',
+        sub: 'Ingresa año, marca, modelo, versión y uso del vehículo para ver los planes RCV.',
       }
     : getStepMeta(product, localStep);
 

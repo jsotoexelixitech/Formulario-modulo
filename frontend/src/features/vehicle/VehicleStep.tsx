@@ -327,6 +327,18 @@ export function VehicleStep() {
     const len  = (v?: string) => (v ?? '').trim().length;
     const digs = (v?: string) => (v ?? '').replace(/\D/g, '').length;
 
+    if (cotizadorRcv) {
+      if (req(vehicle.año)) e.año = 'Selecciona el año del vehículo';
+      if (req(vehicle.cmarca)) e.marca = 'La marca es obligatoria';
+      if (req(vehicle.cmodelo)) e.modelo = 'Selecciona el modelo del catálogo';
+      else if (req(vehicle.modelo)) e.modelo = 'El modelo es obligatorio';
+      if (req(vehicle.cversion)) e.uso = 'Debes seleccionar la versión exacta del vehículo';
+      else if (!vehicle.ccategoria_uso && req(vehicle.uso)) e.uso = 'Selecciona el uso del vehículo';
+
+      setErrors(e);
+      return Object.keys(e).length === 0;
+    }
+
     if (req(vehicle.placa)) {
       e.placa = 'La placa es obligatoria';
     } else if (len(vehicle.placa) < 6) {
@@ -410,8 +422,8 @@ export function VehicleStep() {
       return false;
     }
 
-    // Validación remota La Mundial (nest-api) — no aplica en flujo Exélixi genérico
-    if (!isExelixiCatalogFlow()) {
+    // Validación remota La Mundial — no aplica en cotizador ni flujo Exélixi
+    if (!isExelixiCatalogFlow() && !cotizadorRcv) {
       try {
         const { validateVehicle } = await import('../../lib/api');
         toast.info('Validando vehículo', 'Verificando placa y serial...', 2000);
@@ -514,9 +526,48 @@ export function VehicleStep() {
       )}
 
       {/* ── Formulario del vehículo ────────────────────────────────────────────── */}
-      <SectionCard Icon={Car} title="¿Cuál es tu vehículo?" description="Cuéntanos sobre el vehículo que deseas asegurar">
+      <SectionCard
+        Icon={Car}
+        title="¿Cuál es tu vehículo?"
+        description={
+          cotizadorRcv
+            ? 'Datos mínimos para obtener la tarifa RCV: origen de placa, año, marca, modelo, versión y uso.'
+            : 'Cuéntanos sobre el vehículo que deseas asegurar'
+        }
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
+          {cotizadorRcv ? (
+            <Field label="Origen de placa *">
+              <span className="inline-flex items-center gap-0 rounded-lg bg-slate-100 p-0.5 text-[0.65rem] font-bold border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setVehicle({ tipoPlaca: 'nacional' })}
+                  className={cn(
+                    'px-3 py-2 rounded-md transition-all',
+                    vehicle.tipoPlaca !== 'extranjera'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700',
+                  )}
+                >
+                  Nacional
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVehicle({ tipoPlaca: 'extranjera' })}
+                  className={cn(
+                    'px-3 py-2 rounded-md transition-all',
+                    vehicle.tipoPlaca === 'extranjera'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700',
+                  )}
+                >
+                  Extranjera
+                </button>
+              </span>
+            </Field>
+          ) : (
+          <>
           {/* Placa con selector de tipo (Nacional / Extranjera) */}
           <Field
             label={
@@ -560,6 +611,8 @@ export function VehicleStep() {
               maxLength={vehicle.tipoPlaca === 'extranjera' ? 12 : 8}
             />
           </Field>
+          </>
+          )}
 
           {/* Año — selector del catálogo INMA */}
           <Field label="Año del vehículo *" error={errors.año}>
@@ -791,6 +844,8 @@ export function VehicleStep() {
             </div>
           )}
 
+          {!cotizadorRcv && (
+          <>
           {/* Color */}
           <Field label="Color *" error={errors.color}>
             <div className="relative">
@@ -830,17 +885,21 @@ export function VehicleStep() {
               maxLength={60}
             />
           </Field>
+          </>
+          )}
         </div>
 
-        {/* Vista previa de placa */}
+        {/* Vista previa */}
         <div className="mt-5 pt-5 border-t border-slate-100 flex items-center gap-3 sm:gap-4 flex-wrap">
           <p className="text-[0.62rem] font-black text-slate-500 uppercase tracking-widest inline-flex items-center gap-1.5">
             <Sparkles size={11} className="text-indigo-500" /> Vista previa
           </p>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+            {!cotizadorRcv && (
             <div className="rounded-md bg-white border-2 border-slate-900 px-3 py-1.5 font-mono font-black text-slate-900 text-sm tracking-widest shadow-sm">
               {vehicle.placa || 'AAA000'}
             </div>
+            )}
             <span className="text-sm text-slate-700 font-bold truncate max-w-[200px]">
               {[vehicle.marca, vehicle.modelo].filter(Boolean).join(' ') || 'Marca · Modelo'}
             </span>
