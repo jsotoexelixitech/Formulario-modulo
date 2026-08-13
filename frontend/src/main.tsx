@@ -30,8 +30,8 @@ function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
   return children;
 }
 
-// Enrutamiento simple: /config → panel de configuración, resto → app normal.
-const isConfigRoute = window.location.pathname === '/config';
+// /config (dev) o /formulario/config (prod con prefijo Apache)
+const isConfigRoute = /\/config\/?$/.test(window.location.pathname);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
