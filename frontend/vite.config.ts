@@ -1,8 +1,14 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { prefixDevProxy, resolveAppBase } from './vite-paths'
+import {
+  prefixDevProxy,
+  resolveAppBase,
+  resolvePublicModulePrefix,
+  withNexusPreviewProxy,
+} from './vite-paths'
 import { spaPreviewFallback } from './vite-spa-preview'
+import { nexusPreviewProxyPlugin } from './vite-nexus-preview-proxy'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -11,16 +17,28 @@ export default defineConfig(({ mode }) => {
 
   // Mismo mapa de proxy para el dev server (`vite`) y para `vite preview`
   // (producción sirve el build con preview, que NO hereda `server.proxy`).
-  const proxy = prefixDevProxy(base, {
-    '/api': { target: 'http://localhost:4002', changeOrigin: true },
-    '/files': { target: 'http://localhost:4002', changeOrigin: true },
-    '/docs': { target: 'http://localhost:4002', changeOrigin: true },
-    '/docs.json': { target: 'http://localhost:4002', changeOrigin: true },
-  }, env.VITE_DEPLOY_PREFIX)
+  const modulePrefix = resolvePublicModulePrefix(env, base) || '/formulario';
+  const nexusTarget = env.VITE_NEXUS_API_PROXY || 'http://127.0.0.1:3092';
+
+  const proxy = withNexusPreviewProxy(
+    prefixDevProxy(base, {
+      '/api': { target: 'http://localhost:4002', changeOrigin: true },
+      '/files': { target: 'http://localhost:4002', changeOrigin: true },
+      '/docs': { target: 'http://localhost:4002', changeOrigin: true },
+      '/docs.json': { target: 'http://localhost:4002', changeOrigin: true },
+    }, env.VITE_DEPLOY_PREFIX),
+    modulePrefix,
+    nexusTarget,
+  )
 
   return {
     base,
-    plugins: [react(), tailwindcss(), spaPreviewFallback(base)],
+    plugins: [
+      nexusPreviewProxyPlugin(modulePrefix, nexusTarget),
+      react(),
+      tailwindcss(),
+      spaPreviewFallback(base),
+    ],
     server: {
       host: true,
       port: 5182,

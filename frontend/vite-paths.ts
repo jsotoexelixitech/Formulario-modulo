@@ -11,11 +11,51 @@ export function resolveAppBase(env: Record<string, string>): string {
 /** Rutas que vite preview debe proxyar al backend — no reescribir a index.html. */
 export function isBackendProxyPath(pathname: string): boolean {
   return (
-    /\/api(\/|$)/.test(pathname)
+    /\/nexus-api(\/|$)/.test(pathname)
+    || /\/api(\/|$)/.test(pathname)
     || /\/files(\/|$)/.test(pathname)
     || /\/docs(\/|$)/.test(pathname)
     || pathname.endsWith('/docs.json')
   );
+}
+
+/** Prefijo público Apache del módulo (`/ocr`, `/formulario`, …). */
+export function resolvePublicModulePrefix(
+  env: Record<string, string>,
+  base: string,
+): string {
+  const deploy = env.VITE_DEPLOY_PREFIX?.trim();
+  if (deploy) return deploy.replace(/\/$/, '');
+  if (base !== '/' && base !== './') return base.replace(/\/$/, '');
+  return '';
+}
+
+type ProxyRoutes = Record<
+  string,
+  { target: string; changeOrigin?: boolean; rewrite?: (path: string) => string }
+>;
+
+function nexusProxyEntry(mount: string, nexusTarget: string) {
+  const escaped = mount.replace(/\//g, '\\/');
+  return {
+    target: nexusTarget,
+    changeOrigin: true,
+    rewrite: (p: string) => p.replace(new RegExp(`^${escaped}`), '') || '/',
+  };
+}
+
+export function withNexusPreviewProxy(
+  proxy: ProxyRoutes,
+  modulePublicPrefix: string,
+  nexusTarget = 'http://127.0.0.1:3092',
+): ProxyRoutes {
+  const prefix = modulePublicPrefix.replace(/\/$/, '');
+  if (!prefix) return proxy;
+
+  const out = { ...proxy };
+  out[`${prefix}/nexus-api`] = nexusProxyEntry(`${prefix}/nexus-api`, nexusTarget);
+  out['/nexus-api'] = nexusProxyEntry('/nexus-api', nexusTarget);
+  return out;
 }
 
 /** Prefija rutas de proxy cuando la app se sirve bajo un subpath. */
