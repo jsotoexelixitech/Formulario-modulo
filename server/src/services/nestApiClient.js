@@ -175,10 +175,38 @@ async function getValrepList(domain) {
     .filter((it) => it.code !== '' && it.label !== '');
 }
 
+/** @returns {Promise<Record<string, unknown>|null>} */
+async function searchProprietaryViaNestApi({ cid, xrif_cliente } = {}) {
+  const url = `${getBaseUrl()}/api/v1/emissions/automobile_new/propietary`;
+  const payload = {
+    cid: cid != null && String(cid).trim() !== '' ? String(cid).trim() : undefined,
+    xrif_cliente:
+      xrif_cliente != null && String(xrif_cliente).trim() !== ''
+        ? String(xrif_cliente).trim()
+        : undefined,
+  };
+
+  const response = await axios.post(url, payload, await axiosOpts({ validateStatus: () => true }));
+  const body = response.data ?? {};
+
+  if (response.status === 404 || body?.status === false) {
+    return null;
+  }
+  if (response.status >= 400) {
+    const err = new Error(body?.message || `HTTP ${response.status} proprietary lookup`);
+    err.status = response.status;
+    err.code = body?.code || 'PROPRIETARY_LOOKUP_ERROR';
+    throw err;
+  }
+
+  return body?.data ?? body?.info ?? null;
+}
+
 module.exports = {
   getBaseUrl,
   getTimeout,
   validateEmissionAutoViaNestApi,
+  searchProprietaryViaNestApi,
   getInmaAnios,
   getInmaMarcas,
   getInmaModelos,

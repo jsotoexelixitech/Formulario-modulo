@@ -7,7 +7,8 @@ import { useCatalogs, useCiudades } from '../../hooks/useCatalogs';
 import { PersonLocationFields } from '../../components/PersonLocationFields';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { IdentityInput } from '../../components/ui/IdentityInput';
-import { formatTelefono, isValidPhonePrefix } from '@exelixi/shared';
+import { formatTelefono, isValidPhonePrefix } from '../../lib/phone';
+import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
 import {
   Car, UserCog, Sparkles, ScanLine, ShieldCheck,
   Loader2, AlertTriangle,
@@ -408,12 +409,16 @@ export function VehicleStep() {
         e.cond_nombre = 'El nombre del conductor es obligatorio';
       } else if (nombre.length < 2) {
         e.cond_nombre = 'El nombre debe tener al menos 2 caracteres';
+      } else if (nombre.length > PERSON_FIELD_LIMITS.nombre) {
+        e.cond_nombre = `El nombre no puede superar ${PERSON_FIELD_LIMITS.nombre} caracteres`;
       }
 
       if (!apellido) {
         e.cond_apellido = 'El apellido del conductor es obligatorio';
       } else if (apellido.length < 2) {
         e.cond_apellido = 'El apellido debe tener al menos 2 caracteres';
+      } else if (apellido.length > PERSON_FIELD_LIMITS.apellido) {
+        e.cond_apellido = `El apellido no puede superar ${PERSON_FIELD_LIMITS.apellido} caracteres`;
       }
 
       if (!licencia) {
@@ -424,6 +429,9 @@ export function VehicleStep() {
         e.cond_licencia = 'La licencia no puede superar 20 caracteres';
       }
       if (req(conductor.identificacion)) e.cond_identificacion = 'La identificación es obligatoria';
+      else if (digs(conductor.identificacion) > PERSON_FIELD_LIMITS.identificacion) {
+        e.cond_identificacion = `La identificación no puede tener más de ${PERSON_FIELD_LIMITS.identificacion} dígitos`;
+      }
 
       if (req(conductor.telefono)) {
         e.cond_telefono = 'El teléfono es obligatorio';
@@ -437,13 +445,24 @@ export function VehicleStep() {
         e.cond_email = 'El correo electrónico es obligatorio';
       } else if (!emailRe.test((conductor.email || '').trim())) {
         e.cond_email = 'Ingresa un correo válido';
+      } else if ((conductor.email || '').trim().length > PERSON_FIELD_LIMITS.email) {
+        e.cond_email = `El correo no puede superar ${PERSON_FIELD_LIMITS.email} caracteres`;
       }
 
       if (req(conductor.sexo))           e.cond_sexo           = 'El sexo es obligatorio';
       if (req(conductor.estadoCivil))    e.cond_estadoCivil    = 'El estado civil es obligatorio';
-      if (req(conductor.estado))         e.cond_estado         = 'El estado es obligatorio';
-      if (req(conductor.ciudad))         e.cond_ciudad         = 'La ciudad es obligatoria';
+      const hasEstado =
+        !req(conductor.estado) ||
+        (conductor.cestado != null && Number.isFinite(Number(conductor.cestado)));
+      const hasCiudad =
+        !req(conductor.ciudad) ||
+        (conductor.cciudad != null && Number.isFinite(Number(conductor.cciudad)));
+      if (!hasEstado) e.cond_estado = 'El estado es obligatorio';
+      if (!hasCiudad) e.cond_ciudad = 'La ciudad es obligatoria';
       if (req(conductor.direccion))      e.cond_direccion      = 'La dirección es obligatoria';
+      else if ((conductor.direccion || '').trim().length > PERSON_FIELD_LIMITS.direccion) {
+        e.cond_direccion = `La dirección no puede superar ${PERSON_FIELD_LIMITS.direccion} caracteres`;
+      }
 
       void digs; // usado en validaciones adicionales si se requieren
     }
@@ -981,22 +1000,61 @@ export function VehicleStep() {
                 <IdentityInput
                   tipoDoc={conductor.tipoDoc ?? 'V'}
                   identificacion={conductor.identificacion}
+                  maxLength={PERSON_FIELD_LIMITS.identificacion}
                   onTipoDocChange={(v) => setConductor({ tipoDoc: v })}
-                  onIdentificacionChange={(v) => setConductor({ identificacion: v })}
+                  onIdentificacionChange={(v) =>
+                    setConductor({ identificacion: clipPersonField('identificacion', v) })
+                  }
                 />
               </Field>
               <div className="hidden sm:block"></div>
               <Field label="Nombre *" error={errors.cond_nombre}>
-                <Input value={conductor.nombre} onChange={(e) => setConductor({ nombre: String(e.target.value).replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '') })} placeholder="Nombre" />
+                <Input
+                  value={conductor.nombre}
+                  onChange={(e) =>
+                    setConductor({
+                      nombre: String(e.target.value)
+                        .replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '')
+                        .slice(0, PERSON_FIELD_LIMITS.nombre),
+                    })
+                  }
+                  placeholder="Nombre"
+                  maxLength={PERSON_FIELD_LIMITS.nombre}
+                />
               </Field>
               <Field label="Apellido *" error={errors.cond_apellido}>
-                <Input value={conductor.apellido} onChange={(e) => setConductor({ apellido: String(e.target.value).replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '') })} placeholder="Apellido" />
+                <Input
+                  value={conductor.apellido}
+                  onChange={(e) =>
+                    setConductor({
+                      apellido: String(e.target.value)
+                        .replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '')
+                        .slice(0, PERSON_FIELD_LIMITS.apellido),
+                    })
+                  }
+                  placeholder="Apellido"
+                  maxLength={PERSON_FIELD_LIMITS.apellido}
+                />
               </Field>
               <Field label="Teléfono *" error={errors.cond_telefono} hint="Exactamente 11 dígitos, ej. 04121234567">
-                <Input value={formatTelefono(conductor.telefono ?? '')} onChange={(e) => setConductor({ telefono: formatTelefono(e.target.value) })} placeholder="(0412) 123-4567" type="tel" maxLength={15} inputMode="numeric" />
+                <Input
+                  value={formatTelefono(conductor.telefono ?? '')}
+                  onChange={(e) => setConductor({ telefono: formatTelefono(e.target.value) })}
+                  placeholder="(0412) 123-4567"
+                  type="tel"
+                  maxLength={PERSON_FIELD_LIMITS.telefonoDisplay}
+                  inputMode="numeric"
+                />
               </Field>
               <Field label="Correo electrónico *" error={errors.cond_email}>
-                <Input value={conductor.email ?? ''} onChange={(e) => setConductor({ email: e.target.value })} placeholder="correo@ejemplo.com" type="email" inputMode="email" />
+                <Input
+                  value={conductor.email ?? ''}
+                  onChange={(e) => setConductor({ email: clipPersonField('email', e.target.value) })}
+                  placeholder="correo@ejemplo.com"
+                  type="email"
+                  inputMode="email"
+                  maxLength={PERSON_FIELD_LIMITS.email}
+                />
               </Field>
               <PersonLocationFields
                 person={conductor}
@@ -1027,7 +1085,15 @@ export function VehicleStep() {
               </Field>
               <div className="hidden sm:block"></div>
               <Field label="Dirección *" error={errors.cond_direccion} full>
-                <Textarea value={conductor.direccion ?? ''} onChange={(e) => setConductor({ direccion: e.target.value })} placeholder="Dirección completa" rows={2} />
+                <Textarea
+                  value={conductor.direccion ?? ''}
+                  onChange={(e) =>
+                    setConductor({ direccion: clipPersonField('direccion', e.target.value) })
+                  }
+                  placeholder="Dirección completa"
+                  rows={2}
+                  maxLength={PERSON_FIELD_LIMITS.direccion}
+                />
               </Field>
               <Field label="Número de licencia de conducir *" error={errors.cond_licencia} hint="Máx. 20 caracteres alfanuméricos" full>
                 <Input

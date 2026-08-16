@@ -1,6 +1,7 @@
 import { Field, Input } from './ui/FormField';
 import { SearchSelect } from './ui/SearchSelect';
 import type { CatalogItem } from '../lib/api';
+import { PERSON_FIELD_LIMITS, clipPersonField } from '../lib/field-limits';
 
 interface PersonLike {
   cestado?: number;
@@ -68,9 +69,15 @@ export function PersonLocationFields({
         {exelixiFlow ? (
           <Input
             value={person.ciudad ?? ''}
-            onChange={(e) => setPerson({ ciudad: e.target.value, cciudad: undefined })}
+            onChange={(e) =>
+              setPerson({
+                ciudad: clipPersonField('ciudad', e.target.value),
+                cciudad: undefined,
+              })
+            }
             placeholder="Ej. Caracas, Valencia, Maracaibo…"
             disabled={!person.cestado}
+            maxLength={PERSON_FIELD_LIMITS.ciudad}
           />
         ) : (
           <SearchSelect

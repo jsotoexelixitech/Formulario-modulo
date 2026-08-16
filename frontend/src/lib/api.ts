@@ -509,3 +509,44 @@ export async function validateVehicle(
     throw err;
   }
 }
+
+export interface ProprietaryLookupResult {
+  success: boolean;
+  data?: Record<string, unknown>;
+  info?: Record<string, unknown>;
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Busca propietario/cliente en nest-api vía backend del módulo
+ * (`POST /api/emissions/propietary` → automobile_new/propietary).
+ */
+export async function searchProprietary(
+  cid: string,
+): Promise<ProprietaryLookupResult> {
+  try {
+    const { data } = await api.post<ProprietaryLookupResult>('/emissions/propietary', {
+      cid,
+      xrif_cliente: cid,
+    });
+    return data;
+  } catch (err) {
+    const axErr = err as AxiosError<ProprietaryLookupResult>;
+    if (axErr.response?.status === 404) {
+      return {
+        success: false,
+        code: 'NOT_FOUND',
+        message: axErr.response.data?.message ?? 'Propietario no encontrado',
+      };
+    }
+    if (axErr.response?.data) {
+      return {
+        success: false,
+        code: axErr.response.data.code ?? 'LOOKUP_ERROR',
+        message: axErr.response.data.message ?? 'Error al buscar propietario.',
+      };
+    }
+    throw err;
+  }
+}

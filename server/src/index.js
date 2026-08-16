@@ -9,6 +9,7 @@
  *   GET /api/health
  *   GET /api/catalogo/anios | /marcas | /modelos | /versiones | /categorias-uso | /resolver
  *   GET /api/valrep/state | /city | /list/:domain
+ *   POST /api/emissions/propietary
  */
 require('dotenv').config();
 const cors = require('cors');
@@ -18,6 +19,7 @@ const swaggerSpec = require('./swagger');
 
 const catalogoRoutes = require('./routes/catalogo');
 const valrepRoutes   = require('./routes/valrep');
+const emissionsRoutes = require('./routes/emissions');
 const nexusAuth      = require('./middleware/nexusAuth');
 
 const app = express();
@@ -50,6 +52,7 @@ app.get('/api/health', (_req, res) => {
 // Multi-tenant: las rutas de datos requieren nexus_token
 app.use('/api/catalogo', nexusAuth, catalogoRoutes);
 app.use('/api/valrep',   nexusAuth, valrepRoutes);
+app.use('/api/emissions', nexusAuth, emissionsRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('[modulo-formulario] error:', err);

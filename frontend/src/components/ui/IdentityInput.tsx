@@ -1,4 +1,5 @@
 import { ChevronDown } from 'lucide-react';
+import { PERSON_FIELD_LIMITS } from '../../lib/field-limits';
 
 /**
  * Input compuesto: nacionalidad (V/E/J/P) + numero de identificacion.
@@ -24,8 +25,12 @@ interface IdentityInputProps {
   identificacion: string;
   onTipoDocChange: (v: string) => void;
   onIdentificacionChange: (v: string) => void;
+  onIdentificacionBlur?: (identificacion: string) => void;
   placeholder?: string;
   inputId?: string;
+  loading?: boolean;
+  /** Máximo de caracteres del número (default: límite Sis2000 cci_rif = 13). */
+  maxLength?: number;
 }
 
 export function IdentityInput({
@@ -33,8 +38,11 @@ export function IdentityInput({
   identificacion,
   onTipoDocChange,
   onIdentificacionChange,
+  onIdentificacionBlur,
   placeholder = 'Ej. 18456329',
   inputId,
+  loading = false,
+  maxLength = PERSON_FIELD_LIMITS.identificacion,
 }: IdentityInputProps) {
   return (
     <div
@@ -50,12 +58,13 @@ export function IdentityInput({
           aria-label="Tipo de documento"
           value={tipoDoc || 'V'}
           onChange={(e) => onTipoDocChange(e.target.value)}
+          disabled={loading}
           className={
             'h-full appearance-none cursor-pointer bg-slate-50/70 ' +
             'pl-3.5 pr-8 py-2.5 ' +
             'text-sm font-bold text-slate-800 outline-none ' +
             'border-r border-slate-200 ' +
-            'hover:bg-slate-100 transition-colors'
+            'hover:bg-slate-100 transition-colors disabled:opacity-60'
           }
         >
           {NATIONALITY_OPTIONS.map((o) => (
@@ -76,21 +85,29 @@ export function IdentityInput({
         id={inputId}
         type="text"
         inputMode={['V', 'E', 'J'].includes(tipoDoc) ? 'numeric' : 'text'}
-        maxLength={9}
+        maxLength={maxLength}
         value={identificacion}
+        disabled={loading}
         onChange={(e) => {
           let val = e.target.value;
           if (['V', 'E', 'J'].includes(tipoDoc)) {
             val = val.replace(/\D/g, '');
           }
+          if (val.length > maxLength) val = val.slice(0, maxLength);
           onIdentificacionChange(val);
         }}
+        onBlur={(e) => onIdentificacionBlur?.(e.target.value)}
         placeholder={placeholder}
         className={
           'flex-1 min-w-0 px-3.5 py-2.5 bg-white text-sm text-slate-900 outline-none ' +
-          'placeholder:text-slate-300'
+          'placeholder:text-slate-300 disabled:opacity-60'
         }
       />
+      {loading && (
+        <div className="flex items-center pr-3 text-[0.65rem] font-semibold uppercase tracking-wide text-indigo-500">
+          Buscando…
+        </div>
+      )}
     </div>
   );
 }
