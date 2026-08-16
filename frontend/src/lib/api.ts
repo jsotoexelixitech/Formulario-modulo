@@ -550,3 +550,81 @@ export async function searchProprietary(
     throw err;
   }
 }
+
+export interface ValidatePlacaResult {
+  /** `true` si la placa está libre (no bloquea). */
+  success: boolean;
+  /** `true` si fn_validar_placa marcó la placa como activa. */
+  blocked?: boolean;
+  is_active?: boolean;
+  status?: boolean;
+  message?: string;
+  code?: string;
+}
+
+/**
+ * Valida placa vía módulo → nest-api `POST /emissions/automobile/vehicle`.
+ */
+export async function validatePlaca(
+  placa: string,
+  options?: { fdesde?: string; type?: string },
+): Promise<ValidatePlacaResult> {
+  try {
+    const { data } = await api.post<ValidatePlacaResult>('/emissions/vehicle', {
+      xplaca: placa,
+      fdesde: options?.fdesde ?? new Date().toISOString().slice(0, 10),
+      type: options?.type ?? 'warning',
+    });
+    return data;
+  } catch (err) {
+    const axErr = err as AxiosError<ValidatePlacaResult>;
+    if (axErr.response?.data) {
+      return {
+        success: false,
+        blocked: true,
+        code: axErr.response.data.code ?? 'VALIDATE_PLACA_ERROR',
+        message: axErr.response.data.message ?? 'Error al validar la placa.',
+      };
+    }
+    throw err;
+  }
+}
+
+export interface ValidateSerialResult {
+  /** `true` si el serial está libre (no bloquea). */
+  success: boolean;
+  /** `true` si fn_validar_serialCar marcó el serial como activo. */
+  blocked?: boolean;
+  is_active?: boolean;
+  status?: boolean;
+  message?: string;
+  code?: string;
+}
+
+/**
+ * Valida serial de carrocería vía módulo → nest-api `POST /emissions/automobile/serial`.
+ */
+export async function validateSerial(
+  serial: string,
+  options?: { fdesde?: string; type?: string },
+): Promise<ValidateSerialResult> {
+  try {
+    const { data } = await api.post<ValidateSerialResult>('/emissions/serial', {
+      xsercar: serial,
+      fdesde: options?.fdesde ?? new Date().toISOString().slice(0, 10),
+      type: options?.type ?? 'warning',
+    });
+    return data;
+  } catch (err) {
+    const axErr = err as AxiosError<ValidateSerialResult>;
+    if (axErr.response?.data) {
+      return {
+        success: false,
+        blocked: true,
+        code: axErr.response.data.code ?? 'VALIDATE_SERIAL_ERROR',
+        message: axErr.response.data.message ?? 'Error al validar el serial.',
+      };
+    }
+    throw err;
+  }
+}

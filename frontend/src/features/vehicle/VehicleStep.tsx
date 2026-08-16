@@ -15,7 +15,12 @@ import {
 } from 'lucide-react';
 import { toast } from '../../store/toastStore';
 import { cn } from '../../lib/utils';
-import { catalogoApi, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
+import { catalogoApi, searchProprietary, validatePlaca, validateSerial, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
+import {
+  buildProprietaryCid,
+  mapProprietaryToPerson,
+  type ProprietaryInfo,
+} from '../../lib/map-proprietary';
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
 import type { VehicleData } from '../../types';
@@ -153,6 +158,12 @@ export function VehicleStep() {
 
   const [errors, setErrors] = useState<VehicleErrors>({});
   const [verified, setVerified] = useState(false);
+  const [placaValidating, setPlacaValidating] = useState(false);
+  const [serialValidating, setSerialValidating] = useState(false);
+  const [conductorLookupLoading, setConductorLookupLoading] = useState(false);
+  const lastValidatedPlaca = useRef('');
+  const lastValidatedSerial = useRef('');
+  const lastConductorLookupCid = useRef('');
   const catalogs = useCatalogs();
   const exelixiFlow = isExelixiCatalogFlow();
   const cotizadorRcv = isCotizadorFlow();
@@ -352,6 +363,143 @@ export function VehicleStep() {
     if (target == null || target === '') return false;
     return categoriasUso.some((c) => Number(c.ccategoria_uso) === Number(target));
   })();
+
+  // ── Validación remota de placa (fn_validar_placa vía nest-api) ────────────
+  const validatePlacaRemote = useCallback(async (rawPlaca: string) => {
+    if (exelixiFlow || cotizadorRcv) return;
+
+    const placa = String(rawPlaca || '').trim().toUpperCase();
+    if (placa.length < 6) return;
+    if (lastValidatedPlaca.current === placa) return;
+
+    setPlacaValidating(true);
+    try {
+      const res = await validatePlaca(placa, { type: 'warning' });
+      lastValidatedPlaca.current = placa;
+
+      if (res.blocked || res.is_active) {
+        const msg =
+          res.message ||
+          'La placa ya se encuentra registrada y activa en el sistema.';
+        setErrors((prev) => ({ ...prev, placa: msg }));
+        toast.warning('Placa no disponible', msg, 5000);
+        return;
+      }
+
+      setErrors((prev) => {
+        if (!prev.placa) return prev;
+        const { placa: _removed, ...rest } = prev;
+        return rest;
+      });
+      toast.success('Placa disponible', 'No hay póliza vigente que bloquee esta placa.', 2500);
+    } catch {
+      toast.warning(
+        'No se pudo validar la placa',
+        'Inténtalo de nuevo o continúa y se validará al guardar.',
+        4000,
+      );
+    } finally {
+      setPlacaValidating(false);
+    }
+  }, [exelixiFlow, cotizadorRcv]);
+
+  // ── Validación remota de serial (fn_validar_serialCar vía nest-api) ───────
+  const validateSerialRemote = useCallback(async (rawSerial: string) => {
+    if (exelixiFlow || cotizadorRcv) return;
+
+    const serial = String(rawSerial || '').trim().toUpperCase();
+    if (serial.length < 10) return;
+    if (lastValidatedSerial.current === serial) return;
+
+    setSerialValidating(true);
+    try {
+      const res = await validateSerial(serial, { type: 'warning' });
+      lastValidatedSerial.current = serial;
+
+      if (res.blocked || res.is_active) {
+        const msg =
+          res.message ||
+          'El serial de carrocería ya se encuentra registrado y activo en el sistema.';
+        setErrors((prev) => ({ ...prev, serial: msg }));
+        toast.warning('Serial no disponible', msg, 5000);
+        return;
+      }
+
+      setErrors((prev) => {
+        if (!prev.serial) return prev;
+        const { serial: _removed, ...rest } = prev;
+        return rest;
+      });
+      toast.success('Serial disponible', 'No hay póliza vigente que bloquee este serial.', 2500);
+    } catch {
+      toast.warning(
+        'No se pudo validar el serial',
+        'Inténtalo de nuevo o continúa y se validará al guardar.',
+        4000,
+      );
+    } finally {
+      setSerialValidating(false);
+    }
+  }, [exelixiFlow, cotizadorRcv]);
+
+  // ── Autocompletar conductor por cédula (mismo flujo que EmissionStep) ────
+  const lookupConductorByCedula = useCallback(
+    async (tipoDoc: string, identificacion: string) => {
+      const digits = String(identificacion || '').replace(/\D/g, '');
+      if (digits.length < 1) return;
+
+      const cid = buildProprietaryCid(tipoDoc || 'V', digits);
+      if (lastConductorLookupCid.current === cid) return;
+
+      setConductorLookupLoading(true);
+      try {
+        const tryCids = [digits, cid].filter((v, i, arr) => v && arr.indexOf(v) === i);
+
+        let row: ProprietaryInfo | undefined;
+        let matchedCid = cid;
+
+        for (const candidate of tryCids) {
+          const result = await searchProprietary(candidate);
+          const found = (result.data ?? result.info) as ProprietaryInfo | undefined;
+          if (result.success && found) {
+            row = found;
+            matchedCid = candidate;
+            break;
+          }
+        }
+
+        if (!row) {
+          lastConductorLookupCid.current = cid;
+          toast.info(
+            'Sin datos en Sis2000',
+            'No encontramos ese documento. Complete el formulario manualmente.',
+            3500,
+          );
+          return;
+        }
+
+        const patch = mapProprietaryToPerson(row, {
+          sexos: catalogs.sexos,
+          estadosCivil: catalogs.estadosCivil,
+          estados: catalogs.estados,
+        });
+        if (!patch.identificacion) patch.identificacion = digits;
+
+        setConductor(patch);
+        lastConductorLookupCid.current = matchedCid;
+        toast.success('Datos cargados', 'Se completó el conductor con la información del cliente.', 2800);
+      } catch {
+        toast.warning(
+          'Consulta no disponible',
+          'No se pudo buscar el documento. Complete el formulario manualmente.',
+          4000,
+        );
+      } finally {
+        setConductorLookupLoading(false);
+      }
+    },
+    [catalogs.sexos, catalogs.estadosCivil, catalogs.estados, setConductor],
+  );
 
   // ── Validación ────────────────────────────────────────────────────────────
   const validate = async () => {
@@ -653,14 +801,30 @@ export function VehicleStep() {
               </span> as unknown as string
             }
             error={errors.placa}
+            hint={placaValidating ? 'Validando placa en Sis2000…' : 'Al salir del campo se valida si la placa está activa'}
           >
-            <Input
-              value={vehicle.placa}
-              onChange={(e) => setVehicle({ placa: e.target.value.toUpperCase() })}
-              placeholder={vehicle.tipoPlaca === 'extranjera' ? 'ABC-1234' : 'AE123KT'}
-              className="uppercase font-mono tracking-wider"
-              maxLength={vehicle.tipoPlaca === 'extranjera' ? 12 : 8}
-            />
+            <div className="relative">
+              <Input
+                value={vehicle.placa}
+                onChange={(e) => {
+                  lastValidatedPlaca.current = '';
+                  setVehicle({ placa: e.target.value.toUpperCase() });
+                }}
+                onBlur={(e) => {
+                  void validatePlacaRemote(e.target.value);
+                }}
+                placeholder={vehicle.tipoPlaca === 'extranjera' ? 'ABC-1234' : 'AE123KT'}
+                className="uppercase font-mono tracking-wider"
+                maxLength={vehicle.tipoPlaca === 'extranjera' ? 12 : 8}
+                disabled={placaValidating}
+              />
+              {placaValidating && (
+                <Loader2
+                  size={16}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-indigo-500"
+                />
+              )}
+            </div>
           </Field>
           </>
           )}
@@ -938,14 +1102,37 @@ export function VehicleStep() {
           </Field>
 
           {/* Serial de carrocería (VIN) */}
-          <Field label="Serial de carrocería (VIN) *" error={errors.serial} hint="Entre 10 y 17 caracteres alfanuméricos del documento del vehículo">
-            <Input
-              value={vehicle.serial}
-              onChange={(e) => setVehicle({ serial: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 17) })}
-              placeholder="1HGBH41JXMN109186"
-              className="font-mono uppercase tracking-wider"
-              maxLength={17}
-            />
+          <Field
+            label="Serial de carrocería (VIN) *"
+            error={errors.serial}
+            hint={
+              serialValidating
+                ? 'Validando serial en Sis2000…'
+                : 'Entre 10 y 17 caracteres · Al salir del campo se valida si el serial está activo'
+            }
+          >
+            <div className="relative">
+              <Input
+                value={vehicle.serial}
+                onChange={(e) => {
+                  lastValidatedSerial.current = '';
+                  setVehicle({ serial: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 17) });
+                }}
+                onBlur={(e) => {
+                  void validateSerialRemote(e.target.value);
+                }}
+                placeholder="1HGBH41JXMN109186"
+                className="font-mono uppercase tracking-wider"
+                maxLength={17}
+                disabled={serialValidating}
+              />
+              {serialValidating && (
+                <Loader2
+                  size={16}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-indigo-500"
+                />
+              )}
+            </div>
           </Field>
 
           {/* Serial del motor — opcional */}
@@ -996,15 +1183,27 @@ export function VehicleStep() {
         />
         {hasDriver && (
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
-              <Field label="Cédula o documento *" error={errors.cond_identificacion}>
+              <Field
+                label="Cédula o documento *"
+                error={errors.cond_identificacion}
+                hint="Al salir del campo se buscan los datos en Sis2000"
+              >
                 <IdentityInput
                   tipoDoc={conductor.tipoDoc ?? 'V'}
                   identificacion={conductor.identificacion}
                   maxLength={PERSON_FIELD_LIMITS.identificacion}
-                  onTipoDocChange={(v) => setConductor({ tipoDoc: v })}
-                  onIdentificacionChange={(v) =>
-                    setConductor({ identificacion: clipPersonField('identificacion', v) })
-                  }
+                  loading={conductorLookupLoading}
+                  onTipoDocChange={(v) => {
+                    lastConductorLookupCid.current = '';
+                    setConductor({ tipoDoc: v });
+                  }}
+                  onIdentificacionChange={(v) => {
+                    lastConductorLookupCid.current = '';
+                    setConductor({ identificacion: clipPersonField('identificacion', v) });
+                  }}
+                  onIdentificacionBlur={(id) => {
+                    void lookupConductorByCedula(conductor.tipoDoc ?? 'V', id);
+                  }}
                 />
               </Field>
               <div className="hidden sm:block"></div>

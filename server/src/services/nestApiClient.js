@@ -202,11 +202,83 @@ async function searchProprietaryViaNestApi({ cid, xrif_cliente } = {}) {
   return body?.data ?? body?.info ?? null;
 }
 
+/**
+ * Valida placa vía nest-api `POST /api/v1/emissions/automobile/vehicle`
+ * (`dbo.fn_validar_placa`).
+ *
+ * Nota SysIP: `status: true` significa placa ACTIVA (bloqueante);
+ * `status: false` significa placa disponible.
+ *
+ * @returns {{ is_active: boolean, message?: string, status: boolean }}
+ */
+async function validatePlacaViaNestApi({ xplaca, placa, fdesde, type } = {}) {
+  const url = `${getBaseUrl()}/api/v1/emissions/automobile/vehicle`;
+  const payload = {
+    xplaca: String(xplaca || placa || '').trim(),
+    fdesde: String(fdesde || new Date().toISOString().slice(0, 10)),
+    type: type != null ? String(type) : undefined,
+  };
+
+  const response = await axios.post(url, payload, await axiosOpts({ validateStatus: () => true }));
+  const body = response.data ?? {};
+
+  if (response.status >= 400) {
+    const err = new Error(body?.message || `HTTP ${response.status} validate placa`);
+    err.status = response.status;
+    err.code = body?.code || 'VALIDATE_PLACA_ERROR';
+    throw err;
+  }
+
+  const isActive = Boolean(body?.is_active ?? body?.status === true);
+  return {
+    status: Boolean(body?.status),
+    is_active: isActive,
+    message: body?.message,
+  };
+}
+
+/**
+ * Valida serial de carrocería vía nest-api `POST /api/v1/emissions/automobile/serial`
+ * (`dbo.fn_validar_serialCar`).
+ *
+ * Nota SysIP: `status: true` significa serial ACTIVO (bloqueante);
+ * `status: false` significa serial disponible.
+ *
+ * @returns {{ is_active: boolean, message?: string, status: boolean }}
+ */
+async function validateSerialViaNestApi({ xsercar, xserialcarroceria, fdesde, type } = {}) {
+  const url = `${getBaseUrl()}/api/v1/emissions/automobile/serial`;
+  const payload = {
+    xsercar: String(xsercar || xserialcarroceria || '').trim(),
+    fdesde: String(fdesde || new Date().toISOString().slice(0, 10)),
+    type: type != null ? String(type) : undefined,
+  };
+
+  const response = await axios.post(url, payload, await axiosOpts({ validateStatus: () => true }));
+  const body = response.data ?? {};
+
+  if (response.status >= 400) {
+    const err = new Error(body?.message || `HTTP ${response.status} validate serial`);
+    err.status = response.status;
+    err.code = body?.code || 'VALIDATE_SERIAL_ERROR';
+    throw err;
+  }
+
+  const isActive = Boolean(body?.is_active ?? body?.status === true);
+  return {
+    status: Boolean(body?.status),
+    is_active: isActive,
+    message: body?.message,
+  };
+}
+
 module.exports = {
   getBaseUrl,
   getTimeout,
   validateEmissionAutoViaNestApi,
   searchProprietaryViaNestApi,
+  validatePlacaViaNestApi,
+  validateSerialViaNestApi,
   getInmaAnios,
   getInmaMarcas,
   getInmaModelos,
