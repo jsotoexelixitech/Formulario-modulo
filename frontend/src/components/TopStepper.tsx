@@ -154,7 +154,7 @@ export function TopStepper() {
                     <li aria-hidden className="flex items-center px-1">
                       <span
                         className={`block h-0.5 w-10 sm:w-12 rounded-full transition-colors ${
-                          step > STEPS[idx - 1].n ? 'bg-emerald-400' : 'bg-slate-200'
+                          step > STEPS[idx - 1].n ? 'bg-[#0F1A5A]' : 'bg-slate-200'
                         }`}
                       />
                     </li>
@@ -172,9 +172,9 @@ export function TopStepper() {
                       className={`
                         w-10 h-10 rounded-full grid place-items-center flex-shrink-0 transition-colors duration-200
                         ${isComplete
-                          ? 'bg-emerald-500 shadow-[0_4px_12px_rgba(16,185,129,0.35)]'
+                          ? 'bg-[#0F1A5A] shadow-[0_4px_12px_rgba(15,26,90,0.35)]'
                           : isActive
-                          ? 'bg-sky-50 ring-2 ring-sky-200/80'
+                          ? 'bg-[#ECEFF8] ring-2 ring-[#0F1A5A]/40'
                           : 'bg-slate-100'
                         }
                       `}
@@ -193,7 +193,7 @@ export function TopStepper() {
                     <div className="min-w-0">
                       <p
                         className={`text-[0.62rem] font-bold tracking-[0.12em] uppercase leading-none ${
-                          isComplete ? 'text-emerald-500' : isActive ? 'text-sky-600' : 'text-slate-400'
+                          isComplete ? 'text-[#0F1A5A]' : isActive ? 'text-[#E84F51]' : 'text-slate-400'
                         }`}
                       >
                         PASO 0{stepLabel}

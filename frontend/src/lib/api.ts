@@ -424,18 +424,26 @@ export interface ResolverResult {
 }
 
 export const catalogoApi = {
-  anios: () =>
-    api.get<{ success: boolean; min: number; max: number }>('/catalogo/anios'),
-  marcas: (fano: number) =>
-    api.get<{ success: boolean; data: InmaMarca[] }>(`/catalogo/marcas?fano=${fano}`),
-  modelos: (fano: number, cmarca: string) =>
-    api.get<{ success: boolean; data: InmaModelo[] }>(`/catalogo/modelos?fano=${fano}&cmarca=${cmarca}`),
-  versiones: (fano: number, cmarca: string, cmodelo: string) =>
-    api.get<{ success: boolean; data: InmaVersion[] }>(`/catalogo/versiones?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}`),
+  anios: (binacional = false) =>
+    api.get<{ success: boolean; min: number; max: number }>(
+      `/catalogo/anios${binacional ? '?binacional=1' : ''}`,
+    ),
+  marcas: (fano: number, binacional = false) =>
+    api.get<{ success: boolean; data: InmaMarca[] }>(
+      `/catalogo/marcas?fano=${fano}${binacional ? '&binacional=1' : ''}`,
+    ),
+  modelos: (fano: number, cmarca: string, binacional = false) =>
+    api.get<{ success: boolean; data: InmaModelo[] }>(
+      `/catalogo/modelos?fano=${fano}&cmarca=${cmarca}${binacional ? '&binacional=1' : ''}`,
+    ),
+  versiones: (fano: number, cmarca: string, cmodelo: string, binacional = false) =>
+    api.get<{ success: boolean; data: InmaVersion[] }>(
+      `/catalogo/versiones?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}${binacional ? '&binacional=1' : ''}`,
+    ),
   /** Categorías de uso aplicables a la versión (depende de la versión seleccionada). */
-  categoriasUso: (fano: number, cmarca: string, cmodelo: string, cversion: string) =>
+  categoriasUso: (fano: number, cmarca: string, cmodelo: string, cversion: string, binacional = false) =>
     api.get<{ success: boolean; data: CategoriaUso[] }>(
-      `/catalogo/categorias-uso?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}&cversion=${cversion}`,
+      `/catalogo/categorias-uso?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}&cversion=${cversion}${binacional ? '&binacional=1' : ''}`,
     ),
   /** Resuelve texto libre (de OCR) → cmarca + cmodelo + versiones en una sola llamada */
   resolver: (fano: number, marca: string, modelo: string) =>

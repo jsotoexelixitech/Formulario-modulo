@@ -92,43 +92,49 @@ async function validateEmissionAutoViaNestApi(params) {
 }
 
 /** @returns {Promise<{ min: number, max: number }>} */
-async function getInmaAnios() {
-  const { data } = await axios.get(`${getBaseUrl()}/api/v1/inma/anios`, await axiosOpts());
+async function getInmaAnios(binacional = false) {
+  const qs = binacional ? '?binacional=1' : '';
+  const { data } = await axios.get(`${getBaseUrl()}/api/v1/inma/anios${qs}`, await axiosOpts());
   return data?.data ?? { min: 2000, max: new Date().getFullYear() + 1 };
 }
 
 /** @returns {Promise<Array<{ cmarca: string, xmarca: string }>>} */
-async function getInmaMarcas(fano) {
+async function getInmaMarcas(fano, binacional = false) {
   const { data } = await axios.post(
     `${getBaseUrl()}/api/v1/inma/marcas`,
-    { fano },
+    { fano, binacional: Boolean(binacional) || undefined },
     await axiosOpts(),
   );
   return data?.data?.marcas ?? [];
 }
 
 /** @returns {Promise<Array<{ cmodelo: string, cmarca: string, xmodelo: string }>>} */
-async function getInmaModelos(fano, cmarca) {
+async function getInmaModelos(fano, cmarca, binacional = false) {
   const { data } = await axios.post(
     `${getBaseUrl()}/api/v1/inma/modelo`,
-    { fano, cmarca: String(cmarca).trim() },
+    { fano, cmarca: String(cmarca).trim(), binacional: Boolean(binacional) || undefined },
     await axiosOpts(),
   );
   return data?.data?.info ?? [];
 }
 
 /** @returns {Promise<Array<{ cversion: string, xversion?: string }>>} */
-async function getInmaVersiones(fano, cmarca, cmodelo) {
+async function getInmaVersiones(fano, cmarca, cmodelo, binacional = false) {
   const { data } = await axios.post(
     `${getBaseUrl()}/api/v1/inma/version`,
-    { fano, cmarca: String(cmarca).trim(), cmodelo: String(cmodelo).trim() },
+    {
+      fano,
+      cmarca: String(cmarca).trim(),
+      cmodelo: String(cmodelo).trim(),
+      binacional: Boolean(binacional) || undefined,
+    },
     await axiosOpts(),
   );
   return data?.data?.info ?? [];
 }
 
 /** @returns {Promise<Array<{ ccategoria_uso: number, xcategoria_uso: string }>>} */
-async function getCategoriasUso(fano, cmarca, cmodelo, cversion) {
+async function getCategoriasUso(fano, cmarca, cmodelo, cversion, binacional = false) {
   const { data } = await axios.post(
     `${getBaseUrl()}/api/v1/inma/categorias-uso`,
     {
@@ -136,6 +142,7 @@ async function getCategoriasUso(fano, cmarca, cmodelo, cversion) {
       cmarca: String(cmarca).trim(),
       cmodelo: String(cmodelo).trim(),
       cversion: String(cversion).trim(),
+      binacional: Boolean(binacional) || undefined,
     },
     await axiosOpts(),
   );
