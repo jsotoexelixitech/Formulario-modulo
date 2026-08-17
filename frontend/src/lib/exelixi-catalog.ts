@@ -5,7 +5,7 @@ import {
   type ExelixiOcrHandoff,
   type OcrDocType,
 } from './exelixi-handoff-types';
-import { resolveOcrModelo } from './vehicle-carnet-labels';
+import { resolveOcrModelo, resolveOcrTipoPlaca } from './vehicle-carnet-labels';
 
 export type BuilderProductBranch =
   | 'AUTOMOVIL'
@@ -178,17 +178,6 @@ function defaultDoc(status: DocumentState['status'] = 'done'): DocumentState {
   return { status, progress: status === 'done' ? 100 : 0 };
 }
 
-/** Solo binacional si el OCR identificó carnet colombiano; por defecto nacional. */
-export function resolveOcrTipoPlaca(cert?: {
-  tipoCarnet?: string;
-  tipoPlaca?: string;
-}): 'nacional' | 'extranjera' | 'binacional' {
-  if (cert?.tipoCarnet === 'binacional') return 'binacional';
-  if (cert?.tipoPlaca === 'extranjera') return 'extranjera';
-  return 'nacional';
-}
-
-/** Hidrata wizardStore con datos del OCR Exélixi (sessionStorage handoff). */
 export function applyExelixiOcrHandoff(
   setters: {
     setDocState: (doc: DocType, state: Partial<DocumentState>) => void;
