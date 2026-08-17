@@ -5,6 +5,7 @@ import {
   type ExelixiOcrHandoff,
   type OcrDocType,
 } from './exelixi-handoff-types';
+import { resolveOcrModelo } from './vehicle-carnet-labels';
 
 export type BuilderProductBranch =
   | 'AUTOMOVIL'
@@ -238,7 +239,7 @@ export function applyExelixiOcrHandoff(
     setters.setVehicle({
       placa: cert.placa ?? '',
       marca: cert.marca ?? '',
-      modelo: cert.modelo ?? cert.linea ?? '',
+      modelo: resolveOcrModelo(cert),
       año: cert.año ?? cert.anio ?? '',
       color: cert.color ?? '',
       serial: cert.serial ?? '',

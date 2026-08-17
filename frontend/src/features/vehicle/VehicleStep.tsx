@@ -8,6 +8,7 @@ import { PersonLocationFields } from '../../components/PersonLocationFields';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { IdentityInput } from '../../components/ui/IdentityInput';
 import { formatTelefono, isValidPhonePrefix } from '../../lib/phone';
+import { resolveOcrModelo } from '../../lib/vehicle-carnet-labels';
 import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
 import {
   Car, UserCog, Sparkles, ScanLine, ShieldCheck,
@@ -300,7 +301,7 @@ export function VehicleStep() {
     if (!modelos.length) return;
     if (autoSelectedModelo.current) return;
     if (vehicle.cmodelo) return;
-    const ocrModelText = String(ocrCert?.modelo ?? ocrCert?.linea ?? '').trim();
+    const ocrModelText = resolveOcrModelo(ocrCert);
     if (!ocrModelText) return;
 
     const match = findBestMatch(modelos, ocrModelText, 'xmodelo' as keyof InmaModelo);
