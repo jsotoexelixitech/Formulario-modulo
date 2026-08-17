@@ -712,12 +712,9 @@ export function VehicleStep() {
 
       {/* ── Banner OCR ────────────────────────────────────────────────────────── */}
       {hasOcr && (
-        <div
-          className="rounded-2xl text-white p-4 sm:p-5 shadow-[0_18px_40px_-12px_rgba(15,26,90,0.32)] relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #091133 0%, #0F1A5A 60%, #E84F51 100%)' }}
-        >
+        <div className="rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 text-white p-4 sm:p-5 shadow-[0_18px_40px_-12px_rgba(15,26,90,0.32)] relative overflow-hidden">
           <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-12 -left-12 w-32 h-32 rounded-full bg-[#E84F51]/20 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-12 -left-12 w-32 h-32 rounded-full bg-fuchsia-300/15 blur-3xl pointer-events-none" />
           <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <div className="flex items-start gap-3 min-w-0 flex-1">
               <div className="w-10 h-10 rounded-xl bg-white/15 backdrop-blur-md grid place-items-center flex-shrink-0 ring-1 ring-white/20">
@@ -741,7 +738,7 @@ export function VehicleStep() {
                     </span>
                   )}
                 </p>
-                <p className="text-xs text-white/80 mt-0.5 leading-relaxed">
+                <p className="text-xs text-indigo-100 mt-0.5 leading-relaxed">
                   {hasOcrCodes
                     ? 'Marca y modelo identificados en el catálogo. Solo confirma la versión.'
                     : 'Revisa los campos y completa lo que falte. Puedes cambiar cualquier valor.'}
