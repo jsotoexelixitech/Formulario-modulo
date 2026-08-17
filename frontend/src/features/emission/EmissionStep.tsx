@@ -13,6 +13,7 @@ import { searchProprietary } from '../../lib/api';
 import {
   buildProprietaryCid,
   mapProprietaryToPerson,
+  type PersonFormPatch,
   type ProprietaryInfo,
 } from '../../lib/map-proprietary';
 import { toast } from '../../store/toastStore';
@@ -107,7 +108,7 @@ export function EmissionStep() {
       prefix: string,
       tipoDoc: string,
       identificacion: string,
-      setPerson: (patch: Record<string, unknown>) => void,
+      setPerson: (patch: PersonFormPatch) => void,
     ) => {
       const digits = String(identificacion || '').replace(/\D/g, '');
       if (digits.length < 1) return;

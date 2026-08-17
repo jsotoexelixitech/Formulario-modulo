@@ -24,6 +24,7 @@ import {
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
 import { isRcvLaMundialFlow } from '../../lib/product';
+import type { VehicleData } from '../../types';
 
 const COLOR_SWATCHES: Record<string, string> = {
   blanco: '#F8FAFC', negro: '#0F172A', gris: '#94A3B8', plateado: '#CBD5E1',
