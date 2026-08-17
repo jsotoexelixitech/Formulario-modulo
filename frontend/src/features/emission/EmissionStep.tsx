@@ -207,7 +207,7 @@ export function EmissionStep() {
       } else if (digs(person.telefono) !== 11) {
         e[`${prefix}telefono`] = 'El teléfono debe tener exactamente 11 dígitos';
       } else if (!isValidPhonePrefix(person.telefono || '')) {
-        e[`${prefix}telefono`] = 'El prefijo debe ser válido en Venezuela';
+        e[`${prefix}telefono`] = 'El prefijo no es válido (Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX)';
       }
 
       if (req(person.email)) {
@@ -300,7 +300,7 @@ export function EmissionStep() {
           maxLength={PERSON_FIELD_LIMITS.apellido}
         />
       </Field>
-      <Field label="Teléfono *" error={errors[`${prefix}telefono`]} hint="11 dígitos · Movilnet 0412/0416 · Movistar 0414/0424 · Digitel 0412/0422">
+      <Field label="Teléfono *" error={errors[`${prefix}telefono`]} hint="11 dígitos · Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX">
         <Input
           value={formatTelefono(person.telefono ?? '')}
           onChange={(e) => setPerson({ telefono: formatTelefono(e.target.value) })}
