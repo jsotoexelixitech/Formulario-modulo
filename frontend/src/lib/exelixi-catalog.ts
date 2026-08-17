@@ -177,6 +177,16 @@ function defaultDoc(status: DocumentState['status'] = 'done'): DocumentState {
   return { status, progress: status === 'done' ? 100 : 0 };
 }
 
+/** Solo binacional si el OCR identificó carnet colombiano; por defecto nacional. */
+export function resolveOcrTipoPlaca(cert?: {
+  tipoCarnet?: string;
+  tipoPlaca?: string;
+}): 'nacional' | 'extranjera' | 'binacional' {
+  if (cert?.tipoCarnet === 'binacional') return 'binacional';
+  if (cert?.tipoPlaca === 'extranjera') return 'extranjera';
+  return 'nacional';
+}
+
 /** Hidrata wizardStore con datos del OCR Exélixi (sessionStorage handoff). */
 export function applyExelixiOcrHandoff(
   setters: {
@@ -235,12 +245,7 @@ export function applyExelixiOcrHandoff(
       serialMotor: cert.serialMotor ?? '',
       cilindrada: rcvHandoff ? cert.cilindrada ?? '' : '',
       tipoCarnet: rcvHandoff ? cert.tipoCarnet : undefined,
-      tipoPlaca:
-        rcvHandoff && (cert.tipoPlaca === 'binacional' || cert.tipoCarnet === 'binacional')
-          ? 'binacional'
-          : cert.tipoPlaca === 'extranjera'
-            ? 'extranjera'
-            : 'nacional',
+      tipoPlaca: rcvHandoff ? resolveOcrTipoPlaca(cert) : 'nacional',
     });
   }
 

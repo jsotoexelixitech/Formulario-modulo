@@ -446,8 +446,10 @@ export const catalogoApi = {
       `/catalogo/categorias-uso?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}&cversion=${cversion}${binacional ? '&binacional=1' : ''}`,
     ),
   /** Resuelve texto libre (de OCR) → cmarca + cmodelo + versiones en una sola llamada */
-  resolver: (fano: number, marca: string, modelo: string) =>
-    api.get<ResolverResult>(`/catalogo/resolver?fano=${fano}&marca=${encodeURIComponent(marca)}&modelo=${encodeURIComponent(modelo)}`),
+  resolver: (fano: number, marca: string, modelo: string, binacional = false) =>
+    api.get<ResolverResult>(
+      `/catalogo/resolver?fano=${fano}&marca=${encodeURIComponent(marca)}&modelo=${encodeURIComponent(modelo)}${binacional ? '&binacional=1' : ''}`,
+    ),
 };
 
 // ──────────────────────────────────────────────────────────────────────

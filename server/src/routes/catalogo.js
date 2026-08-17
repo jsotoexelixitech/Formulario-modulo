@@ -135,7 +135,8 @@ router.get('/resolver', async (req, res) => {
   if (!fano || !marca) return res.status(400).json({ success: false, message: 'fano y marca requeridos' });
 
   try {
-    const marcas = await getInmaMarcas(fano);
+    const binacional = parseBinacional(req);
+    const marcas = await getInmaMarcas(fano, binacional);
     const normMarca = normCatalogText(marca);
     const marcaMatch =
       marcas.find((m) => normCatalogText(m.xmarca) === normMarca) ??
@@ -149,7 +150,7 @@ router.get('/resolver', async (req, res) => {
       return res.json({ success: false, fallback: true, message: `Marca "${marca}" no encontrada` });
     }
 
-    const modelos = await getInmaModelos(fano, marcaMatch.cmarca);
+    const modelos = await getInmaModelos(fano, marcaMatch.cmarca, binacional);
     const modeloMatch = modelo ? findModeloMatch(modelos, modelo) : null;
     const resolvedModelo = modeloMatch ?? modelos[0];
 
@@ -162,7 +163,7 @@ router.get('/resolver', async (req, res) => {
       });
     }
 
-    const versiones = await getInmaVersiones(fano, marcaMatch.cmarca, resolvedModelo.cmodelo);
+    const versiones = await getInmaVersiones(fano, marcaMatch.cmarca, resolvedModelo.cmodelo, binacional);
 
     res.json({
       success: true,
