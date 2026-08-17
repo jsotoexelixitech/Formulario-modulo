@@ -7,6 +7,8 @@ import { SearchSelect } from '../../components/ui/SearchSelect';
 import { PersonLocationFields } from '../../components/PersonLocationFields';
 import { useCatalogs, useCiudades } from '../../hooks/useCatalogs';
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
+import { isCotizadorFlow } from '../../lib/cotizador-flow';
+import { isRcvLaMundialFlow } from '../../lib/product';
 import { searchProprietary } from '../../lib/api';
 import {
   buildProprietaryCid,
@@ -92,6 +94,7 @@ export function EmissionStep() {
 
   const catalogs = useCatalogs();
   const exelixiFlow = isExelixiCatalogFlow();
+  const isRcvEmision = isRcvLaMundialFlow() && !isCotizadorFlow();
   const ciudadesState = useCiudades(tomador.cestado);
   const aseguradoCiudades = useCiudades(asegurado.cestado);
   const beneficiarioCiudades = useCiudades(beneficiario.cestado);
@@ -255,7 +258,7 @@ export function EmissionStep() {
       <Field
         label="Cédula o documento *"
         error={errors[`${prefix}identificacion`]}
-        hint="Al salir del campo se buscan los datos en Sis2000"
+        hint={isRcvEmision ? 'Al salir del campo se buscan los datos en Sis2000' : undefined}
       >
         <IdentityInput
           tipoDoc={person.tipoDoc ?? 'V'}
@@ -270,14 +273,13 @@ export function EmissionStep() {
             lastLookupCid.current[prefix] = '';
             setPerson({ identificacion: clipPersonField('identificacion', v) });
           }}
-          onIdentificacionBlur={(id) => {
-            void lookupByCedula(
-              prefix,
-              person.tipoDoc ?? 'V',
-              id,
-              setPerson,
-            );
-          }}
+          onIdentificacionBlur={
+            isRcvEmision
+              ? (id) => {
+                  void lookupByCedula(prefix, person.tipoDoc ?? 'V', id, setPerson);
+                }
+              : undefined
+          }
         />
       </Field>
       <div className="hidden sm:block"></div>

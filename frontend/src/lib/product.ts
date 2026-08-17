@@ -9,6 +9,7 @@
  * Si no se especifica, el producto por defecto es `rcv` (comportamiento previo).
  */
 import type { ProductId } from '../types';
+import { isCotizadorFlow } from './cotizador-flow';
 import { getExelixiCatalogProductView, isExelixiCatalogFlow } from './exelixi-catalog';
 
 export interface ProductConfig {
@@ -148,4 +149,10 @@ export function isFunerario(): boolean {
 
 export function isRcv(): boolean {
   return getProductId() === 'rcv';
+}
+
+/** RCV La Mundial (emisión o cotizador). Excluye catálogo genérico Exélixi. */
+export function isRcvLaMundialFlow(): boolean {
+  if (isExelixiCatalogFlow()) return false;
+  return isRcv() || isCotizadorFlow();
 }

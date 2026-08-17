@@ -224,6 +224,7 @@ export function applyExelixiOcrHandoff(
 
   const cert = handoff.ocrData.certificado;
   if (cert) {
+    const rcvHandoff = !isExelixiCatalogFlow();
     setters.setVehicle({
       placa: cert.placa ?? '',
       marca: cert.marca ?? '',
@@ -232,10 +233,10 @@ export function applyExelixiOcrHandoff(
       color: cert.color ?? '',
       serial: cert.serial ?? '',
       serialMotor: cert.serialMotor ?? '',
-      cilindrada: cert.cilindrada ?? '',
-      tipoCarnet: cert.tipoCarnet,
+      cilindrada: rcvHandoff ? cert.cilindrada ?? '' : '',
+      tipoCarnet: rcvHandoff ? cert.tipoCarnet : undefined,
       tipoPlaca:
-        cert.tipoPlaca === 'binacional' || cert.tipoCarnet === 'binacional'
+        rcvHandoff && (cert.tipoPlaca === 'binacional' || cert.tipoCarnet === 'binacional')
           ? 'binacional'
           : cert.tipoPlaca === 'extranjera'
             ? 'extranjera'

@@ -23,8 +23,7 @@ import {
 } from '../../lib/map-proprietary';
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
-import { getProductId } from '../../lib/product';
-import type { VehicleData } from '../../types';
+import { isRcvLaMundialFlow } from '../../lib/product';
 
 const COLOR_SWATCHES: Record<string, string> = {
   blanco: '#F8FAFC', negro: '#0F172A', gris: '#94A3B8', plateado: '#CBD5E1',
@@ -168,11 +167,13 @@ export function VehicleStep() {
   const catalogs = useCatalogs();
   const exelixiFlow = isExelixiCatalogFlow();
   const cotizadorRcv = isCotizadorFlow();
-  const isRcvEmision = !exelixiFlow && !cotizadorRcv && getProductId() === 'rcv';
+  const rcvLaMundial = isRcvLaMundialFlow();
+  const isRcvEmision = rcvLaMundial && !cotizadorRcv;
   const conductorCiudades = useCiudades(conductor.cestado);
-  const isBinacional = vehicle.tipoPlaca === 'binacional';
+  const isBinacional = rcvLaMundial && vehicle.tipoPlaca === 'binacional';
 
   const setTipoPlaca = useCallback((tipoPlaca: VehicleData['tipoPlaca']) => {
+    if (tipoPlaca === 'binacional' && !rcvLaMundial) return;
     const nextBi = tipoPlaca === 'binacional';
     const prevBi = vehicle.tipoPlaca === 'binacional';
     if (nextBi === prevBi && vehicle.tipoPlaca === tipoPlaca) return;
@@ -192,7 +193,24 @@ export function VehicleStep() {
       return;
     }
     setVehicle({ tipoPlaca });
-  }, [vehicle.tipoPlaca, setVehicle]);
+  }, [rcvLaMundial, vehicle.tipoPlaca, setVehicle]);
+
+  useEffect(() => {
+    if (rcvLaMundial || vehicle.tipoPlaca !== 'binacional') return;
+    setVehicle({
+      tipoPlaca: 'nacional',
+      cmarca: '',
+      marca: '',
+      cmodelo: '',
+      modelo: '',
+      cversion: '',
+      ccategoria_uso: undefined,
+      xcategoria_uso: '',
+      ccategotr: undefined,
+      cilindrada: '',
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rcvLaMundial]);
 
   // Rango de años del catálogo INMA
   const [anios, setAnios] = useState<number[]>([]);
@@ -406,7 +424,7 @@ export function VehicleStep() {
 
   // ── Validación remota de placa (fn_validar_placa vía nest-api) ────────────
   const validatePlacaRemote = useCallback(async (rawPlaca: string) => {
-    if (exelixiFlow || cotizadorRcv) return;
+    if (!isRcvEmision) return;
 
     const placa = String(rawPlaca || '').trim().toUpperCase();
     if (placa.length < 6) return;
@@ -441,11 +459,11 @@ export function VehicleStep() {
     } finally {
       setPlacaValidating(false);
     }
-  }, [exelixiFlow, cotizadorRcv]);
+  }, [isRcvEmision]);
 
   // ── Validación remota de serial (fn_validar_serialCar vía nest-api) ───────
   const validateSerialRemote = useCallback(async (rawSerial: string) => {
-    if (exelixiFlow || cotizadorRcv) return;
+    if (!isRcvEmision) return;
 
     const serial = String(rawSerial || '').trim().toUpperCase();
     if (serial.length < 10) return;
@@ -480,7 +498,7 @@ export function VehicleStep() {
     } finally {
       setSerialValidating(false);
     }
-  }, [exelixiFlow, cotizadorRcv]);
+  }, [isRcvEmision]);
 
   // ── Autocompletar conductor por cédula (mismo flujo que EmissionStep) ────
   const lookupConductorByCedula = useCallback(
@@ -661,8 +679,8 @@ export function VehicleStep() {
       return false;
     }
 
-    // Validación remota La Mundial — no aplica en cotizador ni flujo Exélixi
-    if (!isExelixiCatalogFlow() && !cotizadorRcv) {
+    // Validación remota La Mundial — solo emisión RCV completa
+    if (isRcvEmision) {
       try {
         const { validateVehicle } = await import('../../lib/api');
         toast.info('Validando vehículo', 'Verificando placa y serial...', 2000);
@@ -806,6 +824,7 @@ export function VehicleStep() {
                 >
                   Extranjera
                 </button>
+                {rcvLaMundial && (
                 <button
                   type="button"
                   onClick={() => setTipoPlaca('binacional')}
@@ -818,6 +837,7 @@ export function VehicleStep() {
                 >
                   Binacional
                 </button>
+                )}
               </span>
             </Field>
           ) : (
@@ -852,6 +872,7 @@ export function VehicleStep() {
                   >
                     Extranjera
                   </button>
+                  {rcvLaMundial && (
                   <button
                     type="button"
                     onClick={() => setTipoPlaca('binacional')}
@@ -864,6 +885,7 @@ export function VehicleStep() {
                   >
                     Binacional
                   </button>
+                  )}
                 </span>
               </span> as unknown as string
             }
@@ -1219,7 +1241,8 @@ export function VehicleStep() {
             />
           </Field>
 
-          {/* Cilindrada — típico carnet binacional Colombia */}
+          {/* Cilindrada — carnet binacional Colombia (solo RCV La Mundial) */}
+          {isBinacional && (
           <Field label="Cilindrada (CC)" hint="Opcional · Del carnet binacional colombiano">
             <Input
               value={vehicle.cilindrada ?? ''}
@@ -1229,6 +1252,7 @@ export function VehicleStep() {
               maxLength={20}
             />
           </Field>
+          )}
           </>
           )}
         </div>
@@ -1285,9 +1309,13 @@ export function VehicleStep() {
                     lastConductorLookupCid.current = '';
                     setConductor({ identificacion: clipPersonField('identificacion', v) });
                   }}
-                  onIdentificacionBlur={(id) => {
-                    void lookupConductorByCedula(conductor.tipoDoc ?? 'V', id);
-                  }}
+                  onIdentificacionBlur={
+                    isRcvEmision
+                      ? (id) => {
+                          void lookupConductorByCedula(conductor.tipoDoc ?? 'V', id);
+                        }
+                      : undefined
+                  }
                 />
               </Field>
               <div className="hidden sm:block"></div>
