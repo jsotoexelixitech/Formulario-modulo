@@ -424,18 +424,26 @@ export interface ResolverResult {
 }
 
 export const catalogoApi = {
-  anios: () =>
-    api.get<{ success: boolean; min: number; max: number }>('/catalogo/anios'),
-  marcas: (fano: number) =>
-    api.get<{ success: boolean; data: InmaMarca[] }>(`/catalogo/marcas?fano=${fano}`),
-  modelos: (fano: number, cmarca: string) =>
-    api.get<{ success: boolean; data: InmaModelo[] }>(`/catalogo/modelos?fano=${fano}&cmarca=${cmarca}`),
-  versiones: (fano: number, cmarca: string, cmodelo: string) =>
-    api.get<{ success: boolean; data: InmaVersion[] }>(`/catalogo/versiones?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}`),
+  anios: (binacional = false) =>
+    api.get<{ success: boolean; min: number; max: number }>(
+      `/catalogo/anios${binacional ? '?binacional=1' : ''}`,
+    ),
+  marcas: (fano: number, binacional = false) =>
+    api.get<{ success: boolean; data: InmaMarca[] }>(
+      `/catalogo/marcas?fano=${fano}${binacional ? '&binacional=1' : ''}`,
+    ),
+  modelos: (fano: number, cmarca: string, binacional = false) =>
+    api.get<{ success: boolean; data: InmaModelo[] }>(
+      `/catalogo/modelos?fano=${fano}&cmarca=${cmarca}${binacional ? '&binacional=1' : ''}`,
+    ),
+  versiones: (fano: number, cmarca: string, cmodelo: string, binacional = false) =>
+    api.get<{ success: boolean; data: InmaVersion[] }>(
+      `/catalogo/versiones?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}${binacional ? '&binacional=1' : ''}`,
+    ),
   /** Categorías de uso aplicables a la versión (depende de la versión seleccionada). */
-  categoriasUso: (fano: number, cmarca: string, cmodelo: string, cversion: string) =>
+  categoriasUso: (fano: number, cmarca: string, cmodelo: string, cversion: string, binacional = false) =>
     api.get<{ success: boolean; data: CategoriaUso[] }>(
-      `/catalogo/categorias-uso?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}&cversion=${cversion}`,
+      `/catalogo/categorias-uso?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}&cversion=${cversion}${binacional ? '&binacional=1' : ''}`,
     ),
   /** Resuelve texto libre (de OCR) → cmarca + cmodelo + versiones en una sola llamada */
   resolver: (fano: number, marca: string, modelo: string) =>
@@ -505,6 +513,125 @@ export async function validateVehicle(
     const axErr = err as AxiosError<{ success: boolean; message: string; code?: string }>;
     if (axErr.response?.data) {
       return axErr.response.data;
+    }
+    throw err;
+  }
+}
+
+export interface ProprietaryLookupResult {
+  success: boolean;
+  data?: Record<string, unknown>;
+  info?: Record<string, unknown>;
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Busca propietario/cliente en nest-api vía backend del módulo
+ * (`POST /api/emissions/propietary` → automobile_new/propietary).
+ */
+export async function searchProprietary(
+  cid: string,
+): Promise<ProprietaryLookupResult> {
+  try {
+    const { data } = await api.post<ProprietaryLookupResult>('/emissions/propietary', {
+      cid,
+      xrif_cliente: cid,
+    });
+    return data;
+  } catch (err) {
+    const axErr = err as AxiosError<ProprietaryLookupResult>;
+    if (axErr.response?.status === 404) {
+      return {
+        success: false,
+        code: 'NOT_FOUND',
+        message: axErr.response.data?.message ?? 'Propietario no encontrado',
+      };
+    }
+    if (axErr.response?.data) {
+      return {
+        success: false,
+        code: axErr.response.data.code ?? 'LOOKUP_ERROR',
+        message: axErr.response.data.message ?? 'Error al buscar propietario.',
+      };
+    }
+    throw err;
+  }
+}
+
+export interface ValidatePlacaResult {
+  /** `true` si la placa está libre (no bloquea). */
+  success: boolean;
+  /** `true` si fn_validar_placa marcó la placa como activa. */
+  blocked?: boolean;
+  is_active?: boolean;
+  status?: boolean;
+  message?: string;
+  code?: string;
+}
+
+/**
+ * Valida placa vía módulo → nest-api `POST /emissions/automobile/vehicle`.
+ */
+export async function validatePlaca(
+  placa: string,
+  options?: { fdesde?: string; type?: string },
+): Promise<ValidatePlacaResult> {
+  try {
+    const { data } = await api.post<ValidatePlacaResult>('/emissions/vehicle', {
+      xplaca: placa,
+      fdesde: options?.fdesde ?? new Date().toISOString().slice(0, 10),
+      type: options?.type ?? 'warning',
+    });
+    return data;
+  } catch (err) {
+    const axErr = err as AxiosError<ValidatePlacaResult>;
+    if (axErr.response?.data) {
+      return {
+        success: false,
+        blocked: true,
+        code: axErr.response.data.code ?? 'VALIDATE_PLACA_ERROR',
+        message: axErr.response.data.message ?? 'Error al validar la placa.',
+      };
+    }
+    throw err;
+  }
+}
+
+export interface ValidateSerialResult {
+  /** `true` si el serial está libre (no bloquea). */
+  success: boolean;
+  /** `true` si fn_validar_serialCar marcó el serial como activo. */
+  blocked?: boolean;
+  is_active?: boolean;
+  status?: boolean;
+  message?: string;
+  code?: string;
+}
+
+/**
+ * Valida serial de carrocería vía módulo → nest-api `POST /emissions/automobile/serial`.
+ */
+export async function validateSerial(
+  serial: string,
+  options?: { fdesde?: string; type?: string },
+): Promise<ValidateSerialResult> {
+  try {
+    const { data } = await api.post<ValidateSerialResult>('/emissions/serial', {
+      xsercar: serial,
+      fdesde: options?.fdesde ?? new Date().toISOString().slice(0, 10),
+      type: options?.type ?? 'warning',
+    });
+    return data;
+  } catch (err) {
+    const axErr = err as AxiosError<ValidateSerialResult>;
+    if (axErr.response?.data) {
+      return {
+        success: false,
+        blocked: true,
+        code: axErr.response.data.code ?? 'VALIDATE_SERIAL_ERROR',
+        message: axErr.response.data.message ?? 'Error al validar el serial.',
+      };
     }
     throw err;
   }

@@ -146,6 +146,25 @@ export function getExelixiCatalogProductView(): ExelixiCatalogProductView | null
 
 export function readOcrHandoff(): ExelixiOcrHandoff | null {
   try {
+    // Preferir query (cross-port local OCR→Formulario) y luego sessionStorage (mismo origen).
+    const fromUrl = new URLSearchParams(window.location.search).get('ocr_handoff');
+    if (fromUrl) {
+      const b64 = fromUrl.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+      const binary = atob(b64 + pad);
+      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+      const json = new TextDecoder().decode(bytes);
+      const parsed = JSON.parse(json) as ExelixiOcrHandoff;
+      try {
+        sessionStorage.setItem(EXELIXI_OCR_HANDOFF_KEY, json);
+      } catch { /* ignore */ }
+      // Limpiar el param de la URL para no rehidratar en cada refresh.
+      const url = new URL(window.location.href);
+      url.searchParams.delete('ocr_handoff');
+      window.history.replaceState({}, '', url.toString());
+      return parsed;
+    }
+
     const raw = sessionStorage.getItem(EXELIXI_OCR_HANDOFF_KEY);
     if (!raw) return null;
     return JSON.parse(raw) as ExelixiOcrHandoff;
@@ -168,10 +187,9 @@ export function applyExelixiOcrHandoff(
     goTo: (step: number) => void;
   },
 ): boolean {
-  if (!isExelixiCatalogFlow()) return false;
-
   const handoff = readOcrHandoff();
   if (!handoff) return false;
+  // Local OCR→Formulario (?ocr_handoff) también aplica en La Mundial (?product=rcv).
 
   if (handoff.product) {
     try {
@@ -209,10 +227,19 @@ export function applyExelixiOcrHandoff(
     setters.setVehicle({
       placa: cert.placa ?? '',
       marca: cert.marca ?? '',
-      modelo: cert.modelo ?? '',
+      modelo: cert.modelo ?? cert.linea ?? '',
       año: cert.año ?? cert.anio ?? '',
       color: cert.color ?? '',
       serial: cert.serial ?? '',
+      serialMotor: cert.serialMotor ?? '',
+      cilindrada: cert.cilindrada ?? '',
+      tipoCarnet: cert.tipoCarnet,
+      tipoPlaca:
+        cert.tipoPlaca === 'binacional' || cert.tipoCarnet === 'binacional'
+          ? 'binacional'
+          : cert.tipoPlaca === 'extranjera'
+            ? 'extranjera'
+            : 'nacional',
     });
   }
 

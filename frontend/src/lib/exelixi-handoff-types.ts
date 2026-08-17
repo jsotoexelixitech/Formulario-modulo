@@ -12,10 +12,15 @@ export interface OcrFields {
   placa?: string;
   marca?: string;
   modelo?: string;
+  linea?: string;
   anio?: string;
   año?: string;
   serial?: string;
+  serialMotor?: string;
+  cilindrada?: string;
   color?: string;
+  tipoCarnet?: 'nacional' | 'binacional';
+  tipoPlaca?: 'nacional' | 'extranjera' | 'binacional';
   rif?: string;
   razonSocial?: string;
   fechaNacimiento?: string;

@@ -18,15 +18,13 @@ function onlyLetters(v: string): string {
   return v.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
 }
 
-import { formatTelefono, isValidPhonePrefix } from '@exelixi/shared';
+import { formatTelefono, isValidPhonePrefix } from '../../lib/phone';
+import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
 
 /** Aplica máscara visual al teléfono: (0414) 123-4567 */
 function maskPhone(v: string | undefined): string {
   if (!v) return '';
-  let d = formatTelefono(v);
-  if (d.length <= 4) return d;
-  if (d.length <= 7) return `(${d.slice(0, 4)}) ${d.slice(4)}`;
-  return `(${d.slice(0, 4)}) ${d.slice(4, 7)}-${d.slice(7, 11)}`;
+  return formatTelefono(v);
 }
 
 const emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -68,8 +66,11 @@ function PersonFields({
         <IdentityInput
           tipoDoc={person.tipoDoc || 'V'}
           identificacion={person.identificacion}
+          maxLength={PERSON_FIELD_LIMITS.identificacion}
           onTipoDocChange={(v) => onChange({ tipoDoc: v })}
-          onIdentificacionChange={(v) => onChange({ identificacion: v })}
+          onIdentificacionChange={(v) =>
+            onChange({ identificacion: clipPersonField('identificacion', v) })
+          }
         />
       </Field>
 
@@ -90,18 +91,28 @@ function PersonFields({
       <Field label="Nombre *" error={errors.nombre}>
         <Input
           value={person.nombre}
-          onChange={(e) => onChange({ nombre: onlyLetters(e.target.value) })}
+          onChange={(e) =>
+            onChange({
+              nombre: onlyLetters(e.target.value).slice(0, PERSON_FIELD_LIMITS.nombre),
+            })
+          }
           placeholder="Nombre"
           autoComplete="given-name"
+          maxLength={PERSON_FIELD_LIMITS.nombre}
         />
       </Field>
 
       <Field label="Apellido *" error={errors.apellido}>
         <Input
           value={person.apellido}
-          onChange={(e) => onChange({ apellido: onlyLetters(e.target.value) })}
+          onChange={(e) =>
+            onChange({
+              apellido: onlyLetters(e.target.value).slice(0, PERSON_FIELD_LIMITS.apellido),
+            })
+          }
           placeholder="Apellido"
           autoComplete="family-name"
+          maxLength={PERSON_FIELD_LIMITS.apellido}
         />
       </Field>
 
@@ -138,17 +149,18 @@ function PersonFields({
           placeholder="(0412) 123-4567"
           type="tel"
           inputMode="numeric"
-          maxLength={15}
+          maxLength={PERSON_FIELD_LIMITS.telefonoDisplay}
         />
       </Field>
 
       <Field label="Correo (Opcional)" error={errors.email}>
         <Input
           value={person.email ?? ''}
-          onChange={(e) => onChange({ email: e.target.value })}
+          onChange={(e) => onChange({ email: clipPersonField('email', e.target.value) })}
           placeholder="correo@ejemplo.com"
           type="email"
           inputMode="email"
+          maxLength={PERSON_FIELD_LIMITS.email}
         />
       </Field>
     </div>
@@ -238,26 +250,26 @@ export function FuneralStep() {
 
     if (req(p.identificacion)) {
       e.identificacion = 'La identificación es obligatoria';
-    } else if (digs(p.identificacion) < 6) {
-      e.identificacion = 'Debe tener al menos 6 dígitos';
-    } else if (digs(p.identificacion) > 9) {
-      e.identificacion = 'No puede tener más de 9 dígitos';
+    } else if (digs(p.identificacion) < 1) {
+      e.identificacion = 'Debe tener al menos 1 dígito';
+    } else if (digs(p.identificacion) > PERSON_FIELD_LIMITS.identificacion) {
+      e.identificacion = `No puede tener más de ${PERSON_FIELD_LIMITS.identificacion} dígitos`;
     }
 
     if (req(p.nombre)) {
       e.nombre = 'El nombre es obligatorio';
     } else if (len(p.nombre) < 2) {
       e.nombre = 'Debe tener al menos 2 caracteres';
-    } else if (len(p.nombre) > 50) {
-      e.nombre = 'No puede superar 50 caracteres';
+    } else if (len(p.nombre) > PERSON_FIELD_LIMITS.nombre) {
+      e.nombre = `No puede superar ${PERSON_FIELD_LIMITS.nombre} caracteres`;
     }
 
     if (req(p.apellido)) {
       e.apellido = 'El apellido es obligatorio';
     } else if (len(p.apellido) < 2) {
       e.apellido = 'Debe tener al menos 2 caracteres';
-    } else if (len(p.apellido) > 50) {
-      e.apellido = 'No puede superar 50 caracteres';
+    } else if (len(p.apellido) > PERSON_FIELD_LIMITS.apellido) {
+      e.apellido = `No puede superar ${PERSON_FIELD_LIMITS.apellido} caracteres`;
     }
 
     if (req(p.fechaNac)) {
@@ -279,6 +291,8 @@ export function FuneralStep() {
 
     if (p.email && !emailRe.test(p.email)) {
       e.email = 'Ingresa un correo válido (ej. usuario@dominio.com)';
+    } else if (p.email && len(p.email) > PERSON_FIELD_LIMITS.email) {
+      e.email = `El correo no puede superar ${PERSON_FIELD_LIMITS.email} caracteres`;
     }
 
     return e;

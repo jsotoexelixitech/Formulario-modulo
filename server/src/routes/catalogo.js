@@ -55,9 +55,14 @@ function findModeloMatch(modelos, modelo) {
   return candidates.reduce((best, cur) => (label(cur).length > label(best).length ? cur : best));
 }
 
-router.get('/anios', async (_req, res) => {
+function parseBinacional(req) {
+  const v = req.query?.binacional ?? req.body?.binacional;
+  return v === true || v === 1 || v === '1' || v === 'true';
+}
+
+router.get('/anios', async (req, res) => {
   try {
-    const data = await getInmaAnios();
+    const data = await getInmaAnios(parseBinacional(req));
     res.json({ success: true, ...data });
   } catch (err) {
     logError('anios', err);
@@ -69,7 +74,7 @@ router.get('/marcas', async (req, res) => {
   const fano = parseInt(req.query.fano, 10);
   if (!fano) return res.status(400).json({ success: false, message: 'fano requerido' });
   try {
-    const data = await getInmaMarcas(fano);
+    const data = await getInmaMarcas(fano, parseBinacional(req));
     res.json({ success: true, data });
   } catch (err) {
     logError('marcas', err);
@@ -82,7 +87,7 @@ router.get('/modelos', async (req, res) => {
   const cmarca = req.query.cmarca;
   if (!fano || !cmarca) return res.status(400).json({ success: false, message: 'fano y cmarca requeridos' });
   try {
-    const data = await getInmaModelos(fano, cmarca);
+    const data = await getInmaModelos(fano, cmarca, parseBinacional(req));
     res.json({ success: true, data });
   } catch (err) {
     logError('modelos', err);
@@ -98,7 +103,7 @@ router.get('/versiones', async (req, res) => {
     return res.status(400).json({ success: false, message: 'fano, cmarca y cmodelo requeridos' });
   }
   try {
-    const data = await getInmaVersiones(fano, cmarca, cmodelo);
+    const data = await getInmaVersiones(fano, cmarca, cmodelo, parseBinacional(req));
     res.json({ success: true, data });
   } catch (err) {
     logError('versiones', err);
@@ -115,7 +120,7 @@ router.get('/categorias-uso', async (req, res) => {
     return res.status(400).json({ success: false, message: 'fano, cmarca, cmodelo y cversion son requeridos' });
   }
   try {
-    const data = await getCategoriasUso(fano, cmarca, cmodelo, cversion);
+    const data = await getCategoriasUso(fano, cmarca, cmodelo, cversion, parseBinacional(req));
     res.json({ success: true, data });
   } catch (err) {
     logError('categorias-uso', err);

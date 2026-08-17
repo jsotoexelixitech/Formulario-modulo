@@ -92,43 +92,49 @@ async function validateEmissionAutoViaNestApi(params) {
 }
 
 /** @returns {Promise<{ min: number, max: number }>} */
-async function getInmaAnios() {
-  const { data } = await axios.get(`${getBaseUrl()}/api/v1/inma/anios`, await axiosOpts());
+async function getInmaAnios(binacional = false) {
+  const qs = binacional ? '?binacional=1' : '';
+  const { data } = await axios.get(`${getBaseUrl()}/api/v1/inma/anios${qs}`, await axiosOpts());
   return data?.data ?? { min: 2000, max: new Date().getFullYear() + 1 };
 }
 
 /** @returns {Promise<Array<{ cmarca: string, xmarca: string }>>} */
-async function getInmaMarcas(fano) {
+async function getInmaMarcas(fano, binacional = false) {
   const { data } = await axios.post(
     `${getBaseUrl()}/api/v1/inma/marcas`,
-    { fano },
+    { fano, binacional: Boolean(binacional) || undefined },
     await axiosOpts(),
   );
   return data?.data?.marcas ?? [];
 }
 
 /** @returns {Promise<Array<{ cmodelo: string, cmarca: string, xmodelo: string }>>} */
-async function getInmaModelos(fano, cmarca) {
+async function getInmaModelos(fano, cmarca, binacional = false) {
   const { data } = await axios.post(
     `${getBaseUrl()}/api/v1/inma/modelo`,
-    { fano, cmarca: String(cmarca).trim() },
+    { fano, cmarca: String(cmarca).trim(), binacional: Boolean(binacional) || undefined },
     await axiosOpts(),
   );
   return data?.data?.info ?? [];
 }
 
 /** @returns {Promise<Array<{ cversion: string, xversion?: string }>>} */
-async function getInmaVersiones(fano, cmarca, cmodelo) {
+async function getInmaVersiones(fano, cmarca, cmodelo, binacional = false) {
   const { data } = await axios.post(
     `${getBaseUrl()}/api/v1/inma/version`,
-    { fano, cmarca: String(cmarca).trim(), cmodelo: String(cmodelo).trim() },
+    {
+      fano,
+      cmarca: String(cmarca).trim(),
+      cmodelo: String(cmodelo).trim(),
+      binacional: Boolean(binacional) || undefined,
+    },
     await axiosOpts(),
   );
   return data?.data?.info ?? [];
 }
 
 /** @returns {Promise<Array<{ ccategoria_uso: number, xcategoria_uso: string }>>} */
-async function getCategoriasUso(fano, cmarca, cmodelo, cversion) {
+async function getCategoriasUso(fano, cmarca, cmodelo, cversion, binacional = false) {
   const { data } = await axios.post(
     `${getBaseUrl()}/api/v1/inma/categorias-uso`,
     {
@@ -136,6 +142,7 @@ async function getCategoriasUso(fano, cmarca, cmodelo, cversion) {
       cmarca: String(cmarca).trim(),
       cmodelo: String(cmodelo).trim(),
       cversion: String(cversion).trim(),
+      binacional: Boolean(binacional) || undefined,
     },
     await axiosOpts(),
   );
@@ -175,10 +182,110 @@ async function getValrepList(domain) {
     .filter((it) => it.code !== '' && it.label !== '');
 }
 
+/** @returns {Promise<Record<string, unknown>|null>} */
+async function searchProprietaryViaNestApi({ cid, xrif_cliente } = {}) {
+  const url = `${getBaseUrl()}/api/v1/emissions/automobile_new/propietary`;
+  const payload = {
+    cid: cid != null && String(cid).trim() !== '' ? String(cid).trim() : undefined,
+    xrif_cliente:
+      xrif_cliente != null && String(xrif_cliente).trim() !== ''
+        ? String(xrif_cliente).trim()
+        : undefined,
+  };
+
+  const response = await axios.post(url, payload, await axiosOpts({ validateStatus: () => true }));
+  const body = response.data ?? {};
+
+  if (response.status === 404 || body?.status === false) {
+    return null;
+  }
+  if (response.status >= 400) {
+    const err = new Error(body?.message || `HTTP ${response.status} proprietary lookup`);
+    err.status = response.status;
+    err.code = body?.code || 'PROPRIETARY_LOOKUP_ERROR';
+    throw err;
+  }
+
+  return body?.data ?? body?.info ?? null;
+}
+
+/**
+ * Valida placa vía nest-api `POST /api/v1/emissions/automobile/vehicle`
+ * (`dbo.fn_validar_placa`).
+ *
+ * Nota SysIP: `status: true` significa placa ACTIVA (bloqueante);
+ * `status: false` significa placa disponible.
+ *
+ * @returns {{ is_active: boolean, message?: string, status: boolean }}
+ */
+async function validatePlacaViaNestApi({ xplaca, placa, fdesde, type } = {}) {
+  const url = `${getBaseUrl()}/api/v1/emissions/automobile/vehicle`;
+  const payload = {
+    xplaca: String(xplaca || placa || '').trim(),
+    fdesde: String(fdesde || new Date().toISOString().slice(0, 10)),
+    type: type != null ? String(type) : undefined,
+  };
+
+  const response = await axios.post(url, payload, await axiosOpts({ validateStatus: () => true }));
+  const body = response.data ?? {};
+
+  if (response.status >= 400) {
+    const err = new Error(body?.message || `HTTP ${response.status} validate placa`);
+    err.status = response.status;
+    err.code = body?.code || 'VALIDATE_PLACA_ERROR';
+    throw err;
+  }
+
+  const isActive = Boolean(body?.is_active ?? body?.status === true);
+  return {
+    status: Boolean(body?.status),
+    is_active: isActive,
+    message: body?.message,
+  };
+}
+
+/**
+ * Valida serial de carrocería vía nest-api `POST /api/v1/emissions/automobile/serial`
+ * (`dbo.fn_validar_serialCar`).
+ *
+ * Nota SysIP: `status: true` significa serial ACTIVO (bloqueante);
+ * `status: false` significa serial disponible.
+ *
+ * @returns {{ is_active: boolean, message?: string, status: boolean }}
+ */
+async function validateSerialViaNestApi({ xsercar, xserialcarroceria, fdesde, type } = {}) {
+  const url = `${getBaseUrl()}/api/v1/emissions/automobile/serial`;
+  const payload = {
+    xsercar: String(xsercar || xserialcarroceria || '').trim(),
+    fdesde: String(fdesde || new Date().toISOString().slice(0, 10)),
+    type: type != null ? String(type) : undefined,
+  };
+
+  const response = await axios.post(url, payload, await axiosOpts({ validateStatus: () => true }));
+  const body = response.data ?? {};
+
+  if (response.status >= 400) {
+    const err = new Error(body?.message || `HTTP ${response.status} validate serial`);
+    err.status = response.status;
+    err.code = body?.code || 'VALIDATE_SERIAL_ERROR';
+    throw err;
+  }
+
+  const isActive = Boolean(body?.is_active ?? body?.status === true);
+  return {
+    status: Boolean(body?.status),
+    is_active: isActive,
+    message: body?.message,
+  };
+}
+
 module.exports = {
   getBaseUrl,
   getTimeout,
   validateEmissionAutoViaNestApi,
+  searchProprietaryViaNestApi,
+  validatePlacaViaNestApi,
+  validateSerialViaNestApi,
   getInmaAnios,
   getInmaMarcas,
   getInmaModelos,
