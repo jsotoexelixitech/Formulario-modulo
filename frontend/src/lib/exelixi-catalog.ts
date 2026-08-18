@@ -5,7 +5,7 @@ import {
   type ExelixiOcrHandoff,
   type OcrDocType,
 } from './exelixi-handoff-types';
-import { resolveOcrModelo, resolveOcrTipoPlaca } from './vehicle-carnet-labels';
+import { resolveOcrModelo, resolveOcrTipoPlaca, sanitizeOcrField } from './vehicle-carnet-labels';
 
 export type BuilderProductBranch =
   | 'AUTOMOVIL'
@@ -231,8 +231,8 @@ export function applyExelixiOcrHandoff(
       modelo: resolveOcrModelo(cert),
       año: cert.año ?? cert.anio ?? '',
       color: cert.color ?? '',
-      serial: cert.serial ?? '',
-      serialMotor: cert.serialMotor ?? '',
+      serial: sanitizeOcrField(cert.serial),
+      serialMotor: sanitizeOcrField(cert.serialMotor),
       cilindrada: rcvHandoff ? cert.cilindrada ?? '' : '',
       tipoCarnet: rcvHandoff ? cert.tipoCarnet : undefined,
       tipoPlaca: rcvHandoff ? resolveOcrTipoPlaca(cert) : 'nacional',
