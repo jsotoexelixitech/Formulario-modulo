@@ -25,6 +25,7 @@ import {
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
 import { isRcvLaMundialFlow } from '../../lib/product';
+import { isQaDeploy } from '../../lib/deploy-env';
 import type { VehicleData } from '../../types';
 
 const COLOR_SWATCHES: Record<string, string> = {
@@ -231,6 +232,13 @@ export function VehicleStep() {
   const ocrCert     = documents.certificado.ocr;
   const hasOcr      = !!(ocrCert?.marca || ocrCert?.modelo || ocrCert?.placa);
   const hasOcrCodes = !!(vehicle.cmarca && vehicle.cmodelo);
+  /** QA: campos precargados por OCR quedan bloqueados (placa, serial, catálogo INMA, etc.). */
+  const qaOcrLock = isQaDeploy() && hasOcr;
+  const catalogLocked = verified || qaOcrLock;
+
+  useEffect(() => {
+    if (qaOcrLock && !verified) setVerified(true);
+  }, [qaOcrLock, verified]);
 
   // ── Cargar rango de años (nacional vs binacional) ─────────────────────────
   useEffect(() => {
@@ -741,13 +749,15 @@ export function VehicleStep() {
                   )}
                 </p>
                 <p className="text-xs text-indigo-100 mt-0.5 leading-relaxed">
-                  {hasOcrCodes
-                    ? 'Marca y modelo identificados en el catálogo. Solo confirma la versión.'
-                    : 'Revisa los campos y completa lo que falte. Puedes cambiar cualquier valor.'}
+                  {qaOcrLock
+                    ? 'Entorno QA: los datos extraídos del OCR no se pueden modificar.'
+                    : hasOcrCodes
+                      ? 'Marca y modelo identificados en el catálogo. Solo confirma la versión.'
+                      : 'Revisa los campos y completa lo que falte. Puedes cambiar cualquier valor.'}
                 </p>
               </div>
             </div>
-            {hasOcrCodes && !verified && (
+            {hasOcrCodes && !verified && !qaOcrLock && (
               <button
                 type="button"
                 onClick={() => {
@@ -763,7 +773,7 @@ export function VehicleStep() {
                 <ShieldCheck size={14} /> Confirmar datos
               </button>
             )}
-            {verified && (
+            {verified && !qaOcrLock && (
               <div className="self-start sm:self-auto flex-shrink-0 flex items-center gap-2">
                 <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-400/95 text-emerald-950 text-xs font-bold ring-1 ring-emerald-300">
                   <ShieldCheck size={14} /> Verificado
@@ -802,24 +812,28 @@ export function VehicleStep() {
               <span className="inline-flex flex-wrap items-center gap-0 rounded-lg bg-slate-100 p-0.5 text-[0.65rem] font-bold border border-slate-200">
                 <button
                   type="button"
+                  disabled={qaOcrLock}
                   onClick={() => setTipoPlaca('nacional')}
                   className={cn(
                     'px-3 py-2 rounded-md transition-all',
                     vehicle.tipoPlaca === 'nacional'
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-700',
+                    qaOcrLock && 'opacity-60 cursor-not-allowed',
                   )}
                 >
                   Nacional
                 </button>
                 <button
                   type="button"
+                  disabled={qaOcrLock}
                   onClick={() => setTipoPlaca('extranjera')}
                   className={cn(
                     'px-3 py-2 rounded-md transition-all',
                     vehicle.tipoPlaca === 'extranjera'
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-700',
+                    qaOcrLock && 'opacity-60 cursor-not-allowed',
                   )}
                 >
                   Extranjera
@@ -827,12 +841,14 @@ export function VehicleStep() {
                 {rcvLaMundial && (
                 <button
                   type="button"
+                  disabled={qaOcrLock}
                   onClick={() => setTipoPlaca('binacional')}
                   className={cn(
                     'px-3 py-2 rounded-md transition-all',
                     vehicle.tipoPlaca === 'binacional'
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-700',
+                    qaOcrLock && 'opacity-60 cursor-not-allowed',
                   )}
                 >
                   Binacional
@@ -850,24 +866,28 @@ export function VehicleStep() {
                 <span className="inline-flex items-center gap-0 rounded-lg bg-slate-100 p-0.5 text-[0.65rem] font-bold border border-slate-200">
                   <button
                     type="button"
+                    disabled={qaOcrLock}
                     onClick={() => setTipoPlaca('nacional')}
                     className={cn(
                       'px-2 py-1 rounded-md transition-all',
                       vehicle.tipoPlaca === 'nacional'
                         ? 'bg-indigo-600 text-white shadow-sm'
                         : 'text-slate-500 hover:text-slate-700',
+                      qaOcrLock && 'opacity-60 cursor-not-allowed',
                     )}
                   >
                     Nacional
                   </button>
                   <button
                     type="button"
+                    disabled={qaOcrLock}
                     onClick={() => setTipoPlaca('extranjera')}
                     className={cn(
                       'px-2 py-1 rounded-md transition-all',
                       vehicle.tipoPlaca === 'extranjera'
                         ? 'bg-indigo-600 text-white shadow-sm'
                         : 'text-slate-500 hover:text-slate-700',
+                      qaOcrLock && 'opacity-60 cursor-not-allowed',
                     )}
                   >
                     Extranjera
@@ -875,12 +895,14 @@ export function VehicleStep() {
                   {rcvLaMundial && (
                   <button
                     type="button"
+                    disabled={qaOcrLock}
                     onClick={() => setTipoPlaca('binacional')}
                     className={cn(
                       'px-2 py-1 rounded-md transition-all',
                       vehicle.tipoPlaca === 'binacional'
                         ? 'bg-indigo-600 text-white shadow-sm'
                         : 'text-slate-500 hover:text-slate-700',
+                      qaOcrLock && 'opacity-60 cursor-not-allowed',
                     )}
                   >
                     Binacional
@@ -911,7 +933,7 @@ export function VehicleStep() {
                 }
                 className="uppercase font-mono tracking-wider"
                 maxLength={vehicle.tipoPlaca === 'nacional' ? 8 : 12}
-                disabled={placaValidating}
+                disabled={placaValidating || qaOcrLock}
               />
               {placaValidating && (
                 <Loader2
@@ -929,7 +951,7 @@ export function VehicleStep() {
             {anios.length > 0 ? (
               <Select
                 value={vehicle.año}
-                disabled={verified}
+                disabled={catalogLocked}
                 onChange={(e) => {
                   setVehicle({ año: e.target.value, cmarca: '', marca: '', cmodelo: '', modelo: '', cversion: '', ccategoria_uso: undefined, xcategoria_uso: '' });
                 }}
@@ -961,7 +983,7 @@ export function VehicleStep() {
             {marcas.length > 0 ? (
               <Select
                 value={vehicle.cmarca ?? ''}
-                disabled={verified}
+                disabled={catalogLocked}
                 onChange={(e) => {
                   const cmarca = e.target.value;
                   const xmarca = marcas.find(m => m.cmarca === cmarca)?.xmarca ?? '';
@@ -1009,7 +1031,7 @@ export function VehicleStep() {
             {modelos.length > 0 ? (
               <Select
                 value={vehicle.cmodelo ?? ''}
-                disabled={verified}
+                disabled={catalogLocked}
                 onChange={(e) => {
                   const cmodelo = e.target.value;
                   const xmodelo = modelos.find(m => m.cmodelo === cmodelo)?.xmodelo ?? '';
@@ -1060,6 +1082,7 @@ export function VehicleStep() {
               {versiones.length > 0 ? (
                 <Select
                   value={vehicle.cversion ?? ''}
+                  disabled={catalogLocked}
                   onChange={(e) => {
                     const ver = versiones.find(v => v.cversion === e.target.value);
                     setVehicle({
@@ -1183,6 +1206,7 @@ export function VehicleStep() {
             <div className="relative">
               <Input
                 value={vehicle.color}
+                disabled={qaOcrLock}
                 onChange={(e) => setVehicle({ color: e.target.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '').slice(0, 15) })}
                 placeholder="Plateado"
                 maxLength={15}
@@ -1219,7 +1243,7 @@ export function VehicleStep() {
                 placeholder="1HGBH41JXMN109186"
                 className="font-mono uppercase tracking-wider"
                 maxLength={17}
-                disabled={serialValidating}
+                disabled={serialValidating || qaOcrLock}
               />
               {serialValidating && (
                 <Loader2
@@ -1234,6 +1258,7 @@ export function VehicleStep() {
           <Field label="Serial del motor" hint="Opcional · Máx. 60 caracteres · Aparece en el documento del vehículo">
             <Input
               value={vehicle.serialMotor ?? ''}
+              disabled={qaOcrLock}
               onChange={(e) => setVehicle({ serialMotor: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 60) })}
               placeholder="Ej. 4A123456789"
               className="font-mono uppercase tracking-wider"
@@ -1246,6 +1271,7 @@ export function VehicleStep() {
           <Field label="Cilindrada (CC)" hint="Opcional · Del carnet binacional colombiano">
             <Input
               value={vehicle.cilindrada ?? ''}
+              disabled={qaOcrLock}
               onChange={(e) => setVehicle({ cilindrada: e.target.value.slice(0, 20) })}
               placeholder="Ej. 1.998"
               className="font-mono tracking-wider"

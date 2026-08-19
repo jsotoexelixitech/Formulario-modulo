@@ -235,7 +235,7 @@ export function applyExelixiOcrHandoff(
       serialMotor: sanitizeOcrField(cert.serialMotor),
       cilindrada: rcvHandoff ? cert.cilindrada ?? '' : '',
       tipoCarnet: rcvHandoff ? cert.tipoCarnet : undefined,
-      tipoPlaca: rcvHandoff ? resolveOcrTipoPlaca(cert) : 'nacional',
+      tipoPlaca: resolveOcrTipoPlaca(cert),
     });
   }
 
