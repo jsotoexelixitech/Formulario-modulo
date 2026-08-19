@@ -26,6 +26,7 @@ import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
 import { isRcvLaMundialFlow } from '../../lib/product';
 import { isQaDeploy } from '../../lib/deploy-env';
+import { findBestInmaMarca } from '../../lib/inma-marca-match';
 import type { VehicleData } from '../../types';
 
 const COLOR_SWATCHES: Record<string, string> = {
@@ -279,17 +280,50 @@ export function VehicleStep() {
     if (vehicle.cmarca) return; // usuario ya eligió
     if (!ocrCert?.marca) return;
 
-    const match = findBestMatch(marcas, ocrCert.marca, 'xmarca' as keyof InmaMarca);
+    const serialHint = ocrCert.serial || vehicle.serial;
+    const match = findBestInmaMarca(marcas, ocrCert.marca, serialHint);
     if (match) {
       autoSelectedMarca.current = true;
       setVehicle({ cmarca: match.cmarca, marca: match.xmarca, cmodelo: '', modelo: '', cversion: '', ccategoria_uso: undefined, xcategoria_uso: '' });
     } else if (isRcvEmision) {
       autoSelectedMarca.current = true;
-      toast.warning(
-        'Marca no encontrada',
-        `No encontramos "${ocrCert.marca}" en el catálogo. Comunícate con soporte para continuar.`,
-        7000,
-      );
+      const y = parseInt(vehicle.año, 10) || parseInt(String(ocrCert.año ?? ''), 10);
+      const ocrMarca = ocrCert.marca ?? '';
+
+      const warnMarca = (title: string, message: string) => {
+        toast.warning(title, message, isBinacional ? 8000 : 7000);
+      };
+
+      if (isBinacional && y >= 1990 && ocrMarca) {
+        void catalogoApi.marcaDisponibilidad(y, ocrMarca, serialHint)
+          .then(({ data }) => {
+            if (data.inBinacionalCatalog) return;
+            if (data.inGeneralCatalog) {
+              warnMarca(
+                'Marca sin tarifa binacional',
+                `"${ocrMarca}" está en catálogo La Mundial pero no habilitada para plan binacional (${y}). Selecciona otra marca del listado o solicita el alta a La Mundial.`,
+              );
+              return;
+            }
+            warnMarca(
+              'Marca no encontrada',
+              `No encontramos "${ocrMarca}" en el catálogo INMA. Selecciona la marca manualmente en el listado.`,
+            );
+          })
+          .catch(() => {
+            warnMarca(
+              'Marca no encontrada',
+              `No encontramos "${ocrMarca}" en el catálogo binacional. Selecciona la marca manualmente.`,
+            );
+          });
+      } else {
+        warnMarca(
+          'Marca no encontrada',
+          isBinacional
+            ? `No encontramos "${ocrMarca}" en el catálogo binacional. Selecciona la marca manualmente.`
+            : `No encontramos "${ocrMarca}" en el catálogo. Comunícate con soporte para continuar.`,
+        );
+      }
     }
   // Solo cuando marcas cambia
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -318,7 +352,7 @@ export function VehicleStep() {
       setVehicle({ cmodelo: match.cmodelo, modelo: match.xmodelo, cversion: '', ccategoria_uso: undefined, xcategoria_uso: '' });
     } else {
       autoSelectedModelo.current = true;
-      if (isRcvEmision) {
+      if (isRcvEmision && !isBinacional) {
         toast.warning(
           'Modelo no encontrado',
           `No encontramos "${ocrModelText}" en el catálogo. Comunícate con soporte para continuar.`,
@@ -343,7 +377,7 @@ export function VehicleStep() {
     if (vehicle.cmarca && vehicle.cmodelo) return; // ya tenemos códigos
 
     let cancelled = false;
-    catalogoApi.resolver(y, vehicle.marca, vehicle.modelo, isBinacional)
+    catalogoApi.resolver(y, vehicle.marca, vehicle.modelo, isBinacional, vehicle.serial || ocrCert?.serial || '')
       .then(({ data }) => {
         if (cancelled) return;
         if (!data?.success) return;

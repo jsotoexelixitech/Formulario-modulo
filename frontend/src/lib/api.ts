@@ -423,6 +423,18 @@ export interface ResolverResult {
   message?: string;
 }
 
+export interface MarcaDisponibilidadResult {
+  success: boolean;
+  ocrMarca?: string;
+  inGeneralCatalog?: boolean;
+  inBinacionalCatalog?: boolean;
+  xmarcaGeneral?: string | null;
+  xmarcaBinacional?: string | null;
+  cmarcaGeneral?: string | null;
+  cmarcaBinacional?: string | null;
+  message?: string;
+}
+
 export const catalogoApi = {
   anios: (binacional = false) =>
     api.get<{ success: boolean; min: number; max: number }>(
@@ -446,9 +458,13 @@ export const catalogoApi = {
       `/catalogo/categorias-uso?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}&cversion=${cversion}${binacional ? '&binacional=1' : ''}`,
     ),
   /** Resuelve texto libre (de OCR) → cmarca + cmodelo + versiones en una sola llamada */
-  resolver: (fano: number, marca: string, modelo: string, binacional = false) =>
+  resolver: (fano: number, marca: string, modelo: string, binacional = false, serial = '') =>
     api.get<ResolverResult>(
-      `/catalogo/resolver?fano=${fano}&marca=${encodeURIComponent(marca)}&modelo=${encodeURIComponent(modelo)}${binacional ? '&binacional=1' : ''}`,
+      `/catalogo/resolver?fano=${fano}&marca=${encodeURIComponent(marca)}&modelo=${encodeURIComponent(modelo)}${binacional ? '&binacional=1' : ''}${serial ? `&serial=${encodeURIComponent(serial)}` : ''}`,
+    ),
+  marcaDisponibilidad: (fano: number, marca: string, serial = '') =>
+    api.get<MarcaDisponibilidadResult>(
+      `/catalogo/marca-disponibilidad?fano=${fano}&marca=${encodeURIComponent(marca)}${serial ? `&serial=${encodeURIComponent(serial)}` : ''}`,
     ),
 };
 

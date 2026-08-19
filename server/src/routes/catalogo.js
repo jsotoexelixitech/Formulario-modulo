@@ -13,6 +13,7 @@ const {
   getInmaVersiones,
   getCategoriasUso,
 } = require('../services/nestApiClient');
+const { findMarcaInList } = require('../lib/inmaMarcaMatch');
 
 const router = express.Router();
 
@@ -136,15 +137,9 @@ router.get('/resolver', async (req, res) => {
 
   try {
     const binacional = parseBinacional(req);
+    const serial = (req.query.serial || '').trim();
     const marcas = await getInmaMarcas(fano, binacional);
-    const normMarca = normCatalogText(marca);
-    const marcaMatch =
-      marcas.find((m) => normCatalogText(m.xmarca) === normMarca) ??
-      marcas.find(
-        (m) =>
-          normCatalogText(m.xmarca).includes(normMarca) ||
-          normMarca.includes(normCatalogText(m.xmarca)),
-      );
+    const marcaMatch = findMarcaInList(marcas, marca, serial);
 
     if (!marcaMatch) {
       return res.json({ success: false, fallback: true, message: `Marca "${marca}" no encontrada` });
@@ -176,6 +171,39 @@ router.get('/resolver', async (req, res) => {
     });
   } catch (err) {
     logError('resolver', err);
+    res.status(502).json({ success: false, message: err.message });
+  }
+});
+
+/** Diagnóstico: marca OCR vs catálogo INMA general y binacional (ctarifabi). */
+router.get('/marca-disponibilidad', async (req, res) => {
+  const fano = parseInt(req.query.fano, 10);
+  const marca = (req.query.marca || '').trim();
+  const serial = (req.query.serial || '').trim();
+  if (!fano || !marca) {
+    return res.status(400).json({ success: false, message: 'fano y marca requeridos' });
+  }
+
+  try {
+    const [marcasGeneral, marcasBinacional] = await Promise.all([
+      getInmaMarcas(fano, false),
+      getInmaMarcas(fano, true),
+    ]);
+    const matchGeneral = findMarcaInList(marcasGeneral, marca, serial);
+    const matchBinacional = findMarcaInList(marcasBinacional, marca, serial);
+
+    res.json({
+      success: true,
+      ocrMarca: marca,
+      inGeneralCatalog: Boolean(matchGeneral),
+      inBinacionalCatalog: Boolean(matchBinacional),
+      xmarcaGeneral: matchGeneral?.xmarca ?? null,
+      xmarcaBinacional: matchBinacional?.xmarca ?? null,
+      cmarcaGeneral: matchGeneral?.cmarca ?? null,
+      cmarcaBinacional: matchBinacional?.cmarca ?? null,
+    });
+  } catch (err) {
+    logError('marca-disponibilidad', err);
     res.status(502).json({ success: false, message: err.message });
   }
 });
