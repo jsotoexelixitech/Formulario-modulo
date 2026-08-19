@@ -2,12 +2,73 @@ import type { DocType, DocumentState } from '../types';
 
 type CertOcr = {
   tipoCarnet?: string;
+  tipo_carnet?: string;
   tipoPlaca?: string;
+  placa?: string;
+  linea?: string;
+  cilindrada?: string;
+  serialMotor?: string;
+  vin?: string;
+  numeroMotor?: string;
 };
 
+function sanitizeOcrString(value?: string | null): string {
+  if (value == null) return '';
+  const s = String(value).trim();
+  if (!s) return '';
+  const u = s.toUpperCase();
+  if (u === 'NULL' || u === 'N/A' || u === 'NA' || u === 'NONE') return '';
+  return s;
+}
+
+function looksLikeVePlacaNacional(placa?: string | null): boolean {
+  const p = String(placa ?? '').replace(/[\s-]/g, '').toUpperCase();
+  if (!p) return false;
+  return /^[A-Z]{1,3}\d{3}[A-Z]{0,3}$/.test(p) || /^[A-Z]{2}\d{5}$/.test(p);
+}
+
+function looksLikeCoPlaca(placa?: string | null): boolean {
+  const p = String(placa ?? '').replace(/[\s-]/g, '').toUpperCase();
+  if (!p) return false;
+  return /^[A-Z]{3}\d{2,3}[A-Z]?$/.test(p);
+}
+
 export function isBinacionalCarnet(cert?: CertOcr | null): boolean {
-  if (!cert) return false;
-  return cert.tipoCarnet === 'binacional' || cert.tipoPlaca === 'binacional';
+  if (!cert || typeof cert !== 'object') return false;
+
+  const tipoRaw = String(cert.tipoCarnet || cert.tipo_carnet || '').toLowerCase().trim();
+  const placaTipo = String(cert.tipoPlaca || '').toLowerCase().trim();
+
+  const hasLinea = Boolean(sanitizeOcrString(cert.linea));
+  const hasCilindrada = Boolean(sanitizeOcrString(cert.cilindrada));
+  const hasVin = Boolean(sanitizeOcrString(cert.vin));
+  const hasSerialMotor = Boolean(
+    sanitizeOcrString(cert.serialMotor) || sanitizeOcrString(cert.numeroMotor),
+  );
+
+  const placaNorm = String(cert.placa || '').replace(/[\s-]/g, '').toUpperCase();
+  const looksVeNacional =
+    looksLikeVePlacaNacional(placaNorm)
+    && !hasLinea
+    && !hasCilindrada;
+
+  const isExplicitColombia =
+    tipoRaw === 'colombia'
+    || tipoRaw === 'colombiano'
+    || placaTipo === 'binacional';
+
+  if (tipoRaw === 'binacional' || isExplicitColombia) {
+    if (looksVeNacional && !isExplicitColombia) return false;
+    return true;
+  }
+
+  let isBinacional = hasLinea && (hasCilindrada || hasVin || hasSerialMotor);
+  if (isBinacional && looksVeNacional) isBinacional = false;
+  if (!isBinacional && looksLikeCoPlaca(placaNorm) && !looksLikeVePlacaNacional(placaNorm)) {
+    isBinacional = true;
+  }
+
+  return isBinacional;
 }
 
 export function adjustDocsForBinacionalCarnet(
@@ -15,8 +76,11 @@ export function adjustDocsForBinacionalCarnet(
   optionalDocs: DocType[],
   documents: Record<DocType, DocumentState>,
 ): { requiredDocs: DocType[]; optionalDocs: DocType[] } {
-  const cert = documents.certificado?.ocr as CertOcr | undefined;
-  if (!isBinacionalCarnet(cert)) {
+  const certState = documents.certificado;
+  const cert = certState?.ocr as CertOcr | undefined;
+  const certDone = certState?.status === 'done';
+
+  if (!certDone || !isBinacionalCarnet(cert)) {
     return { requiredDocs: [...requiredDocs], optionalDocs: [...optionalDocs] };
   }
 

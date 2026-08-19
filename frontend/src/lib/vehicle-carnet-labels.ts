@@ -32,11 +32,6 @@ export function sanitizeOcrField(value?: string | null): string {
   return isNullishOcrValue(value) ? '' : String(value).trim();
 }
 
-function looksLikeVePlacaNacional(placa?: string | null): boolean {
-  const p = String(placa ?? '').replace(/[\s-]/g, '').toUpperCase();
-  if (!p) return false;
-  return /^[A-Z]{1,3}\d{3}[A-Z]{0,3}$/.test(p) || /^[A-Z]{2}\d{5}$/.test(p);
-}
 
 export function isVehicleClassOrTypeLabel(value?: string | null): boolean {
   const v = normalizeLabel(String(value ?? '').trim());
@@ -63,6 +58,8 @@ export function resolveOcrModelo(cert?: {
   return '';
 }
 
+import { isBinacionalCarnet } from './ocr-binacional';
+
 export function resolveOcrTipoPlaca(cert?: {
   placa?: string;
   linea?: string;
@@ -75,17 +72,8 @@ export function resolveOcrTipoPlaca(cert?: {
 } | null): 'nacional' | 'extranjera' | 'binacional' {
   if (!cert) return 'nacional';
   if (cert.referenciaModelo || cert.tipoVehiculo || cert.claseUso) return 'nacional';
-  if (
-    cert.tipoCarnet === 'binacional' &&
-    looksLikeVePlacaNacional(cert.placa) &&
-    !cert.linea &&
-    isNullishOcrValue(cert.cilindrada)
-  ) {
-    return 'nacional';
-  }
+  if (isBinacionalCarnet(cert)) return 'binacional';
   if (cert.tipoCarnet === 'nacional') return 'nacional';
-  if (cert.tipoCarnet === 'binacional') return 'binacional';
   if (cert.tipoPlaca === 'extranjera') return 'extranjera';
-  if (cert.tipoPlaca === 'binacional') return 'binacional';
   return 'nacional';
 }

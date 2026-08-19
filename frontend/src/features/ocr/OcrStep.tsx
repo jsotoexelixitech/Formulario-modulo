@@ -559,7 +559,8 @@ export function OcrStep() {
   }, [allRequiredDone, ocrDone, documents.cedula.ocr, documents.certificado.ocr, setTomador, setVehicle, setOcrDone]);
 
   const completedCount = requiredDocs.filter((d) => documents[d].status === 'done').length;
-  const completionPct = (completedCount / requiredDocs.length) * 100;
+  const completionPct =
+    requiredDocs.length > 0 ? (completedCount / requiredDocs.length) * 100 : 0;
 
   /**
    * Carga un documento demo con simulacion visual (uploading -> processing -> done).
