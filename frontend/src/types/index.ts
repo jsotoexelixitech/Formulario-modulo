@@ -1,4 +1,6 @@
-export type DocType = 'cedula' | 'licencia' | 'certificado' | 'rif';
+export type DocType = 'cedula' | 'licencia' | 'certificado' | 'rif' | 'pasaporte';
+
+export type { DiligenciaState, TipoDiligencia } from '../lib/diligencia';
 
 /** Producto de seguro que se está suscribiendo en el flujo. */
 export type ProductId = 'rcv' | 'funerario';
@@ -45,6 +47,7 @@ export interface DocumentState {
   file?: DocumentFile;
   ocr?: OcrResult;
   error?: string;
+  hash?: string;
 }
 
 export type TomadorData = {
@@ -67,6 +70,12 @@ export type TomadorData = {
   cestado?: number;
   /** Código numérico La Mundial de la ciudad (cciudad). Se obtiene del selector de catálogo. */
   cciudad?: number;
+  /** Circular SAA-02-1079-2026 — código profesión La Mundial. */
+  cprofesion?: number | string;
+  cactividad?: number | string;
+  xprofesion?: string;
+  xactividad?: string;
+  itipoDiligencia?: 'S' | 'C';
 };
 
 export type PersonData = {
@@ -246,4 +255,6 @@ export interface WizardState {
   /** Snapshot del vehiculo con el que se hizo la ultima cotizacion. Sirve para
    *  invalidar la quote si cambian datos relevantes (placa, marca, modelo, año, uso). */
   quoteVehicleSignature: string | null;
+  /** Circular SAA-02-1079-2026 — clasificación DDS/DDC. */
+  diligencia: import('../lib/diligencia').DiligenciaState | null;
 }

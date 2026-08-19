@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
 import { Field, Input, Textarea } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
@@ -6,9 +6,15 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { PersonLocationFields } from '../../components/PersonLocationFields';
 import { useCatalogs, useCiudades } from '../../hooks/useCatalogs';
+import { useProductConfig } from '../../hooks/useProductConfig';
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
-import { isRcvLaMundialFlow } from '../../lib/product';
+import { getProductId, isRcvLaMundialFlow } from '../../lib/product';
+import {
+  diligenciaLabel,
+  isPersonaJuridica,
+  preClasificarDiligencia,
+} from '../../lib/diligencia';
 import { searchProprietary } from '../../lib/api';
 import {
   buildProprietaryCid,
@@ -75,6 +81,26 @@ interface ValidationErrors {
 }
 
 const emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
+
+const PROFESION_OPTIONS = [
+  { value: '01', label: 'Empleado' },
+  { value: '02', label: 'Comerciante' },
+  { value: '03', label: 'Profesional independiente' },
+  { value: '04', label: 'Empresario' },
+  { value: '05', label: 'Estudiante' },
+  { value: '06', label: 'Jubilado / Pensionado' },
+  { value: '99', label: 'Otra' },
+];
+
+const ACTIVIDAD_OPTIONS = [
+  { value: '01', label: 'Comercio' },
+  { value: '02', label: 'Servicios' },
+  { value: '03', label: 'Industria' },
+  { value: '04', label: 'Construcción' },
+  { value: '05', label: 'Transporte' },
+  { value: '99', label: 'Otra' },
+];
 
 function onlyLetters(v: string): string {
   return v.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
@@ -91,13 +117,29 @@ export function EmissionStep() {
     asegurado, setAsegurado,
     hasBeneficiary, setHasBeneficiary,
     beneficiario, setBeneficiario,
+    diligencia, setDiligencia,
   } = useWizardStore();
 
   const catalogs = useCatalogs();
   const exelixiFlow = isExelixiCatalogFlow();
   const isRcvEmision = isRcvLaMundialFlow() && !isCotizadorFlow();
+  const producto = getProductId();
+  const { config: formConfig } = useProductConfig(EMPRESA_ID, producto, 'formulario');
+  const showProfesion = isRcvEmision && formConfig?.campos?.cprofesion?.activo !== false;
+  const showActividad = isRcvEmision && formConfig?.campos?.cactividad?.activo !== false;
+  const esPJ = isPersonaJuridica(tomador.tipoDoc);
   const ciudadesState = useCiudades(tomador.cestado);
   const aseguradoCiudades = useCiudades(asegurado.cestado);
+
+  useEffect(() => {
+    if (!isRcvEmision) return;
+    const itipo = preClasificarDiligencia(tomador.tipoDoc);
+    setDiligencia({
+      itipoDiligencia: itipo,
+      clasificadoEn: 'formulario',
+    });
+    setTomador({ itipoDiligencia: itipo });
+  }, [isRcvEmision, tomador.tipoDoc, setDiligencia, setTomador]);
   const beneficiarioCiudades = useCiudades(beneficiario.cestado);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [lookupLoading, setLookupLoading] = useState<Record<string, boolean>>({});
@@ -245,6 +287,13 @@ export function EmissionStep() {
     };
 
     validatePerson(tomador, 'tom_');
+    if (isRcvEmision && !esPJ) {
+      const hasProf = Boolean(tomador.cprofesion || tomador.xprofesion);
+      const hasAct = Boolean(tomador.cactividad || tomador.xactividad);
+      if (!hasProf && !hasAct) {
+        e.tom_profesion = 'Indique profesión o actividad económica';
+      }
+    }
     if (!sameInsured) validatePerson(asegurado, 'aseg_');
     if (hasBeneficiary) validatePerson(beneficiario, 'benef_');
 
@@ -382,6 +431,32 @@ export function EmissionStep() {
           maxLength={PERSON_FIELD_LIMITS.direccion}
         />
       </Field>
+      {prefix === 'tom_' && isRcvEmision && showProfesion && (
+        <Field label="Profesión" error={errors.tom_profesion}>
+          <SearchSelect
+            value={person.xprofesion ?? ''}
+            options={PROFESION_OPTIONS.map((o) => ({ value: o.label, label: o.label }))}
+            onChange={(value) => {
+              const opt = PROFESION_OPTIONS.find((o) => o.label === value);
+              setPerson({ xprofesion: value, cprofesion: opt?.value ?? value });
+            }}
+            placeholder="— Seleccionar —"
+          />
+        </Field>
+      )}
+      {prefix === 'tom_' && isRcvEmision && showActividad && (
+        <Field label="Actividad económica" error={errors.tom_profesion}>
+          <SearchSelect
+            value={person.xactividad ?? ''}
+            options={ACTIVIDAD_OPTIONS.map((o) => ({ value: o.label, label: o.label }))}
+            onChange={(value) => {
+              const opt = ACTIVIDAD_OPTIONS.find((o) => o.label === value);
+              setPerson({ xactividad: value, cactividad: opt?.value ?? value });
+            }}
+            placeholder="— Seleccionar (si no indicó profesión) —"
+          />
+        </Field>
+      )}
     </div>
   );
 
@@ -392,7 +467,14 @@ export function EmissionStep() {
         <SectionCard
           Icon={User}
           title="Datos de la persona que pagará la Póliza (Tomador)"
+          statusLabel={isRcvEmision && diligencia ? diligenciaLabel(diligencia.itipoDiligencia).split(' ')[0] : undefined}
+          statusTone={isRcvEmision && diligencia?.itipoDiligencia === 'C' ? 'warning' : 'success'}
         >
+          {isRcvEmision && esPJ && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+              Persona jurídica: aplica <strong>diligencia completa (DDC)</strong> según circular SAA-02-1079-2026.
+            </div>
+          )}
           {renderPersonForm(tomador, setTomador, 'tom_', ciudadesState)}
         </SectionCard>
 

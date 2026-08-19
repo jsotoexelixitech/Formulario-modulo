@@ -16,6 +16,7 @@ export interface ExelixiWizardHandoff {
   quoteVehicleSignature?: string;
   quoteState?: string;
   ocrDone?: boolean;
+  diligencia?: unknown;
   savedAt: number;
 }
 

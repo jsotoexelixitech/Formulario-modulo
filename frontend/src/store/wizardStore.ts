@@ -14,6 +14,7 @@ import type {
   PolicyQuote,
   QuoteState,
 } from '../types';
+import { buildDiligenciaState, preClasificarDiligencia, type DiligenciaState } from '../lib/diligencia';
 import { getProductId } from '../lib/product';
 
 const defaultDoc = (): DocumentState => ({ status: 'idle', progress: 0 });
@@ -107,6 +108,7 @@ interface WizardActions {
   setQuote: (q: PolicyQuote, vehicleSignature: string) => void;
   setQuoteState: (s: QuoteState, error?: string | null) => void;
   clearQuote: () => void;
+  setDiligencia: (data: Partial<DiligenciaState> | null) => void;
   reset: () => void;
 }
 
@@ -118,6 +120,7 @@ const initialState: WizardState = {
     licencia: defaultDoc(),
     certificado: defaultDoc(),
     rif: defaultDoc(),
+    pasaporte: defaultDoc(),
   },
   ocrDone: false,
   tomador: defaultTomador(),
@@ -141,6 +144,7 @@ const initialState: WizardState = {
   quoteState: 'idle',
   quoteError: null,
   quoteVehicleSignature: null,
+  diligencia: buildDiligenciaState({ itipoDiligencia: 'S', clasificadoEn: 'formulario' }),
 };
 
 export const useWizardStore = create<WizardState & WizardActions>()((set) => ({
@@ -226,6 +230,23 @@ export const useWizardStore = create<WizardState & WizardActions>()((set) => ({
 
   clearQuote: () =>
     set({ quote: null, quoteState: 'idle', quoteError: null, quoteVehicleSignature: null }),
+
+  setDiligencia: (data) =>
+    set((s) => {
+      if (data === null) {
+        return {
+          diligencia: buildDiligenciaState({
+            itipoDiligencia: preClasificarDiligencia(s.tomador.tipoDoc),
+            clasificadoEn: 'formulario',
+          }),
+        };
+      }
+      const base = s.diligencia ?? buildDiligenciaState({
+        itipoDiligencia: preClasificarDiligencia(s.tomador.tipoDoc),
+        clasificadoEn: 'formulario',
+      });
+      return { diligencia: { ...base, ...data } };
+    }),
 
   reset: () => set(initialState),
 }));

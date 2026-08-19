@@ -30,6 +30,7 @@ function buildExelixiWizardSnapshot(): Partial<ExelixiWizardHandoff> {
     vehicle: snap.vehicle,
     funeral: snap.funeral,
     ocrDone: snap.ocrDone,
+    diligencia: snap.diligencia,
   };
 }
 

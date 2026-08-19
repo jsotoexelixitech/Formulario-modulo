@@ -16,7 +16,7 @@ applyExelixiBranding('Formulario');
 
 function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
   useEffect(() => {
-    const { setDocState, setTomador, setVehicle, setOcrDone, goTo } = useWizardStore.getState();
+    const { setDocState, setTomador, setVehicle, setOcrDone, setDiligencia, goTo } = useWizardStore.getState();
     if (isCotizadorFlow() && isRcv()) {
       setOcrDone(true);
       if (!useWizardStore.getState().vehicle.tipoPlaca) {
@@ -25,7 +25,7 @@ function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
       goTo(3);
       return;
     }
-    applyExelixiOcrHandoff({ setDocState, setTomador, setVehicle, setOcrDone, goTo });
+    applyExelixiOcrHandoff({ setDocState, setTomador, setVehicle, setOcrDone, setDiligencia, goTo });
   }, []);
   return children;
 }

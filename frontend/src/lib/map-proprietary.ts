@@ -43,6 +43,8 @@ export interface PersonFormPatch {
   ciudad?: string;
   cciudad?: number;
   direccion?: string;
+  xprofesion?: string;
+  xactividad?: string;
 }
 
 function labelFromCatalog(
@@ -125,6 +127,8 @@ export function mapProprietaryToPerson(
     estado: estadoLabel,
     ciudad: clipPersonField('ciudad', String(info.xciudad ?? '').trim()),
     direccion: clipPersonField('direccion', String(info.xavecalle ?? '').trim()),
+    xprofesion: clipPersonField('nombre', String(info.xprofesion ?? info.xocupacion ?? '').trim()) || undefined,
+    xactividad: clipPersonField('nombre', String(info.xactividad ?? '').trim()) || undefined,
   };
 
   if (tipoDoc) patch.tipoDoc = tipoDoc.slice(0, PERSON_FIELD_LIMITS.tipoDoc);

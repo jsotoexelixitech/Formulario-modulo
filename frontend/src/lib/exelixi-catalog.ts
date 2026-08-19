@@ -185,6 +185,7 @@ export function applyExelixiOcrHandoff(
     setTomador: (data: Partial<TomadorData>) => void;
     setVehicle: (data: Partial<VehicleData>) => void;
     setOcrDone: (done: boolean) => void;
+    setDiligencia?: (data: import('./diligencia').DiligenciaState | Partial<import('./diligencia').DiligenciaState> | null) => void;
     goTo: (step: number) => void;
   },
 ): boolean {
@@ -200,14 +201,27 @@ export function applyExelixiOcrHandoff(
     }
   }
 
-  const docTypes: OcrDocType[] = ['cedula', 'licencia', 'certificado', 'rif'];
+  const docTypes: OcrDocType[] = ['cedula', 'licencia', 'certificado', 'rif', 'pasaporte'];
   for (const type of docTypes) {
     const fields = handoff.ocrData[type];
+    const hash = handoff.documentHashes?.[type];
     if (fields) {
-      setters.setDocState(type, { status: 'done', progress: 100, ocr: fields });
+      setters.setDocState(type, { status: 'done', progress: 100, ocr: fields, hash });
     } else {
       setters.setDocState(type, defaultDoc('idle'));
     }
+  }
+
+  if (handoff.diligencia && setters.setDiligencia) {
+    setters.setDiligencia(handoff.diligencia);
+  } else if (handoff.itipoDiligencia && setters.setDiligencia) {
+    setters.setDiligencia({
+      itipoDiligencia: handoff.itipoDiligencia,
+      documentosRequeridos: (handoff.documentosRequeridos ?? []) as DocType[],
+      documentHashes: handoff.documentHashes as Partial<Record<DocType, string>>,
+      clasificadoEn: 'ocr',
+      camposObligatorios: ['direccion'],
+    });
   }
 
   const cedula = handoff.ocrData.cedula;
