@@ -6,6 +6,7 @@ import {
   type OcrDocType,
 } from './exelixi-handoff-types';
 import { resolveOcrModelo, resolveOcrTipoPlaca, sanitizeOcrField } from './vehicle-carnet-labels';
+import { extractTomadorFromCertificado } from './carnet-propietario';
 
 export type BuilderProductBranch =
   | 'AUTOMOVIL'
@@ -210,7 +211,7 @@ export function applyExelixiOcrHandoff(
   }
 
   const cedula = handoff.ocrData.cedula;
-  if (cedula) {
+  if (cedula?.nombre || cedula?.identificacion) {
     setters.setTomador({
       nombre: cedula.nombre ?? '',
       apellido: cedula.apellido ?? '',
@@ -224,6 +225,10 @@ export function applyExelixiOcrHandoff(
 
   const cert = handoff.ocrData.certificado;
   if (cert) {
+    if (!cedula?.identificacion && !cedula?.nombre) {
+      const tomadorFromCert = extractTomadorFromCertificado(cert);
+      if (tomadorFromCert) setters.setTomador(tomadorFromCert);
+    }
     const rcvHandoff = !isExelixiCatalogFlow();
     setters.setVehicle({
       placa: cert.placa ?? '',
