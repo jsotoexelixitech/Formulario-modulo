@@ -24,7 +24,7 @@ function sanitizeOcrString(value?: string | null): string {
 function looksLikeVePlacaNacional(placa?: string | null): boolean {
   const p = String(placa ?? '').replace(/[\s-]/g, '').toUpperCase();
   if (!p) return false;
-  return /^[A-Z]{1,3}\d{3}[A-Z]{0,3}$/.test(p) || /^[A-Z]{2}\d{5}$/.test(p);
+  return /^[A-Z]{2}\d{3}[A-Z]{2}$/.test(p) || /^[A-Z]{2}\d{5}$/.test(p);
 }
 
 function looksLikeCoPlaca(placa?: string | null): boolean {
@@ -53,20 +53,16 @@ export function isBinacionalCarnet(cert?: CertOcr | null): boolean {
     && !hasCilindrada;
 
   const isExplicitColombia =
-    tipoRaw === 'colombia'
+    tipoRaw === 'binacional'
+    || tipoRaw === 'colombia'
     || tipoRaw === 'colombiano'
     || placaTipo === 'binacional';
 
-  if (tipoRaw === 'binacional' || isExplicitColombia) {
-    if (looksVeNacional && !isExplicitColombia) return false;
-    return true;
-  }
+  if (isExplicitColombia) return true;
+  if (looksLikeCoPlaca(placaNorm)) return true;
 
   let isBinacional = hasLinea && (hasCilindrada || hasVin || hasSerialMotor);
   if (isBinacional && looksVeNacional) isBinacional = false;
-  if (!isBinacional && looksLikeCoPlaca(placaNorm) && !looksLikeVePlacaNacional(placaNorm)) {
-    isBinacional = true;
-  }
 
   return isBinacional;
 }
