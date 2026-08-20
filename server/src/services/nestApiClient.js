@@ -182,6 +182,24 @@ async function getValrepList(domain) {
     .filter((it) => it.code !== '' && it.label !== '');
 }
 
+function mapValrepGetList(raw) {
+  return (raw ?? [])
+    .map((i) => ({ code: String(i.cvalor ?? ''), label: String(i.xdescripcion ?? '') }))
+    .filter((it) => it.code !== '' && it.label !== '');
+}
+
+/** Profesiones — sp_get_ocupaciones_nexus @returns {Promise<Array<{ code: string, label: string }>>} */
+async function getValrepOcupaciones() {
+  const { data } = await axios.get(`${getBaseUrl()}/api/v1/valrep/ocupaciones`, await axiosOpts());
+  return mapValrepGetList(data?.data?.listas);
+}
+
+/** Actividades económicas — sp_get_actividades_nexus @returns {Promise<Array<{ code: string, label: string }>>} */
+async function getValrepActividades() {
+  const { data } = await axios.get(`${getBaseUrl()}/api/v1/valrep/actividades`, await axiosOpts());
+  return mapValrepGetList(data?.data?.listas);
+}
+
 /** @returns {Promise<Record<string, unknown>|null>} */
 async function searchProprietaryViaNestApi({ cid, xrif_cliente } = {}) {
   const url = `${getBaseUrl()}/api/v1/emissions/automobile_new/propietary`;
@@ -294,4 +312,6 @@ module.exports = {
   getValrepStates,
   getValrepCities,
   getValrepList,
+  getValrepOcupaciones,
+  getValrepActividades,
 };

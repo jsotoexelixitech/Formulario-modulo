@@ -511,6 +511,16 @@ export function getValrepList(domain: string): Promise<CatalogItem[]> {
   return _fetchValrep(`/valrep/list/${domain.toUpperCase()}`);
 }
 
+/** Profesiones — sp_get_ocupaciones_nexus (campo cprofesion). */
+export function getOcupaciones(): Promise<CatalogItem[]> {
+  return _fetchValrep('/valrep/ocupaciones');
+}
+
+/** Actividades económicas — sp_get_actividades_nexus (campo cactividad). */
+export function getActividades(): Promise<CatalogItem[]> {
+  return _fetchValrep('/valrep/actividades');
+}
+
 /**
  * Valida en Sis2000 si un vehículo (por placa y serial) ya posee una póliza vigente.
  */

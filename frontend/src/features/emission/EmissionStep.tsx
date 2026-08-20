@@ -83,25 +83,6 @@ interface ValidationErrors {
 const emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
-const PROFESION_OPTIONS = [
-  { value: '01', label: 'Empleado' },
-  { value: '02', label: 'Comerciante' },
-  { value: '03', label: 'Profesional independiente' },
-  { value: '04', label: 'Empresario' },
-  { value: '05', label: 'Estudiante' },
-  { value: '06', label: 'Jubilado / Pensionado' },
-  { value: '99', label: 'Otra' },
-];
-
-const ACTIVIDAD_OPTIONS = [
-  { value: '01', label: 'Comercio' },
-  { value: '02', label: 'Servicios' },
-  { value: '03', label: 'Industria' },
-  { value: '04', label: 'Construcción' },
-  { value: '05', label: 'Transporte' },
-  { value: '99', label: 'Otra' },
-];
-
 function onlyLetters(v: string): string {
   return v.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
 }
@@ -434,26 +415,28 @@ export function EmissionStep() {
       {prefix === 'tom_' && isRcvEmision && showProfesion && (
         <Field label="Profesión" error={errors.tom_profesion}>
           <SearchSelect
-            value={person.xprofesion ?? ''}
-            options={PROFESION_OPTIONS.map((o) => ({ value: o.label, label: o.label }))}
-            onChange={(value) => {
-              const opt = PROFESION_OPTIONS.find((o) => o.label === value);
-              setPerson({ xprofesion: value, cprofesion: opt?.value ?? value });
+            value={person.cprofesion ?? ''}
+            options={catalogs.profesiones.map((o) => ({ value: o.code, label: o.label }))}
+            onChange={(code, label) => {
+              setPerson({ cprofesion: code, xprofesion: label });
             }}
             placeholder="— Seleccionar —"
+            loading={catalogs.loading}
+            noOptionsText="Sin profesiones disponibles"
           />
         </Field>
       )}
       {prefix === 'tom_' && isRcvEmision && showActividad && (
         <Field label="Actividad económica" error={errors.tom_profesion}>
           <SearchSelect
-            value={person.xactividad ?? ''}
-            options={ACTIVIDAD_OPTIONS.map((o) => ({ value: o.label, label: o.label }))}
-            onChange={(value) => {
-              const opt = ACTIVIDAD_OPTIONS.find((o) => o.label === value);
-              setPerson({ xactividad: value, cactividad: opt?.value ?? value });
+            value={person.cactividad ?? ''}
+            options={catalogs.actividades.map((o) => ({ value: o.code, label: o.label }))}
+            onChange={(code, label) => {
+              setPerson({ cactividad: code, xactividad: label });
             }}
             placeholder="— Seleccionar (si no indicó profesión) —"
+            loading={catalogs.loading}
+            noOptionsText="Sin actividades disponibles"
           />
         </Field>
       )}

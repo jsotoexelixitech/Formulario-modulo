@@ -8,6 +8,8 @@ const {
   getValrepList,
   getValrepStates,
   getValrepCities,
+  getValrepOcupaciones,
+  getValrepActividades,
   validateEmissionAutoViaNestApi,
 } = require('../services/nestApiClient');
 
@@ -96,6 +98,26 @@ router.get('/list/:domain', async (req, res) => {
       return res.json({ ok: true, domain, source: 'fallback', items: LIST_FALLBACKS[domain] });
     }
     res.status(502).json({ ok: false, error: `No se pudo obtener la lista ${domain}` });
+  }
+});
+
+router.get('/ocupaciones', async (_req, res) => {
+  try {
+    const items = await getValrepOcupaciones();
+    res.json({ ok: true, source: 'nest-api', items });
+  } catch (err) {
+    logError('ocupaciones', err);
+    res.status(502).json({ ok: false, error: 'No se pudo obtener profesiones/ocupaciones' });
+  }
+});
+
+router.get('/actividades', async (_req, res) => {
+  try {
+    const items = await getValrepActividades();
+    res.json({ ok: true, source: 'nest-api', items });
+  } catch (err) {
+    logError('actividades', err);
+    res.status(502).json({ ok: false, error: 'No se pudo obtener actividades económicas' });
   }
 });
 
