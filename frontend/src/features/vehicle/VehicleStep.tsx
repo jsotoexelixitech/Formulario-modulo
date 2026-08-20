@@ -31,6 +31,11 @@ import {
   isCategoriaToneladas,
   normalizeToneladasForCategoria,
 } from '../../lib/rcv-cargo-toneladas';
+import {
+  normalizeVehicleSerial,
+  validateVehicleSerialMessage,
+  VEHICLE_SERIAL_MAX_LEN,
+} from '../../lib/vehicle-serial';
 import type { VehicleData } from '../../types';
 
 const COLOR_SWATCHES: Record<string, string> = {
@@ -555,7 +560,7 @@ export function VehicleStep() {
     if (!isRcvEmision) return;
 
     const serial = String(rawSerial || '').trim().toUpperCase();
-    if (serial.length < 10) return;
+    if (!serial) return;
     if (lastValidatedSerial.current === serial) return;
 
     setSerialValidating(true);
@@ -696,11 +701,8 @@ export function VehicleStep() {
       e.color = 'El color no puede superar 15 caracteres';
     }
 
-    if (req(vehicle.serial)) {
-      e.serial = 'El serial del vehículo es obligatorio';
-    } else if (len(vehicle.serial) < 10) {
-      e.serial = 'El serial debe tener al menos 10 caracteres';
-    }
+    const serialErr = validateVehicleSerialMessage(vehicle.serial);
+    if (serialErr) e.serial = serialErr;
 
     if (hasDriver && !cotizadorRcv) {
       const nombre   = (conductor.nombre   ?? '').trim();
@@ -1384,7 +1386,7 @@ export function VehicleStep() {
             hint={
               serialValidating
                 ? 'Validando serial en Sis2000…'
-                : 'Entre 10 y 17 caracteres · Al salir del campo se valida si el serial está activo'
+                : 'Como en la licencia de tránsito (máx. 18 caracteres) · Al salir del campo se valida si está activo'
             }
           >
             <div className="relative">
@@ -1392,14 +1394,14 @@ export function VehicleStep() {
                 value={vehicle.serial}
                 onChange={(e) => {
                   lastValidatedSerial.current = '';
-                  setVehicle({ serial: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 17) });
+                  setVehicle({ serial: normalizeVehicleSerial(e.target.value) });
                 }}
                 onBlur={(e) => {
                   void validateSerialRemote(e.target.value);
                 }}
-                placeholder="1HGBH41JXMN109186"
+                placeholder="150895 o VIN completo"
                 className="font-mono uppercase tracking-wider"
-                maxLength={17}
+                maxLength={VEHICLE_SERIAL_MAX_LEN}
                 disabled={serialValidating || qaOcrLock}
               />
               {serialValidating && (
