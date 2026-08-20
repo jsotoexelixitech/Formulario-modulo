@@ -19,7 +19,7 @@ export function getEmisionCotizadorContinueUrl(): string {
   return '/cotizador/?product=rcv';
 }
 
-export function continueToEmisionCotizador(): void {
+export function continueToEmisionCotizador(_snapshot?: unknown): void {
   window.location.href = getEmisionCotizadorContinueUrl();
 }
 
