@@ -412,6 +412,12 @@ export interface InmaVersion {
 }
 export interface CategoriaUso { ccategoria_uso: number; xcategoria_uso: string; }
 
+export interface RecargoRcvItem {
+  csustanc: string;
+  xsustanc: string;
+  porcenta: number;
+}
+
 export interface ResolverResult {
   success: boolean;
   fallback?: boolean;
@@ -457,6 +463,8 @@ export const catalogoApi = {
     api.get<{ success: boolean; data: CategoriaUso[] }>(
       `/catalogo/categorias-uso?fano=${fano}&cmarca=${cmarca}&cmodelo=${cmodelo}&cversion=${cversion}${binacional ? '&binacional=1' : ''}`,
     ),
+  recargosRcv: () =>
+    api.get<{ success: boolean; data: RecargoRcvItem[] }>('/catalogo/recargos-rcv'),
   /** Resuelve texto libre (de OCR) → cmarca + cmodelo + versiones en una sola llamada */
   resolver: (fano: number, marca: string, modelo: string, binacional = false, serial = '') =>
     api.get<ResolverResult>(

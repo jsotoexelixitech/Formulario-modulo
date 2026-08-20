@@ -12,6 +12,7 @@ const {
   getInmaModelos,
   getInmaVersiones,
   getCategoriasUso,
+  getRecargosRcv,
 } = require('../services/nestApiClient');
 const { findMarcaInList } = require('../lib/inmaMarcaMatch');
 
@@ -204,6 +205,16 @@ router.get('/marca-disponibilidad', async (req, res) => {
     });
   } catch (err) {
     logError('marca-disponibilidad', err);
+    res.status(502).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/recargos-rcv', async (_req, res) => {
+  try {
+    const recargos = await getRecargosRcv(18);
+    res.json({ success: true, data: recargos });
+  } catch (err) {
+    logError('recargos-rcv', err);
     res.status(502).json({ success: false, message: err.message });
   }
 });

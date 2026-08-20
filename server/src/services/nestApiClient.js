@@ -149,6 +149,18 @@ async function getCategoriasUso(fano, cmarca, cmodelo, cversion, binacional = fa
   return data?.data?.categorias_uso ?? [];
 }
 
+/** Actividades asociadas / recargo RCV (masustac ramo 18). */
+async function getRecargosRcv(cramo = 18) {
+  const { data } = await axios.get(
+    `${getBaseUrl()}/api/v1/valrep/recargosRCV`,
+    await axiosOpts({ validateStatus: () => true }),
+  );
+  if (data?.status === false) {
+    throw new Error(data?.message || 'No se pudo cargar recargos RCV');
+  }
+  return data?.recargos ?? data?.data?.recargos ?? [];
+}
+
 /** @returns {Promise<Array<{ cestado: number, xdescripcion_l: string }>>} */
 async function getValrepStates() {
   const { data } = await axios.get(`${getBaseUrl()}/api/v1/valrep/states`, await axiosOpts());
@@ -309,6 +321,7 @@ module.exports = {
   getInmaModelos,
   getInmaVersiones,
   getCategoriasUso,
+  getRecargosRcv,
   getValrepStates,
   getValrepCities,
   getValrepList,

@@ -188,8 +188,14 @@ export interface VehicleData {
   cilindrada?: string;
   /** Variante del carnet OCR: nacional (VE) o binacional (CO). */
   tipoCarnet?: 'nacional' | 'binacional';
-  /** Peso del vehículo en toneladas (nullable; default 60 en backend si no se envía). */
+  /** Peso del vehículo en toneladas — solo categoría de uso 11 (>12 TM). */
   ntoneladas?: number;
+  /** Porcentaje recargo RCV (masustac.porcenta). 0 = No aplica. */
+  precargorcv?: number;
+  /** Código masustac.csustanc del recargo seleccionado (auditoría). */
+  csustanc_rcv?: string;
+  /** Etiqueta masustac.xsustanc del recargo seleccionado. */
+  xsustanc_rcv?: string;
 }
 
 export interface PolicyQuote {

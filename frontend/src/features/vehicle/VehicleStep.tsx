@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from '../../store/toastStore';
 import { cn } from '../../lib/utils';
-import { catalogoApi, searchProprietary, validatePlaca, validateSerial, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
+import { catalogoApi, searchProprietary, validatePlaca, validateSerial, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso, type RecargoRcvItem } from '../../lib/api';
 import {
   buildProprietaryCid,
   mapProprietaryToPerson,
@@ -27,6 +27,10 @@ import { isCotizadorFlow } from '../../lib/cotizador-flow';
 import { isRcvLaMundialFlow } from '../../lib/product';
 import { isQaDeploy } from '../../lib/deploy-env';
 import { findBestInmaMarca } from '../../lib/inma-marca-match';
+import {
+  isCategoriaToneladas,
+  normalizeToneladasForCategoria,
+} from '../../lib/rcv-cargo-toneladas';
 import type { VehicleData } from '../../types';
 
 const COLOR_SWATCHES: Record<string, string> = {
@@ -96,6 +100,8 @@ interface VehicleErrors {
   cond_estado?: string;
   cond_ciudad?: string;
   cond_direccion?: string;
+  toneladas?: string;
+  recargoRcv?: string;
 }
 
 // ── Hook catálogo INMA ────────────────────────────────────────────────────────
@@ -165,6 +171,9 @@ export function VehicleStep() {
   const [placaValidating, setPlacaValidating] = useState(false);
   const [serialValidating, setSerialValidating] = useState(false);
   const [conductorLookupLoading, setConductorLookupLoading] = useState(false);
+  const [recargosRcv, setRecargosRcv] = useState<RecargoRcvItem[]>([]);
+  const [recargosLoad, setRecargosLoad] = useState(false);
+  const recargosInitDone = useRef(false);
   const lastValidatedPlaca = useRef('');
   const lastValidatedSerial = useRef('');
   const lastConductorLookupCid = useRef('');
@@ -175,6 +184,41 @@ export function VehicleStep() {
   const isRcvEmision = rcvLaMundial && !cotizadorRcv;
   const conductorCiudades = useCiudades(conductor.cestado);
   const isBinacional = rcvLaMundial && vehicle.tipoPlaca === 'binacional';
+  const showToneladas = rcvLaMundial && isCategoriaToneladas(vehicle.ccategoria_uso);
+
+  useEffect(() => {
+    if (!rcvLaMundial) return;
+    let cancelled = false;
+    setRecargosLoad(true);
+    catalogoApi.recargosRcv()
+      .then((res) => {
+        if (cancelled) return;
+        const list = res.data.data ?? [];
+        setRecargosRcv(list);
+        if (!recargosInitDone.current && list.length > 0) {
+          recargosInitDone.current = true;
+          if (!vehicle.csustanc_rcv) {
+            const targetPct = vehicle.precargorcv ?? 0;
+            const match =
+              list.find((r) => Number(r.porcenta) === Number(targetPct))
+              ?? list.find((r) => Number(r.porcenta) === 0)
+              ?? list[0];
+            setVehicle({
+              precargorcv: Number(match.porcenta),
+              csustanc_rcv: match.csustanc,
+              xsustanc_rcv: match.xsustanc,
+            });
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRecargosRcv([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRecargosLoad(false);
+      });
+    return () => { cancelled = true; };
+  }, [rcvLaMundial, setVehicle]);
 
   const setTipoPlaca = useCallback((tipoPlaca: VehicleData['tipoPlaca']) => {
     if (tipoPlaca === 'binacional' && !rcvLaMundial) return;
@@ -618,6 +662,9 @@ export function VehicleStep() {
       else if (req(vehicle.modelo)) e.modelo = 'El modelo es obligatorio';
       if (req(vehicle.cversion)) e.uso = 'Debes seleccionar la versión exacta del vehículo';
       else if (!vehicle.ccategoria_uso && req(vehicle.uso)) e.uso = 'Selecciona el uso del vehículo';
+      if (rcvLaMundial && showToneladas && (vehicle.ntoneladas == null || Number.isNaN(Number(vehicle.ntoneladas)))) {
+        e.toneladas = 'Indica las toneladas totales (mín. 13 TM)';
+      }
 
       setErrors(e);
       return Object.keys(e).length === 0;
@@ -636,6 +683,10 @@ export function VehicleStep() {
 
     if (req(vehicle.cversion)) e.uso = 'Debes seleccionar la versión exacta del vehículo';
     else if (!vehicle.ccategoria_uso && req(vehicle.uso)) e.uso = 'Selecciona el uso del vehículo';
+
+    if (rcvLaMundial && showToneladas && (vehicle.ntoneladas == null || Number.isNaN(Number(vehicle.ntoneladas)))) {
+      e.toneladas = 'Indica las toneladas totales (mín. 13 TM)';
+    }
 
     if (req(vehicle.color)) {
       e.color = 'El color es obligatorio';
@@ -1193,11 +1244,12 @@ export function VehicleStep() {
                   if (usoLockedByCcategotr) return;
                   const code = e.target.value;
                   const match = categoriasUso.find(c => String(c.ccategoria_uso) === code);
+                  const nextCat = match ? match.ccategoria_uso : undefined;
                   setVehicle({
-                    ccategoria_uso: match ? match.ccategoria_uso : undefined,
+                    ccategoria_uso: nextCat,
                     xcategoria_uso: match?.xcategoria_uso ?? '',
-                    // Mantenemos `uso` (texto) sincronizado para retrocompatibilidad de UI/store
                     uso: match?.xcategoria_uso ?? vehicle.uso,
+                    ...(nextCat != null && !isCategoriaToneladas(nextCat) ? { ntoneladas: undefined } : {}),
                   });
                 }}
                 className={
@@ -1222,6 +1274,77 @@ export function VehicleStep() {
               </Select>
             )}
           </Field>
+
+          {rcvLaMundial && (
+            <>
+              <Field
+                label="Actividades asociadas (Recargo RCV) *"
+                hint="Porcentaje adicional sobre la prima RCV. Aplica a nacional, extranjera y binacional."
+                error={errors.recargoRcv}
+              >
+                {recargosLoad ? (
+                  <div className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-500 flex items-center gap-2">
+                    <Loader2 size={14} className="animate-spin shrink-0" /> Cargando recargos…
+                  </div>
+                ) : (
+                  <Select
+                    value={
+                      vehicle.csustanc_rcv != null
+                        ? String(vehicle.csustanc_rcv)
+                        : String(recargosRcv.find((r) => Number(r.porcenta) === Number(vehicle.precargorcv ?? 0))?.csustanc ?? '')
+                    }
+                    onChange={(e) => {
+                      const item = recargosRcv.find((r) => String(r.csustanc) === e.target.value);
+                      if (!item) return;
+                      setVehicle({
+                        precargorcv: Number(item.porcenta),
+                        csustanc_rcv: item.csustanc,
+                        xsustanc_rcv: item.xsustanc,
+                      });
+                    }}
+                  >
+                    <option value="">— Selecciona actividad —</option>
+                    {recargosRcv.map((r) => (
+                      <option key={r.csustanc} value={String(r.csustanc)}>
+                        {r.xsustanc}{Number(r.porcenta) > 0 ? ` (+${r.porcenta}%)` : ''}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+
+              {showToneladas && (
+                <Field
+                  label="Toneladas totales *"
+                  error={errors.toneladas}
+                  hint="Solo para categoría >12 TM. Si indica menos de 12, se usará 13 TM (regla La Mundial)."
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={vehicle.ntoneladas ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setVehicle({
+                        ntoneladas: raw === '' ? undefined : parseInt(raw, 10),
+                      });
+                    }}
+                    onBlur={() => {
+                      const normalized = normalizeToneladasForCategoria(
+                        vehicle.ccategoria_uso,
+                        vehicle.ntoneladas,
+                      );
+                      if (normalized != null && normalized !== vehicle.ntoneladas) {
+                        setVehicle({ ntoneladas: normalized });
+                      }
+                    }}
+                    placeholder="Ej. 15"
+                  />
+                </Field>
+              )}
+            </>
+          )}
 
           {/* Confirmación amigable cuando el vehículo está completo */}
           {codesReady && (
