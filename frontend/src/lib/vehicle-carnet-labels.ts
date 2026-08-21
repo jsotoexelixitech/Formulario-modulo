@@ -25,7 +25,8 @@ export function isNullishOcrValue(value?: string | null): boolean {
   const s = String(value).trim();
   if (!s) return true;
   const u = s.toUpperCase();
-  return u === 'NULL' || u === 'N/A' || u === 'NA' || u === 'NONE' || u === 'ND' || u === 'N/D';
+  return u === 'NULL' || u === 'N/A' || u === 'NA' || u === 'NONE' || u === 'ND' || u === 'N/D'
+    || u === 'STRING' || u === 'NUMBER' || u === 'BOOLEAN';
 }
 
 export function sanitizeOcrField(value?: string | null): string {

@@ -282,8 +282,9 @@ export function VehicleStep() {
   const ocrCert     = documents.certificado.ocr;
   const hasOcr      = !!(ocrCert?.marca || ocrCert?.modelo || ocrCert?.placa);
   const hasOcrCodes = !!(vehicle.cmarca && vehicle.cmodelo);
-  /** QA: placa/serial/color bloqueados si vienen del OCR. Año/marca/modelo solo si ya matchearon INMA. */
+  /** QA: placa/serial editables para pruebas; solo INMA base fijo si OCR matcheó códigos. */
   const qaOcrLock = isQaDeploy() && hasOcr;
+  const qaIdentLock = qaOcrLock && !isQaDeploy();
   const inmaBasicsLocked = qaOcrLock ? hasOcrCodes : verified;
   /** Versión y uso no vienen del OCR — en QA deben seguir editables (commit 33a41cb bloqueaba todo). */
   const versionLocked = !isQaDeploy() && verified;
@@ -835,7 +836,7 @@ export function VehicleStep() {
                 </p>
                 <p className="text-xs text-indigo-100 mt-0.5 leading-relaxed">
                   {qaOcrLock
-                    ? 'Entorno QA: placa, serial y catálogo base vienen del OCR. Debes elegir versión y uso.'
+                    ? 'Entorno QA: marca/modelo INMA fijos si el OCR los identificó. Placa, serial y versión puedes ajustarlos para pruebas.'
                     : hasOcrCodes
                       ? 'Marca y modelo identificados en el catálogo. Solo confirma la versión.'
                       : 'Revisa los campos y completa lo que falte. Puedes cambiar cualquier valor.'}
@@ -897,28 +898,28 @@ export function VehicleStep() {
               <span className="inline-flex flex-wrap items-center gap-0 rounded-lg bg-slate-100 p-0.5 text-[0.65rem] font-bold border border-slate-200">
                 <button
                   type="button"
-                  disabled={qaOcrLock}
+                  disabled={qaIdentLock}
                   onClick={() => setTipoPlaca('nacional')}
                   className={cn(
                     'px-3 py-2 rounded-md transition-all',
                     vehicle.tipoPlaca === 'nacional'
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-700',
-                    qaOcrLock && 'opacity-60 cursor-not-allowed',
+                    qaIdentLock && 'opacity-60 cursor-not-allowed',
                   )}
                 >
                   Nacional
                 </button>
                 <button
                   type="button"
-                  disabled={qaOcrLock}
+                  disabled={qaIdentLock}
                   onClick={() => setTipoPlaca('extranjera')}
                   className={cn(
                     'px-3 py-2 rounded-md transition-all',
                     vehicle.tipoPlaca === 'extranjera'
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-700',
-                    qaOcrLock && 'opacity-60 cursor-not-allowed',
+                    qaIdentLock && 'opacity-60 cursor-not-allowed',
                   )}
                 >
                   Extranjera
@@ -926,14 +927,14 @@ export function VehicleStep() {
                 {rcvLaMundial && (
                 <button
                   type="button"
-                  disabled={qaOcrLock}
+                  disabled={qaIdentLock}
                   onClick={() => setTipoPlaca('binacional')}
                   className={cn(
                     'px-3 py-2 rounded-md transition-all',
                     vehicle.tipoPlaca === 'binacional'
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-slate-500 hover:text-slate-700',
-                    qaOcrLock && 'opacity-60 cursor-not-allowed',
+                    qaIdentLock && 'opacity-60 cursor-not-allowed',
                   )}
                 >
                   Binacional
@@ -951,28 +952,28 @@ export function VehicleStep() {
                 <span className="inline-flex items-center gap-0 rounded-lg bg-slate-100 p-0.5 text-[0.65rem] font-bold border border-slate-200">
                   <button
                     type="button"
-                    disabled={qaOcrLock}
+                    disabled={qaIdentLock}
                     onClick={() => setTipoPlaca('nacional')}
                     className={cn(
                       'px-2 py-1 rounded-md transition-all',
                       vehicle.tipoPlaca === 'nacional'
                         ? 'bg-indigo-600 text-white shadow-sm'
                         : 'text-slate-500 hover:text-slate-700',
-                      qaOcrLock && 'opacity-60 cursor-not-allowed',
+                      qaIdentLock && 'opacity-60 cursor-not-allowed',
                     )}
                   >
                     Nacional
                   </button>
                   <button
                     type="button"
-                    disabled={qaOcrLock}
+                    disabled={qaIdentLock}
                     onClick={() => setTipoPlaca('extranjera')}
                     className={cn(
                       'px-2 py-1 rounded-md transition-all',
                       vehicle.tipoPlaca === 'extranjera'
                         ? 'bg-indigo-600 text-white shadow-sm'
                         : 'text-slate-500 hover:text-slate-700',
-                      qaOcrLock && 'opacity-60 cursor-not-allowed',
+                      qaIdentLock && 'opacity-60 cursor-not-allowed',
                     )}
                   >
                     Extranjera
@@ -980,14 +981,14 @@ export function VehicleStep() {
                   {rcvLaMundial && (
                   <button
                     type="button"
-                    disabled={qaOcrLock}
+                    disabled={qaIdentLock}
                     onClick={() => setTipoPlaca('binacional')}
                     className={cn(
                       'px-2 py-1 rounded-md transition-all',
                       vehicle.tipoPlaca === 'binacional'
                         ? 'bg-indigo-600 text-white shadow-sm'
                         : 'text-slate-500 hover:text-slate-700',
-                      qaOcrLock && 'opacity-60 cursor-not-allowed',
+                      qaIdentLock && 'opacity-60 cursor-not-allowed',
                     )}
                   >
                     Binacional
@@ -1018,7 +1019,7 @@ export function VehicleStep() {
                 }
                 className="uppercase font-mono tracking-wider"
                 maxLength={vehicle.tipoPlaca === 'nacional' ? 8 : 12}
-                disabled={placaValidating || qaOcrLock}
+                disabled={placaValidating || qaIdentLock}
               />
               {placaValidating && (
                 <Loader2
@@ -1363,7 +1364,7 @@ export function VehicleStep() {
             <div className="relative">
               <Input
                 value={vehicle.color}
-                disabled={qaOcrLock}
+                disabled={qaIdentLock}
                 onChange={(e) => setVehicle({ color: e.target.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '').slice(0, 15) })}
                 placeholder="Plateado"
                 maxLength={15}
@@ -1400,7 +1401,7 @@ export function VehicleStep() {
                 placeholder="150895 o VIN completo"
                 className="font-mono uppercase tracking-wider"
                 maxLength={VEHICLE_SERIAL_MAX_LEN}
-                disabled={serialValidating || qaOcrLock}
+                disabled={serialValidating || qaIdentLock}
               />
               {serialValidating && (
                 <Loader2
@@ -1415,7 +1416,7 @@ export function VehicleStep() {
           <Field label="Serial del motor" hint="Opcional · Máx. 60 caracteres · Aparece en el documento del vehículo">
             <Input
               value={vehicle.serialMotor ?? ''}
-              disabled={qaOcrLock}
+              disabled={qaIdentLock}
               onChange={(e) => setVehicle({ serialMotor: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 60) })}
               placeholder="Ej. 4A123456789"
               className="font-mono uppercase tracking-wider"
@@ -1428,7 +1429,7 @@ export function VehicleStep() {
           <Field label="Cilindrada (CC)" hint="Opcional · Del carnet binacional colombiano">
             <Input
               value={vehicle.cilindrada ?? ''}
-              disabled={qaOcrLock}
+              disabled={qaIdentLock}
               onChange={(e) => setVehicle({ cilindrada: e.target.value.slice(0, 20) })}
               placeholder="Ej. 1.998"
               className="font-mono tracking-wider"

@@ -18,6 +18,7 @@ function sanitizeOcrString(value?: string | null): string {
   if (!s) return '';
   const u = s.toUpperCase();
   if (u === 'NULL' || u === 'N/A' || u === 'NA' || u === 'NONE') return '';
+  if (u === 'STRING' || u === 'NUMBER' || u === 'BOOLEAN') return '';
   return s;
 }
 
