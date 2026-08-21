@@ -282,13 +282,11 @@ export function VehicleStep() {
   const ocrCert     = documents.certificado.ocr;
   const hasOcr      = !!(ocrCert?.marca || ocrCert?.modelo || ocrCert?.placa);
   const hasOcrCodes = !!(vehicle.cmarca && vehicle.cmodelo);
-  /** QA: campos precargados por OCR quedan bloqueados (placa, serial, catálogo INMA, etc.). */
+  /** QA: placa/serial/color bloqueados si vienen del OCR. Año/marca/modelo solo si ya matchearon INMA. */
   const qaOcrLock = isQaDeploy() && hasOcr;
-  const catalogLocked = verified || qaOcrLock;
-
-  useEffect(() => {
-    if (qaOcrLock && !verified) setVerified(true);
-  }, [qaOcrLock, verified]);
+  const inmaBasicsLocked = qaOcrLock ? hasOcrCodes : verified;
+  /** Versión y uso no vienen del OCR — en QA deben seguir editables (commit 33a41cb bloqueaba todo). */
+  const versionLocked = !isQaDeploy() && verified;
 
   // ── Cargar rango de años (nacional vs binacional) ─────────────────────────
   useEffect(() => {
@@ -837,7 +835,7 @@ export function VehicleStep() {
                 </p>
                 <p className="text-xs text-indigo-100 mt-0.5 leading-relaxed">
                   {qaOcrLock
-                    ? 'Entorno QA: los datos extraídos del OCR no se pueden modificar.'
+                    ? 'Entorno QA: placa, serial y catálogo base vienen del OCR. Debes elegir versión y uso.'
                     : hasOcrCodes
                       ? 'Marca y modelo identificados en el catálogo. Solo confirma la versión.'
                       : 'Revisa los campos y completa lo que falte. Puedes cambiar cualquier valor.'}
@@ -1038,7 +1036,7 @@ export function VehicleStep() {
             {anios.length > 0 ? (
               <Select
                 value={vehicle.año}
-                disabled={catalogLocked}
+                disabled={inmaBasicsLocked}
                 onChange={(e) => {
                   setVehicle({ año: e.target.value, cmarca: '', marca: '', cmodelo: '', modelo: '', cversion: '', ccategoria_uso: undefined, xcategoria_uso: '' });
                 }}
@@ -1070,7 +1068,7 @@ export function VehicleStep() {
             {marcas.length > 0 ? (
               <Select
                 value={vehicle.cmarca ?? ''}
-                disabled={catalogLocked}
+                disabled={inmaBasicsLocked}
                 onChange={(e) => {
                   const cmarca = e.target.value;
                   const xmarca = marcas.find(m => m.cmarca === cmarca)?.xmarca ?? '';
@@ -1118,7 +1116,7 @@ export function VehicleStep() {
             {modelos.length > 0 ? (
               <Select
                 value={vehicle.cmodelo ?? ''}
-                disabled={catalogLocked}
+                disabled={inmaBasicsLocked}
                 onChange={(e) => {
                   const cmodelo = e.target.value;
                   const xmodelo = modelos.find(m => m.cmodelo === cmodelo)?.xmodelo ?? '';
@@ -1169,7 +1167,7 @@ export function VehicleStep() {
               {versiones.length > 0 ? (
                 <Select
                   value={vehicle.cversion ?? ''}
-                  disabled={catalogLocked}
+                  disabled={versionLocked}
                   onChange={(e) => {
                     const ver = versiones.find(v => v.cversion === e.target.value);
                     setVehicle({
