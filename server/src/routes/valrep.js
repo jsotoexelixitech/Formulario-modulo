@@ -35,13 +35,19 @@ const LIST_FALLBACKS = {
   ],
 };
 
+function isGeoCatalogPlaceholder(label, code) {
+  const t = String(label ?? '').trim().toUpperCase();
+  return t === 'TODO' || t === 'TODOS' || t === 'TODAS';
+}
+
 function normalizeItems(rows) {
   return (rows ?? [])
     .map((s) => ({
       code: s.code ?? s.cestado ?? s.cciudad,
       label: String(s.label ?? s.xdescripcion_l ?? '').trim(),
     }))
-    .filter((it) => it.code != null && it.code !== '' && it.label !== '');
+    .filter((it) => it.code != null && it.code !== '' && it.label !== '')
+    .filter((it) => !isGeoCatalogPlaceholder(it.label, it.code));
 }
 
 function logError(tag, err) {
