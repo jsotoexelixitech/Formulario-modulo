@@ -413,7 +413,7 @@ export function EmissionStep() {
         />
       </Field>
       {prefix === 'tom_' && isRcvEmision && showProfesion && (
-        <Field label="Profesión" error={errors.tom_profesion}>
+        <Field label="Profesión *" error={errors.tom_profesion}>
           <SearchSelect
             value={person.cprofesion ?? ''}
             options={catalogs.profesiones.map((o) => ({ value: o.code, label: o.label }))}
@@ -427,7 +427,7 @@ export function EmissionStep() {
         </Field>
       )}
       {prefix === 'tom_' && isRcvEmision && showActividad && (
-        <Field label="Actividad económica" error={errors.tom_profesion}>
+        <Field label="Actividad económica *" error={errors.tom_profesion}>
           <SearchSelect
             value={person.cactividad ?? ''}
             options={catalogs.actividades.map((o) => ({ value: o.code, label: o.label }))}
