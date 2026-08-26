@@ -26,6 +26,10 @@ import { toast } from '../../store/toastStore';
 import { User, Heart, ShieldAlert, FileText } from 'lucide-react';
 import { formatTelefono, isValidPhonePrefix } from '../../lib/phone';
 import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
+import {
+  SECONDARY_IDENTIFICACION_MAX_LENGTH,
+  validateSecondaryPersonIdentificacion,
+} from '../../lib/person-identificacion';
 
 export function SectionCard({
   title,
@@ -197,8 +201,11 @@ export function EmissionStep() {
     const len  = (v?: string) => (v ?? '').trim().length;
     const digs = (v?: string) => (v ?? '').replace(/\D/g, '').length;
 
-    const validatePerson = (person: any, prefix: string) => {
-      if (req(person.identificacion)) {
+    const validatePerson = (person: any, prefix: string, opts?: { secondaryIdent?: boolean }) => {
+      if (opts?.secondaryIdent) {
+        const idErr = validateSecondaryPersonIdentificacion(person.identificacion);
+        if (idErr) e[`${prefix}identificacion`] = idErr;
+      } else if (req(person.identificacion)) {
         e[`${prefix}identificacion`] = 'La identificación es obligatoria';
       } else if (digs(person.identificacion) < 1) {
         e[`${prefix}identificacion`] = 'La identificación debe tener al menos 1 dígito';
@@ -275,8 +282,8 @@ export function EmissionStep() {
         e.tom_profesion = 'Indique profesión o actividad económica';
       }
     }
-    if (!sameInsured) validatePerson(asegurado, 'aseg_');
-    if (hasBeneficiary) validatePerson(beneficiario, 'benef_');
+    if (!sameInsured) validatePerson(asegurado, 'aseg_', { secondaryIdent: true });
+    if (hasBeneficiary) validatePerson(beneficiario, 'benef_', { secondaryIdent: true });
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -284,7 +291,13 @@ export function EmissionStep() {
 
   (window as any).__validateStep2 = validate;
 
-  const renderPersonForm = (person: any, setPerson: any, prefix: string, ciuState: any) => (
+  const renderPersonForm = (
+    person: any,
+    setPerson: any,
+    prefix: string,
+    ciuState: any,
+    opts?: { secondaryIdent?: boolean },
+  ) => (
     <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
       <Field
         label="Cédula o documento *"
@@ -294,7 +307,11 @@ export function EmissionStep() {
         <IdentityInput
           tipoDoc={person.tipoDoc ?? 'V'}
           identificacion={person.identificacion ?? ''}
-          maxLength={PERSON_FIELD_LIMITS.identificacion}
+          maxLength={
+            opts?.secondaryIdent
+              ? SECONDARY_IDENTIFICACION_MAX_LENGTH
+              : PERSON_FIELD_LIMITS.identificacion
+          }
           loading={Boolean(lookupLoading[prefix])}
           onTipoDocChange={(v) => {
             lastLookupCid.current[prefix] = '';
@@ -488,7 +505,7 @@ export function EmissionStep() {
             onChange={(v) => setSameInsured(!v)}
             label="¿La persona que pagará la Póliza es diferente a la que será asegurada?"
           />
-          {!sameInsured && renderPersonForm(asegurado, setAsegurado, 'aseg_', aseguradoCiudades)}
+          {!sameInsured && renderPersonForm(asegurado, setAsegurado, 'aseg_', aseguradoCiudades, { secondaryIdent: true })}
         </SectionCard>
 
         {/* Beneficiario */}
@@ -501,7 +518,7 @@ export function EmissionStep() {
             onChange={setHasBeneficiary}
             label="¿Desea agregar un beneficiario preferencial a la póliza?"
           />
-          {hasBeneficiary && renderPersonForm(beneficiario, setBeneficiario, 'benef_', beneficiarioCiudades)}
+          {hasBeneficiary && renderPersonForm(beneficiario, setBeneficiario, 'benef_', beneficiarioCiudades, { secondaryIdent: true })}
         </SectionCard>
       </div>
     </div>

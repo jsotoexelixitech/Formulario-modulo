@@ -37,6 +37,10 @@ import {
   validateVehicleSerialMessage,
   VEHICLE_SERIAL_MAX_LEN,
 } from '../../lib/vehicle-serial';
+import {
+  SECONDARY_IDENTIFICACION_MAX_LENGTH,
+  validateSecondaryPersonIdentificacion,
+} from '../../lib/person-identificacion';
 import type { VehicleData } from '../../types';
 
 const COLOR_SWATCHES: Record<string, string> = {
@@ -732,10 +736,8 @@ export function VehicleStep() {
       } else if (licencia.length > 20) {
         e.cond_licencia = 'La licencia no puede superar 20 caracteres';
       }
-      if (req(conductor.identificacion)) e.cond_identificacion = 'La identificación es obligatoria';
-      else if (digs(conductor.identificacion) > PERSON_FIELD_LIMITS.identificacion) {
-        e.cond_identificacion = `La identificación no puede tener más de ${PERSON_FIELD_LIMITS.identificacion} dígitos`;
-      }
+      const condIdErr = validateSecondaryPersonIdentificacion(conductor.identificacion);
+      if (condIdErr) e.cond_identificacion = condIdErr;
 
       if (req(conductor.telefono)) {
         e.cond_telefono = 'El teléfono es obligatorio';
@@ -1385,7 +1387,7 @@ export function VehicleStep() {
                 <IdentityInput
                   tipoDoc={conductor.tipoDoc ?? 'V'}
                   identificacion={conductor.identificacion}
-                  maxLength={PERSON_FIELD_LIMITS.identificacion}
+                  maxLength={SECONDARY_IDENTIFICACION_MAX_LENGTH}
                   loading={conductorLookupLoading}
                   onTipoDocChange={(v) => {
                     lastConductorLookupCid.current = '';
