@@ -274,7 +274,9 @@ export function EmissionStep() {
       }
     };
 
-    validatePerson(tomador, 'tom_');
+    validatePerson(tomador, 'tom_', {
+      secondaryIdent: isRcvEmision && sameInsured !== false,
+    });
     if (isRcvEmision && !esPJ) {
       const hasProf = Boolean(tomador.cprofesion || tomador.xprofesion);
       const hasAct = Boolean(tomador.cactividad || tomador.xactividad);

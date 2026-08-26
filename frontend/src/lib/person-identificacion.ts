@@ -15,10 +15,10 @@ export function validateSecondaryPersonIdentificacion(
     return 'La identificación es obligatoria';
   }
   if (digits < venezuelanCedulaDigitsMin) {
-    return 'La identificación debe tener al menos 1 dígito';
+    return `La identificación debe tener al menos ${venezuelanCedulaDigitsMin} dígitos`;
   }
   if (digits > venezuelanCedulaDigitsMax) {
-    return `La identificación no puede tener más de ${venezuelanCedulaDigitsMax} dígitos (cédula venezolana)`;
+    return `La identificación no puede tener más de ${venezuelanCedulaDigitsMax} dígitos`;
   }
   return undefined;
 }
