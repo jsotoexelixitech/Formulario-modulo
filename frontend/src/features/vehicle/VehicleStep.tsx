@@ -25,7 +25,7 @@ import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
 import { isRcvLaMundialFlow } from '../../lib/product';
 import { TipoPlacaSelector } from '../../components/TipoPlacaSelector';
-import { placaMaxLength, placaPlaceholder } from '../../lib/placa-tipo';
+import { placaMaxLength, placaPlaceholder, validatePlacaMessage } from '../../lib/placa-tipo';
 import { isQaDeploy } from '../../lib/deploy-env';
 import { findBestInmaMarca } from '../../lib/inma-marca-match';
 import {
@@ -679,11 +679,8 @@ export function VehicleStep() {
       return Object.keys(e).length === 0;
     }
 
-    if (req(vehicle.placa)) {
-      e.placa = 'La placa es obligatoria';
-    } else if (len(vehicle.placa) < 6) {
-      e.placa = 'La placa debe tener al menos 6 caracteres';
-    }
+    const placaErr = validatePlacaMessage(vehicle.placa, vehicle.tipoPlaca ?? 'nacional');
+    if (placaErr) e.placa = placaErr;
 
     if (req(vehicle.año)) e.año = 'Selecciona el año del vehículo';
     if (req(vehicle.marca))  e.marca  = 'La marca es obligatoria';
@@ -788,14 +785,18 @@ export function VehicleStep() {
           plan: selectedPlan?.cplan,
         });
         if (!res.success) {
-          const msg = res.message || 'El vehículo no puede ser asegurado.';
+          const msg = res.message || res.error || 'El vehículo no puede ser asegurado.';
           toast.error('Atención', msg, 6000);
           setErrors({ ...e, placa: msg, serial: msg });
           return false;
         }
-      } catch {
-        toast.error('Error', 'No se pudo validar el vehículo. Inténtalo de nuevo.');
-        setErrors({ ...e, placa: 'No se pudo validar', serial: 'No se pudo validar' });
+      } catch (err) {
+        const msg =
+          err instanceof Error && err.message
+            ? err.message
+            : 'No se pudo validar el vehículo. Inténtalo de nuevo.';
+        toast.error('Error', msg, 6000);
+        setErrors({ ...e, placa: msg, serial: msg });
         return false;
       }
     }
