@@ -15,7 +15,6 @@ import {
   Loader2, AlertTriangle,
 } from 'lucide-react';
 import { toast } from '../../store/toastStore';
-import { cn } from '../../lib/utils';
 import { catalogoApi, searchProprietary, validatePlaca, validateSerial, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso, type RecargoRcvItem } from '../../lib/api';
 import {
   buildProprietaryCid,
@@ -25,6 +24,8 @@ import {
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
 import { isRcvLaMundialFlow } from '../../lib/product';
+import { TipoPlacaSelector } from '../../components/TipoPlacaSelector';
+import { placaMaxLength, placaPlaceholder } from '../../lib/placa-tipo';
 import { isQaDeploy } from '../../lib/deploy-env';
 import { findBestInmaMarca } from '../../lib/inma-marca-match';
 import {
@@ -893,110 +894,19 @@ export function VehicleStep() {
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-          {cotizadorRcv ? (
-            <Field label="Origen de placa *">
-              <span className="inline-flex flex-wrap items-center gap-0 rounded-lg bg-slate-100 p-0.5 text-[0.65rem] font-bold border border-slate-200">
-                <button
-                  type="button"
-                  disabled={qaIdentLock}
-                  onClick={() => setTipoPlaca('nacional')}
-                  className={cn(
-                    'px-3 py-2 rounded-md transition-all',
-                    vehicle.tipoPlaca === 'nacional'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700',
-                    qaIdentLock && 'opacity-60 cursor-not-allowed',
-                  )}
-                >
-                  Nacional
-                </button>
-                <button
-                  type="button"
-                  disabled={qaIdentLock}
-                  onClick={() => setTipoPlaca('extranjera')}
-                  className={cn(
-                    'px-3 py-2 rounded-md transition-all',
-                    vehicle.tipoPlaca === 'extranjera'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700',
-                    qaIdentLock && 'opacity-60 cursor-not-allowed',
-                  )}
-                >
-                  Extranjera
-                </button>
-                {rcvLaMundial && (
-                <button
-                  type="button"
-                  disabled={qaIdentLock}
-                  onClick={() => setTipoPlaca('binacional')}
-                  className={cn(
-                    'px-3 py-2 rounded-md transition-all',
-                    vehicle.tipoPlaca === 'binacional'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700',
-                    qaIdentLock && 'opacity-60 cursor-not-allowed',
-                  )}
-                >
-                  Binacional
-                </button>
-                )}
-              </span>
-            </Field>
-          ) : (
-          <>
-          {/* Placa con selector de tipo (Nacional / Extranjera / Binacional) */}
+          {(cotizadorRcv || isRcvEmision) && (
+            <TipoPlacaSelector
+              value={vehicle.tipoPlaca}
+              placa={vehicle.placa}
+              certOcr={ocrCert}
+              onChange={setTipoPlaca}
+              showBinacional={rcvLaMundial}
+              disabled={qaIdentLock}
+            />
+          )}
+
           <Field
-            label={
-              <span className="flex items-center justify-between gap-2 w-full">
-                <span>Placa</span>
-                <span className="inline-flex items-center gap-0 rounded-lg bg-slate-100 p-0.5 text-[0.65rem] font-bold border border-slate-200">
-                  <button
-                    type="button"
-                    disabled={qaIdentLock}
-                    onClick={() => setTipoPlaca('nacional')}
-                    className={cn(
-                      'px-2 py-1 rounded-md transition-all',
-                      vehicle.tipoPlaca === 'nacional'
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700',
-                      qaIdentLock && 'opacity-60 cursor-not-allowed',
-                    )}
-                  >
-                    Nacional
-                  </button>
-                  <button
-                    type="button"
-                    disabled={qaIdentLock}
-                    onClick={() => setTipoPlaca('extranjera')}
-                    className={cn(
-                      'px-2 py-1 rounded-md transition-all',
-                      vehicle.tipoPlaca === 'extranjera'
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700',
-                      qaIdentLock && 'opacity-60 cursor-not-allowed',
-                    )}
-                  >
-                    Extranjera
-                  </button>
-                  {rcvLaMundial && (
-                  <button
-                    type="button"
-                    disabled={qaIdentLock}
-                    onClick={() => setTipoPlaca('binacional')}
-                    className={cn(
-                      'px-2 py-1 rounded-md transition-all',
-                      vehicle.tipoPlaca === 'binacional'
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700',
-                      qaIdentLock && 'opacity-60 cursor-not-allowed',
-                    )}
-                  >
-                    Binacional
-                  </button>
-                  )}
-                </span>
-              </span> as unknown as string
-            }
+            label={cotizadorRcv ? 'Placa *' : 'Placa'}
             error={errors.placa}
             hint={placaValidating ? 'Validando placa en Sis2000…' : 'Al salir del campo se valida si la placa está activa'}
           >
@@ -1010,15 +920,9 @@ export function VehicleStep() {
                 onBlur={(e) => {
                   void validatePlacaRemote(e.target.value);
                 }}
-                placeholder={
-                  vehicle.tipoPlaca === 'binacional'
-                    ? 'WON028'
-                    : vehicle.tipoPlaca === 'extranjera'
-                      ? 'ABC-1234'
-                      : 'AE123KT'
-                }
+                placeholder={placaPlaceholder(vehicle.tipoPlaca)}
                 className="uppercase font-mono tracking-wider"
-                maxLength={vehicle.tipoPlaca === 'nacional' ? 8 : 12}
+                maxLength={placaMaxLength(vehicle.tipoPlaca)}
                 disabled={placaValidating || qaIdentLock}
               />
               {placaValidating && (
@@ -1029,8 +933,6 @@ export function VehicleStep() {
               )}
             </div>
           </Field>
-          </>
-          )}
 
           {/* Año — selector del catálogo INMA */}
           <Field label="Año del vehículo *" error={errors.año}>
