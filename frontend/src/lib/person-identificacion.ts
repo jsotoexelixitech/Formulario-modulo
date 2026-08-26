@@ -18,7 +18,7 @@ export function validateSecondaryPersonIdentificacion(
     return `La identificación debe tener al menos ${venezuelanCedulaDigitsMin} dígitos`;
   }
   if (digits > venezuelanCedulaDigitsMax) {
-    return `La identificación no puede tener más de ${venezuelanCedulaDigitsMax} dígitos`;
+    return `La identificación no puede tener más de ${venezuelanCedulaDigitsMax} dígitos (cédula venezolana)`;
   }
   return undefined;
 }
