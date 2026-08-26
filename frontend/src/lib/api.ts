@@ -536,7 +536,7 @@ export async function validateVehicle(
   placa: string,
   serial: string,
   options?: { plan?: string; serialMotor?: string },
-): Promise<{ success: boolean; message: string; code?: string }> {
+): Promise<{ success: boolean; message: string; error?: string; code?: string }> {
   try {
     const res = await api.post('/valrep/validate-vehicle', {
       placa,
@@ -546,7 +546,7 @@ export async function validateVehicle(
     });
     return res.data;
   } catch (err) {
-    const axErr = err as AxiosError<{ success: boolean; message: string; code?: string }>;
+    const axErr = err as AxiosError<{ success: boolean; message: string; error?: string; code?: string }>;
     if (axErr.response?.data) {
       return axErr.response.data;
     }
