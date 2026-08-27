@@ -90,7 +90,7 @@ export function adjustDocsForBinacionalCarnet(
   requiredDocs: DocType[],
   optionalDocs: DocType[],
   documents: Record<DocType, DocumentState>,
-  hasVehicle: boolean,
+  hasVehicle = true,
   carnetBinacionalMode = false,
 ): { requiredDocs: DocType[]; optionalDocs: DocType[] } {
   if (!hasVehicle) {
