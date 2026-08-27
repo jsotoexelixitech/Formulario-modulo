@@ -59,7 +59,7 @@ export function resolveOcrModelo(cert?: {
   return '';
 }
 
-import { isBinacionalCarnet } from './ocr-binacional';
+import { isBinacionalCarnet, isExtranjeroCarnet } from './ocr-binacional';
 
 export function resolveOcrTipoPlaca(cert?: {
   placa?: string;
@@ -73,6 +73,7 @@ export function resolveOcrTipoPlaca(cert?: {
 } | null): 'nacional' | 'extranjera' | 'binacional' {
   if (!cert) return 'nacional';
   if (cert.referenciaModelo || cert.tipoVehiculo || cert.claseUso) return 'nacional';
+  if (isExtranjeroCarnet(cert)) return 'extranjera';
   if (isBinacionalCarnet(cert)) return 'binacional';
   if (cert.tipoCarnet === 'nacional') return 'nacional';
   if (cert.tipoPlaca === 'extranjera') return 'extranjera';
