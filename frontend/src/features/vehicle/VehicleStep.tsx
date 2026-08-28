@@ -24,6 +24,7 @@ import {
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
 import { isRcvLaMundialFlow } from '../../lib/product';
+import { applyOcrPersonRolesFromDocuments } from '../../lib/ocr-person-roles';
 import { TipoPlacaSelector } from '../../components/TipoPlacaSelector';
 import { placaMaxLength, placaPlaceholder, validatePlacaMessage } from '../../lib/placa-tipo';
 import { isQaDeploy } from '../../lib/deploy-env';
@@ -174,6 +175,7 @@ export function VehicleStep() {
     conductor, setConductor,
     documents,
     selectedPlan,
+    setSameInsured, setAsegurado,
   } = useWizardStore();
 
   const [errors, setErrors] = useState<VehicleErrors>({});
@@ -184,6 +186,7 @@ export function VehicleStep() {
   const [recargosRcv, setRecargosRcv] = useState<RecargoRcvItem[]>([]);
   const [recargosLoad, setRecargosLoad] = useState(false);
   const recargosInitDone = useRef(false);
+  const driverFromOcrApplied = useRef(false);
   const lastValidatedPlaca = useRef('');
   const lastValidatedSerial = useRef('');
   const lastConductorLookupCid = useRef('');
@@ -195,6 +198,26 @@ export function VehicleStep() {
   const conductorCiudades = useCiudades(conductor.cestado);
   const isBinacional = rcvLaMundial && vehicle.tipoPlaca === 'binacional';
   const showToneladas = rcvLaMundial && isCategoriaToneladas(vehicle.ccategoria_uso);
+
+  useEffect(() => {
+    if (driverFromOcrApplied.current || cotizadorRcv || hasDriver) return;
+    if (!documents.licencia?.ocr) return;
+    applyOcrPersonRolesFromDocuments(documents, {
+      setSameInsured,
+      setAsegurado,
+      setHasDriver,
+      setConductor,
+    });
+    driverFromOcrApplied.current = true;
+  }, [
+    cotizadorRcv,
+    documents,
+    hasDriver,
+    setAsegurado,
+    setConductor,
+    setHasDriver,
+    setSameInsured,
+  ]);
 
   useEffect(() => {
     if (!rcvLaMundial) return;

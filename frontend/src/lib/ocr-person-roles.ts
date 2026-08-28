@@ -12,6 +12,15 @@ function inferTipoDocFromRaw(raw?: string | null): string | null {
   return m[1] === 'G' ? 'J' : m[1];
 }
 
+function normalizePersonName(nombre?: string, apellido?: string): string {
+  return `${nombre ?? ''} ${apellido ?? ''}`
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
 function extractPersonFromOcrFields(ocr?: OcrFields | null): Partial<PersonData> | null {
   if (!ocr) return null;
 
@@ -73,22 +82,32 @@ export function resolveOcrPersonRoles(
     };
   }
 
-  const licenciaDistinta =
-    !!licencia
-    && !!licenciaId
-    && licenciaId !== cedulaId
+  const fromLicencia = extractPersonFromOcrFields(licencia);
+  const cedulaName = normalizePersonName(cedula?.nombre, cedula?.apellido);
+  const titularCarnet = certificado ? extractTomadorFromCertificado(certificado) : null;
+  const carnetName = titularCarnet
+    ? normalizePersonName(titularCarnet.nombre, titularCarnet.apellido)
+    : '';
+  const licenciaName = normalizePersonName(licencia?.nombre, licencia?.apellido);
+
+  const idDistinta =
+    !!licenciaId
+    && (!cedulaId || licenciaId !== cedulaId)
     && (!carnetId || licenciaId !== carnetId);
 
-  if (licenciaDistinta) {
-    const fromLicencia = extractPersonFromOcrFields(licencia);
-    if (fromLicencia) {
-      return {
-        sameInsured,
-        asegurado,
-        hasDriver: true,
-        conductor: fromLicencia,
-      };
-    }
+  const nombreDistinto =
+    !licenciaId
+    && !!licenciaName
+    && (!cedulaName || licenciaName !== cedulaName)
+    && (!carnetName || licenciaName !== carnetName);
+
+  if (fromLicencia && (idDistinta || nombreDistinto)) {
+    return {
+      sameInsured,
+      asegurado,
+      hasDriver: true,
+      conductor: fromLicencia,
+    };
   }
 
   return { sameInsured, asegurado, hasDriver: false };
@@ -114,8 +133,8 @@ export function applyOcrPersonRoles(
     setters.setAsegurado(roles.asegurado);
   }
 
-  setters.setHasDriver(roles.hasDriver);
   if (roles.hasDriver && roles.conductor) {
+    setters.setHasDriver(true);
     setters.setConductor(roles.conductor);
   }
 }

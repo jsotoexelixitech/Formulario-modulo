@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { FormularioConfigPanel } from './config/FormularioConfigPanel.tsx'
-import './lib/bridge'
+import bridgeReady from './lib/bridge'
 import { NexusGuard } from './nexus/NexusGuard'
 import { applyExelixiOcrHandoff } from './lib/exelixi-catalog'
 import { applyOcrPersonRolesFromDocuments } from './lib/ocr-person-roles'
@@ -17,6 +17,8 @@ applyExelixiBranding('Formulario');
 
 function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
   useEffect(() => {
+    let cancelled = false;
+
     const runBootstrap = () => {
       const {
         setDocState,
@@ -29,7 +31,6 @@ function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
         setAsegurado,
         setHasDriver,
         setConductor,
-        documents,
       } = useWizardStore.getState();
 
       if (isCotizadorFlow() && isRcv()) {
@@ -55,12 +56,13 @@ function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
       });
 
       if (!handoffApplied && isRcv()) {
+        const latest = useWizardStore.getState().documents;
         const hasOcr =
-          documents.cedula?.ocr
-          || documents.licencia?.ocr
-          || documents.certificado?.ocr;
+          latest.cedula?.ocr
+          || latest.licencia?.ocr
+          || latest.certificado?.ocr;
         if (hasOcr) {
-          applyOcrPersonRolesFromDocuments(documents, {
+          applyOcrPersonRolesFromDocuments(latest, {
             setSameInsured,
             setAsegurado,
             setHasDriver,
@@ -70,12 +72,17 @@ function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
       }
     };
 
-    const sid = new URLSearchParams(window.location.search).get('sid');
-    if (sid && window.__bridge?.ready) {
-      void window.__bridge.ready.then(runBootstrap);
-      return;
-    }
-    runBootstrap();
+    void (async () => {
+      const sid = new URLSearchParams(window.location.search).get('sid');
+      if (sid) {
+        await bridgeReady;
+        if (window.__bridge?.ready) await window.__bridge.ready;
+      }
+      if (cancelled) return;
+      runBootstrap();
+    })();
+
+    return () => { cancelled = true; };
   }, []);
   return children;
 }

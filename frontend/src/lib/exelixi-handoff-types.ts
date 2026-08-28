@@ -1,5 +1,6 @@
 import type { BuilderCatalogProduct } from './exelixi-catalog';
 import type { DiligenciaState } from './diligencia';
+import type { PersonData } from '../types';
 
 export const EXELIXI_OCR_HANDOFF_KEY = 'exelixi_ocr_handoff';
 
@@ -42,5 +43,9 @@ export interface ExelixiOcrHandoff {
   documentosRequeridos?: string[];
   documentHashes?: Record<string, string>;
   diligencia?: DiligenciaState | null;
+  hasDriver?: boolean;
+  conductor?: Partial<PersonData>;
+  sameInsured?: boolean;
+  asegurado?: Partial<PersonData>;
   savedAt: number;
 }

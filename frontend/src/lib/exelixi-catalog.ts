@@ -264,7 +264,16 @@ export function applyExelixiOcrHandoff(
     });
   }
 
-  if (
+  if (handoff.hasDriver === true && handoff.conductor && setters.setHasDriver && setters.setConductor) {
+    setters.setHasDriver(true);
+    setters.setConductor(handoff.conductor);
+    if (typeof handoff.sameInsured === 'boolean' && setters.setSameInsured) {
+      setters.setSameInsured(handoff.sameInsured);
+    }
+    if (handoff.asegurado && setters.setAsegurado) {
+      setters.setAsegurado(handoff.asegurado);
+    }
+  } else if (
     setters.setSameInsured
     && setters.setAsegurado
     && setters.setHasDriver
