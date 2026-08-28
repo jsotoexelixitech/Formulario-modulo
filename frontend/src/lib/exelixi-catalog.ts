@@ -7,6 +7,8 @@ import {
 } from './exelixi-handoff-types';
 import { resolveOcrModelo, resolveOcrTipoPlaca, sanitizeOcrField } from './vehicle-carnet-labels';
 import { extractTomadorFromCertificado } from './carnet-propietario';
+import { applyOcrPersonRoles } from './ocr-person-roles';
+import type { PersonData } from '../types';
 
 export type BuilderProductBranch =
   | 'AUTOMOVIL'
@@ -186,6 +188,10 @@ export function applyExelixiOcrHandoff(
     setVehicle: (data: Partial<VehicleData>) => void;
     setOcrDone: (done: boolean) => void;
     setDiligencia?: (data: import('./diligencia').DiligenciaState | Partial<import('./diligencia').DiligenciaState> | null) => void;
+    setSameInsured?: (v: boolean) => void;
+    setAsegurado?: (data: Partial<PersonData>) => void;
+    setHasDriver?: (v: boolean) => void;
+    setConductor?: (data: Partial<PersonData>) => void;
     goTo: (step: number) => void;
   },
 ): boolean {
@@ -256,6 +262,25 @@ export function applyExelixiOcrHandoff(
       tipoCarnet: rcvHandoff ? cert.tipoCarnet : undefined,
       tipoPlaca: resolveOcrTipoPlaca(cert),
     });
+  }
+
+  if (
+    setters.setSameInsured
+    && setters.setAsegurado
+    && setters.setHasDriver
+    && setters.setConductor
+  ) {
+    applyOcrPersonRoles(
+      handoff.ocrData.cedula,
+      handoff.ocrData.certificado,
+      handoff.ocrData.licencia,
+      {
+        setSameInsured: setters.setSameInsured,
+        setAsegurado: setters.setAsegurado,
+        setHasDriver: setters.setHasDriver,
+        setConductor: setters.setConductor,
+      },
+    );
   }
 
   setters.setOcrDone(true);
