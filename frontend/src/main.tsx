@@ -15,12 +15,6 @@ import { isRcv } from './lib/product'
 // Identidad Exélixi (colores + favicon) solo si el flujo activo es el catálogo.
 applyExelixiBranding('Formulario');
 
-declare global {
-  interface Window {
-    __bridge?: { ready: Promise<void> };
-  }
-}
-
 function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
   useEffect(() => {
     const runBootstrap = () => {

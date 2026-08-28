@@ -29,6 +29,7 @@ export interface OcrFields {
   estadoCivil?: string;
   numeroLicencia?: string;
   propietario?: string;
+  propietarioIdentificacion?: string;
   identificacionPropietario?: string;
   tipoDocPropietario?: string;
 }
