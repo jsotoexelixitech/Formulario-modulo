@@ -263,4 +263,6 @@ export interface WizardState {
   quoteVehicleSignature: string | null;
   /** Circular SAA-02-1079-2026 — clasificación DDS/DDC. */
   diligencia: import('../lib/diligencia').DiligenciaState | null;
+  /** Metadata SSO del token Nexus (cproductor, cusuario, etc.). */
+  metadataCanal: Record<string, unknown> | null;
 }

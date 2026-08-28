@@ -110,6 +110,7 @@ interface WizardActions {
   setQuoteState: (s: QuoteState, error?: string | null) => void;
   clearQuote: () => void;
   setDiligencia: (data: Partial<DiligenciaState> | null) => void;
+  setMetadataCanal: (data: Record<string, unknown> | null) => void;
   reset: () => void;
 }
 
@@ -146,6 +147,7 @@ const initialState: WizardState = {
   quoteError: null,
   quoteVehicleSignature: null,
   diligencia: buildDiligenciaState({ itipoDiligencia: 'S', clasificadoEn: 'formulario' }),
+  metadataCanal: null,
 };
 
 export const useWizardStore = create<WizardState & WizardActions>()((set) => ({
@@ -251,6 +253,8 @@ export const useWizardStore = create<WizardState & WizardActions>()((set) => ({
       });
       return { diligencia: { ...base, ...data } };
     }),
+
+  setMetadataCanal: (data) => set({ metadataCanal: data }),
 
   reset: () => set(initialState),
 }));
