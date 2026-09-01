@@ -40,3 +40,15 @@ export function isValidPhonePrefix(phone: string): boolean {
   if (d.length !== 11) return false;
   return PREFIX_SET.has(d.slice(0, 4));
 }
+
+const PHONE_PREFIX_HINT =
+  'El prefijo no es válido (Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX)';
+
+/** Misma regla que RCV: obligatorio, 11 dígitos, prefijo venezolano. */
+export function validateRequiredVePhone(phone?: string): string | undefined {
+  if (!String(phone ?? '').trim()) return 'El teléfono es obligatorio';
+  const digits = String(phone).replace(/\D/g, '');
+  if (digits.length !== 11) return 'El teléfono debe tener exactamente 11 dígitos';
+  if (!isValidPhonePrefix(phone ?? '')) return PHONE_PREFIX_HINT;
+  return undefined;
+}

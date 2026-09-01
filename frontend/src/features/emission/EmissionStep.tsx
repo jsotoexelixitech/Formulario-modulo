@@ -335,7 +335,7 @@ export function EmissionStep() {
     };
 
     validatePerson(tomador, 'tom_', {
-      secondaryIdent: isRcvEmision && sameInsured !== false,
+      secondaryIdent: checkFuneralFlow || (isRcvEmision && sameInsured !== false),
     });
     if (isRcvEmision && !esPJ) {
       const hasProf = Boolean(tomador.cprofesion || tomador.xprofesion);
@@ -558,7 +558,9 @@ export function EmissionStep() {
               Persona jurídica: aplica <strong>diligencia completa (DDC)</strong> según circular SAA-02-1079-2026.
             </div>
           )}
-          {renderPersonForm(tomador, setTomador, 'tom_', ciudadesState)}
+          {renderPersonForm(tomador, setTomador, 'tom_', ciudadesState, {
+            secondaryIdent: checkFuneralFlow,
+          })}
         </SectionCard>
 
         {/* Declaración Legal */}

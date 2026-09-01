@@ -8,6 +8,12 @@ import { useProductConfig } from '../../hooks/useProductConfig';
 import { getProductId } from '../../lib/product';
 import { syncTitularFromTomador } from '../../lib/funeral-sync';
 import { cedulaTienePolizaVigente } from '../../lib/funeral-cedula-check';
+import { formatTelefono, validateRequiredVePhone } from '../../lib/phone';
+import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
+import {
+  SECONDARY_IDENTIFICACION_MAX_LENGTH,
+  validateSecondaryPersonIdentificacion,
+} from '../../lib/person-identificacion';
 import { toast } from '../../store/toastStore';
 import { SectionCard } from '../emission/EmissionStep';
 import type { FuneralPerson } from '../../types';
@@ -19,9 +25,6 @@ const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 function onlyLetters(v: string): string {
   return v.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
 }
-
-import { formatTelefono, isValidPhonePrefix } from '../../lib/phone';
-import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
 
 /** Aplica máscara visual al teléfono: (0414) 123-4567 */
 function maskPhone(v: string | undefined): string {
@@ -76,11 +79,11 @@ function PersonFields({
         <IdentityInput
           tipoDoc={person.tipoDoc || 'V'}
           identificacion={person.identificacion}
-          maxLength={PERSON_FIELD_LIMITS.identificacion}
+          maxLength={SECONDARY_IDENTIFICACION_MAX_LENGTH}
           loading={identityLoading}
           onTipoDocChange={(v) => onChange({ tipoDoc: v })}
           onIdentificacionChange={(v) =>
-            onChange({ identificacion: clipPersonField('identificacion', v) })
+            onChange({ identificacion: v.slice(0, SECONDARY_IDENTIFICACION_MAX_LENGTH) })
           }
           onIdentificacionBlur={onIdentificacionBlur}
         />
@@ -154,7 +157,11 @@ function PersonFields({
         />
       </Field>
 
-      <Field label="Teléfono (Opcional)" error={errors.telefono} hint="Ej. 04121234567">
+      <Field
+        label="Teléfono *"
+        error={errors.telefono}
+        hint="11 dígitos · Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX"
+      >
         <Input
           value={maskPhone(person.telefono)}
           onChange={(e) => onChange({ telefono: formatTelefono(e.target.value) })}
@@ -259,15 +266,9 @@ export function FuneralStep() {
     const e: PersonErrors = {};
     const req = (v?: string) => !(v ?? '').trim();
     const len = (v?: string) => (v ?? '').trim().length;
-    const digs = (v?: string) => (v ?? '').replace(/\D/g, '').length;
 
-    if (req(p.identificacion)) {
-      e.identificacion = 'La identificación es obligatoria';
-    } else if (digs(p.identificacion) < 1) {
-      e.identificacion = 'Debe tener al menos 1 dígito';
-    } else if (digs(p.identificacion) > PERSON_FIELD_LIMITS.identificacion) {
-      e.identificacion = `No puede tener más de ${PERSON_FIELD_LIMITS.identificacion} dígitos`;
-    }
+    const idErr = validateSecondaryPersonIdentificacion(p.identificacion);
+    if (idErr) e.identificacion = idErr;
 
     if (req(p.nombre)) {
       e.nombre = 'El nombre es obligatorio';
@@ -294,13 +295,8 @@ export function FuneralStep() {
     if (req(p.sexo)) e.sexo = 'Selecciona el sexo';
     if (!isTitular && req(p.parentesco)) e.parentesco = 'Selecciona el parentesco';
 
-    if (p.telefono) {
-      if (digs(p.telefono) !== 11) {
-        e.telefono = 'El teléfono debe tener exactamente 11 dígitos (ej. 04121234567)';
-      } else if (!isValidPhonePrefix(p.telefono)) {
-        e.telefono = 'El prefijo no es válido (Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX)';
-      }
-    }
+    const phoneErr = validateRequiredVePhone(p.telefono);
+    if (phoneErr) e.telefono = phoneErr;
 
     if (p.email && !emailRe.test(p.email)) {
       e.email = 'Ingresa un correo válido (ej. usuario@dominio.com)';
