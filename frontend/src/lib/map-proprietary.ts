@@ -137,6 +137,24 @@ export function mapProprietaryToPerson(
   return patch;
 }
 
+/**
+ * Fusiona autofill Sis2000 sin pisar datos ya ingresados por el usuario.
+ * Solo aplica valores no vacíos del patch entrante.
+ */
+export function mergeNonEmptyPersonPatch(
+  current: PersonFormPatch,
+  incoming: PersonFormPatch,
+): PersonFormPatch {
+  const out: PersonFormPatch = { ...current };
+  for (const [key, val] of Object.entries(incoming) as Array<[keyof PersonFormPatch, unknown]>) {
+    if (val == null) continue;
+    if (typeof val === 'string' && val.trim() === '') continue;
+    if (typeof val === 'number' && !Number.isFinite(val)) continue;
+    (out as Record<string, unknown>)[key] = val;
+  }
+  return out;
+}
+
 /** CID Sis2000 típico: letra de documento + número (ej. V18456329). */
 export function buildProprietaryCid(tipoDoc: string, identificacion: string): string {
   const letter = String(tipoDoc || 'V').trim().toUpperCase() || 'V';

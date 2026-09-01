@@ -11,6 +11,8 @@ import { searchProprietary } from '../../lib/api';
 import {
   buildProprietaryCid,
   mapProprietaryToPerson,
+  mergeNonEmptyPersonPatch,
+  type PersonFormPatch,
   type ProprietaryInfo,
 } from '../../lib/map-proprietary';
 import { toast } from '../../store/toastStore';
@@ -104,6 +106,7 @@ export function EmissionStep() {
       prefix: string,
       tipoDoc: string,
       identificacion: string,
+      current: PersonFormPatch,
       setPerson: (patch: Record<string, unknown>) => void,
     ) => {
       const digits = String(identificacion || '').replace(/\D/g, '');
@@ -148,7 +151,7 @@ export function EmissionStep() {
         // Conservar el número que acaba de escribir el usuario si el API no trae cci_rif
         if (!patch.identificacion) patch.identificacion = digits;
 
-        setPerson(patch);
+        setPerson(mergeNonEmptyPersonPatch(current, patch));
         lastLookupCid.current[prefix] = matchedCid;
         toast.success('Datos cargados', 'Se completó el formulario con la información del cliente.', 2800);
       } catch {
@@ -275,6 +278,7 @@ export function EmissionStep() {
               prefix,
               person.tipoDoc ?? 'V',
               id,
+              person as PersonFormPatch,
               setPerson,
             );
           }}

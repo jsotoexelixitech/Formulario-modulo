@@ -13,6 +13,33 @@ interface Opt {
   label: string;
 }
 
+function normalizeCatalogLabel(raw: string): string {
+  return String(raw ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\(a\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Resuelve valor guardado vs opciones del catálogo (ej. "Soltero(a)" ↔ "Soltero"). */
+function resolveSelectedOption(allOpts: Opt[], value: string): Opt | null {
+  if (!value.trim()) return null;
+  const exact = allOpts.find((o) => o.value === value);
+  if (exact) return exact;
+  const byLabel = allOpts.find((o) => o.label === value);
+  if (byLabel) return byLabel;
+  const norm = normalizeCatalogLabel(value);
+  return (
+    allOpts.find(
+      (o) =>
+        normalizeCatalogLabel(o.label) === norm ||
+        normalizeCatalogLabel(o.value) === norm,
+    ) ?? null
+  );
+}
+
 interface Props {
   options       : SearchSelectOption[];
   value         : string | number | undefined;
@@ -101,7 +128,7 @@ export function SearchSelect({
     : allOpts;
 
   const valueStr = value === undefined || value === null ? '' : String(value);
-  const selected = allOpts.find((o) => o.value === valueStr) ?? null;
+  const selected = resolveSelectedOption(allOpts, valueStr);
 
   return (
     <ReactSelect<Opt, false>
