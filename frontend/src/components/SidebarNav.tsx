@@ -14,9 +14,11 @@ export function SidebarNav() {
   const STEPS = [
     { n: 1, label: 'Documentos', sub: 'OCR y validación',   Icon: FileText },
     { n: 2, label: product.hasVehicle ? 'Emisión' : 'Tomador', sub: 'Datos del cliente', Icon: UserCog },
-    product.hasVehicle
-      ? { n: 3, label: 'Vehículo',  sub: 'Datos del auto',     Icon: Car }
-      : { n: 3, label: 'Asegurado',  sub: 'Personas',         Icon: Users },
+    ...(product.hasVehicle
+      ? [{ n: 3, label: 'Vehículo',  sub: 'Datos del auto',     Icon: Car }]
+      : product.id === 'funerario'
+        ? []
+        : [{ n: 3, label: 'Asegurado',  sub: 'Personas',         Icon: Users }]),
     { n: 4, label: 'Plan',       sub: 'Cobertura ideal',     Icon: ShieldCheck },
     { n: 5, label: 'Pago',       sub: 'Checkout final',      Icon: CreditCard },
   ];

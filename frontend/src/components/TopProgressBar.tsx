@@ -14,7 +14,9 @@ export function TopProgressBar() {
     ? [3, 4]
     : exelixiFlow
     ? [1, 2, ...(product.hasVehicle || product.useFuneralStep ? [3] : []), 4, 5]
-    : [1, 2, 3, 4, 5];
+    : product.id === 'funerario'
+      ? [1, 2, 4, 5]
+      : [1, 2, 3, 4, 5];
   const TOTAL_STEPS = stepNumbers.length;
   const safeStep = Math.max(
     1,

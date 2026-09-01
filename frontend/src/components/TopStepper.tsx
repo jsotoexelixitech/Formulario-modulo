@@ -57,15 +57,23 @@ export function TopStepper() {
     : [
         { n: 1, label: 'Documentos', Icon: FileText },
         { n: 2, label: product.hasVehicle ? 'Emisión' : 'Tomador', Icon: UserCog },
-        product.hasVehicle
-          ? { n: 3, label: 'Vehículo', Icon: Car }
-          : { n: 3, label: 'Asegurado', Icon: Users },
+        ...(product.hasVehicle
+          ? [{ n: 3, label: 'Vehículo', Icon: Car }]
+          : product.id === 'funerario'
+            ? []
+            : [{ n: 3, label: 'Asegurado', Icon: Users }]),
         { n: 4, label: 'Plan', Icon: ShieldCheck },
         { n: 5, label: 'Pago', Icon: CreditCard },
       ];
 
   /** Pasos que este módulo renderiza localmente. */
-  const LOCAL_STEPS = cotizadorRcv ? [3] : product.exelixiCatalog ? [2, 3] : [2, 3];
+  const LOCAL_STEPS = cotizadorRcv
+    ? [3]
+    : product.exelixiCatalog
+      ? [2, 3]
+      : product.id === 'funerario'
+        ? [2]
+        : [2, 3];
   const EXELIXI_LOCAL_STEPS = LOCAL_STEPS;
 
   function bridgeNavAvailable(): boolean {
@@ -117,7 +125,8 @@ export function TopStepper() {
     ? (STEPS[STEPS.length - 1]?.n ?? 2)
     : 5;
   const canPrev = prevStep != null && !navigating && canGoTo(prevStep);
-  const canNext = step < maxStep && !navigating && canGoTo(step + 1);
+  const nextTarget = product.id === 'funerario' && step === 2 ? 4 : step + 1;
+  const canNext = step < maxStep && !navigating && canGoTo(nextTarget);
 
   return (
     <div className="hidden lg:block w-full mb-8 animate-fade-in">
@@ -216,7 +225,7 @@ export function TopStepper() {
 
         <button
           type="button"
-          onClick={() => goToStep(step + 1)}
+          onClick={() => goToStep(nextTarget)}
           disabled={!canNext}
           className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-700 text-white grid place-items-center shadow-md hover:bg-slate-800 transition-colors disabled:opacity-35 disabled:cursor-not-allowed disabled:hover:bg-slate-700"
           aria-label="Paso siguiente"

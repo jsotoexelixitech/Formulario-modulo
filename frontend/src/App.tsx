@@ -110,8 +110,13 @@ export default function App() {
   const { hideStepper, hideFooterBar } = useUiFlags(config);
 
   useEffect(() => {
+    if (isFunerario() && step === 3) {
+      setLocalStep(2);
+      goTo(2);
+      return;
+    }
     if (step === 2 || step === 3) setLocalStep(step);
-  }, [step]);
+  }, [step, goTo]);
 
   function navigate(to: 2 | 3) {
     setLocalStep(to);
@@ -150,9 +155,13 @@ export default function App() {
       if (skipsPersonasStep()) {
         toast.success(
           '¡Formulario completado!',
-          'Datos del cliente guardados correctamente.',
+          'Datos del cliente y beneficiarios guardados correctamente.',
         );
-        continueToEmisionModule(buildExelixiWizardSnapshot());
+        if (product.exelixiCatalog) {
+          continueToEmisionModule(buildExelixiWizardSnapshot());
+        } else {
+          window.__bridgeAdvance?.();
+        }
         return;
       }
       navigate(3);

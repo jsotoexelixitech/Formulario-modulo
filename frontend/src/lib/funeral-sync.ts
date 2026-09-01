@@ -24,7 +24,6 @@ export function syncTitularFromTomador(): void {
         telefono: src.telefono,
         email: src.email,
       },
-      ...funeral.asegurados.slice(1),
     ],
   });
 }
