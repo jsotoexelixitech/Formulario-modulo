@@ -4,6 +4,23 @@ export type TipoDiligencia = 'S' | 'C';
 
 export type DiligenciaDocType = 'cedula' | 'licencia' | 'certificado' | 'rif' | 'pasaporte';
 
+const DILIGENCIA_DOC_TYPES: readonly DiligenciaDocType[] = [
+  'cedula',
+  'licencia',
+  'certificado',
+  'rif',
+  'pasaporte',
+];
+
+export function isDiligenciaDocType(v: string): v is DiligenciaDocType {
+  return (DILIGENCIA_DOC_TYPES as readonly string[]).includes(v);
+}
+
+/** Filtra slots funerarios (`cedula_titular`, etc.) fuera del expediente RCV. */
+export function toDiligenciaDocTypes(docs: readonly string[] | undefined | null): DiligenciaDocType[] {
+  return (docs ?? []).filter(isDiligenciaDocType);
+}
+
 export interface DocConfigEntry {
   key: string;
   activo: boolean;

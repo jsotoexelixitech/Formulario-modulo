@@ -9,6 +9,7 @@ import { resolveOcrModelo, resolveOcrTipoPlaca, sanitizeOcrField } from './vehic
 import { extractTomadorFromCertificado } from './carnet-propietario';
 import { applyOcrPersonRoles } from './ocr-person-roles';
 import { applyFuneralOcrCedulas } from './funeral-ocr-apply';
+import { toDiligenciaDocTypes, type DiligenciaDocType } from './diligencia';
 import type { PersonData } from '../types';
 
 export type BuilderProductBranch =
@@ -232,8 +233,8 @@ export function applyExelixiOcrHandoff(
   } else if (handoff.itipoDiligencia && setters.setDiligencia) {
     setters.setDiligencia({
       itipoDiligencia: handoff.itipoDiligencia,
-      documentosRequeridos: (handoff.documentosRequeridos ?? []) as DocType[],
-      documentHashes: handoff.documentHashes as Partial<Record<DocType, string>>,
+      documentosRequeridos: toDiligenciaDocTypes(handoff.documentosRequeridos),
+      documentHashes: handoff.documentHashes as Partial<Record<DiligenciaDocType, string>>,
       clasificadoEn: 'ocr',
       camposObligatorios: ['direccion'],
     });
