@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import type { DocType, OcrResult, DocumentFile } from '../types';
+import { toOcrEngineDocType } from './ocr-engine-doc';
 import { moduleApiBase } from './app-base';
 import { attachNexusTokenAxios } from './nexus-token-client';
 
@@ -61,7 +62,7 @@ export async function uploadDocument(
 ): Promise<UploadResponse> {
   const form = new FormData();
   form.append('file', file);
-  form.append('docType', docType);
+  form.append('docType', toOcrEngineDocType(docType));
 
   try {
     const response = await api.post<UploadResponse>('/documents/upload', form, {

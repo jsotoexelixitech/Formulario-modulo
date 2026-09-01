@@ -25,12 +25,28 @@ import {
 } from '../../lib/map-proprietary';
 import { toast } from '../../store/toastStore';
 import { User, Heart, ShieldAlert, FileText } from 'lucide-react';
-import { formatTelefono, isValidPhonePrefix } from '../../lib/phone';
+import { formatTelefono, isValidPhonePrefix, validateRequiredVePhone } from '../../lib/phone';
 import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
 import {
   SECONDARY_IDENTIFICACION_MAX_LENGTH,
   validateSecondaryPersonIdentificacion,
 } from '../../lib/person-identificacion';
+import type { FuneralPerson } from '../../types';
+
+function emptyFuneralBeneficiario(pporcen = 100): FuneralPerson {
+  return {
+    tipoDoc: 'V',
+    identificacion: '',
+    nombre: '',
+    apellido: '',
+    fechaNac: '',
+    sexo: '',
+    parentesco: '',
+    pporcen,
+    telefono: '',
+    email: '',
+  };
+}
 
 export function SectionCard({
   title,
@@ -103,6 +119,7 @@ export function EmissionStep() {
     asegurado, setAsegurado,
     hasBeneficiary, setHasBeneficiary,
     beneficiario, setBeneficiario,
+    funeral, setFuneral,
     diligencia, setDiligencia,
   } = useWizardStore();
 
@@ -133,6 +150,47 @@ export function EmissionStep() {
   const lastFuneralCedula = useRef<Record<string, string>>({});
   const lastFuneralOk = useRef<Record<string, boolean>>({});
   const checkFuneralFlow = isFunerario() || usesFuneralStep();
+
+  const parentescoOptions =
+    catalogs.parentescos.length > 0
+      ? catalogs.parentescos
+          .filter((p) => String(p.code) !== '1')
+          .map((p) => ({ value: String(p.code), label: p.label }))
+      : [
+          { value: '2', label: 'Cónyuge' },
+          { value: '3', label: 'Hijo (a)' },
+          { value: '4', label: 'Abuelos (as)' },
+          { value: '5', label: 'Tíos (as)' },
+          { value: '6', label: 'Padres' },
+          { value: '7', label: 'Hermano (a)' },
+        ];
+
+  const patchFuneralBeneficiario = (idx: number, patch: Partial<FuneralPerson>) => {
+    const next = [...(funeral.beneficiarios ?? [])];
+    next[idx] = { ...next[idx], ...patch };
+    setFuneral({ beneficiarios: next });
+  };
+
+  useEffect(() => {
+    if (!checkFuneralFlow) return;
+    if ((funeral.beneficiarios ?? []).length > 0) return;
+    const fromOcr = beneficiario.identificacion || beneficiario.nombre
+      ? {
+          tipoDoc: beneficiario.tipoDoc || 'V',
+          identificacion: beneficiario.identificacion,
+          nombre: beneficiario.nombre,
+          apellido: beneficiario.apellido,
+          fechaNac: beneficiario.fechaNac ?? '',
+          sexo: beneficiario.sexo ?? '',
+          parentesco: beneficiario.parentesco ?? '',
+          pporcen: beneficiario.pporcen ?? 100,
+          telefono: beneficiario.telefono ?? '',
+          email: beneficiario.email ?? '',
+        }
+      : emptyFuneralBeneficiario(100);
+    setFuneral({ beneficiarios: [fromOcr] });
+    setHasBeneficiary(true);
+  }, [checkFuneralFlow, funeral.beneficiarios, beneficiario, setFuneral, setHasBeneficiary]);
 
   const lookupByCedula = useCallback(
     async (
@@ -345,10 +403,56 @@ export function EmissionStep() {
       }
     }
     if (!sameInsured) validatePerson(asegurado, 'aseg_', { secondaryIdent: true });
-    if (hasBeneficiary) validatePerson(beneficiario, 'benef_', { secondaryIdent: true });
+    if (checkFuneralFlow) {
+      const bens = funeral.beneficiarios ?? [];
+      if (bens.length === 0) {
+        e.funeral_benef = 'Agrega al menos un beneficiario';
+      }
+      let pctSum = 0;
+      bens.forEach((b, i) => {
+        const idErr = validateSecondaryPersonIdentificacion(b.identificacion);
+        if (idErr) e[`fben_${i}_id`] = idErr;
+        if (!(b.nombre ?? '').trim()) e[`fben_${i}_nombre`] = 'El nombre es obligatorio';
+        if (!(b.apellido ?? '').trim()) e[`fben_${i}_apellido`] = 'El apellido es obligatorio';
+        if (!(b.fechaNac ?? '').trim()) e[`fben_${i}_fnac`] = 'La fecha de nacimiento es obligatoria';
+        if (!(b.parentesco ?? '').trim()) e[`fben_${i}_parentesco`] = 'El parentesco es obligatorio';
+        const phoneErr = validateRequiredVePhone(b.telefono);
+        if (phoneErr) e[`fben_${i}_tel`] = phoneErr;
+        const pct = Number(b.pporcen);
+        if (!Number.isFinite(pct) || pct < 1 || pct > 100) {
+          e[`fben_${i}_pct`] = 'El % de beneficio debe estar entre 1 y 100';
+        } else {
+          pctSum += pct;
+        }
+      });
+      if (bens.length > 0 && pctSum !== 100) {
+        e.funeral_benef_pct = 'El porcentaje de beneficio debe sumar 100%';
+      }
+    } else if (hasBeneficiary) {
+      validatePerson(beneficiario, 'benef_', { secondaryIdent: true });
+    }
 
     setErrors(e);
     if (Object.keys(e).length > 0) return false;
+
+    if (checkFuneralFlow) {
+      const first = (funeral.beneficiarios ?? [])[0];
+      if (first) {
+        setHasBeneficiary(true);
+        setBeneficiario({
+          tipoDoc: first.tipoDoc,
+          identificacion: first.identificacion,
+          nombre: first.nombre,
+          apellido: first.apellido,
+          fechaNac: first.fechaNac,
+          sexo: first.sexo,
+          parentesco: first.parentesco,
+          pporcen: first.pporcen,
+          telefono: first.telefono,
+          email: first.email,
+        });
+      }
+    }
 
     if (checkFuneralFlow) {
       const tomOk = await checkFuneralCedula('tom_', tomador.identificacion);
@@ -593,18 +697,158 @@ export function EmissionStep() {
           {!sameInsured && renderPersonForm(asegurado, setAsegurado, 'aseg_', aseguradoCiudades, { secondaryIdent: true })}
         </SectionCard>
 
-        {/* Beneficiario */}
-        <SectionCard
-          Icon={Heart}
-          title="Datos del Beneficiario Preferencial"
-        >
-          <ToggleSwitch
-            checked={hasBeneficiary}
-            onChange={setHasBeneficiary}
-            label="¿Desea agregar un beneficiario preferencial a la póliza?"
-          />
-          {hasBeneficiary && renderPersonForm(beneficiario, setBeneficiario, 'benef_', beneficiarioCiudades, { secondaryIdent: true })}
-        </SectionCard>
+        {checkFuneralFlow ? (
+          <SectionCard
+            Icon={Heart}
+            title="Beneficiarios"
+            description="El porcentaje de todos debe sumar 100% (como en Sis2000 pporce)."
+            statusLabel={errors.funeral_benef_pct || errors.funeral_benef}
+            statusTone={errors.funeral_benef_pct || errors.funeral_benef ? 'warning' : 'neutral'}
+          >
+            <div className="space-y-4">
+              {(funeral.beneficiarios ?? []).map((ben, idx) => (
+                <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[0.7rem] font-black uppercase tracking-wider text-fuchsia-600">
+                      Beneficiario {idx + 1}
+                    </span>
+                    {idx > 0 && (
+                      <button
+                        type="button"
+                        className="text-[0.7rem] font-bold text-rose-500"
+                        onClick={() =>
+                          setFuneral({
+                            beneficiarios: funeral.beneficiarios.filter((_, i) => i !== idx),
+                          })
+                        }
+                      >
+                        Quitar
+                      </button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="Cédula *" error={errors[`fben_${idx}_id`]}>
+                      <IdentityInput
+                        tipoDoc={ben.tipoDoc || 'V'}
+                        identificacion={ben.identificacion}
+                        maxLength={SECONDARY_IDENTIFICACION_MAX_LENGTH}
+                        onTipoDocChange={(v) => patchFuneralBeneficiario(idx, { tipoDoc: v })}
+                        onIdentificacionChange={(v) =>
+                          patchFuneralBeneficiario(idx, {
+                            identificacion: v.slice(0, SECONDARY_IDENTIFICACION_MAX_LENGTH),
+                          })
+                        }
+                      />
+                    </Field>
+                    <Field
+                      label="% Beneficio *"
+                      error={errors[`fben_${idx}_pct`]}
+                      hint="La suma de todos debe ser 100"
+                    >
+                      <Input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={ben.pporcen ?? ''}
+                        onChange={(ev) =>
+                          patchFuneralBeneficiario(idx, { pporcen: Number(ev.target.value) })
+                        }
+                      />
+                    </Field>
+                    <Field label="Nombre *" error={errors[`fben_${idx}_nombre`]}>
+                      <Input
+                        value={ben.nombre}
+                        onChange={(ev) =>
+                          patchFuneralBeneficiario(idx, {
+                            nombre: clipLetters(ev.target.value, PERSON_FIELD_LIMITS.nombre),
+                          })
+                        }
+                      />
+                    </Field>
+                    <Field label="Apellido *" error={errors[`fben_${idx}_apellido`]}>
+                      <Input
+                        value={ben.apellido}
+                        onChange={(ev) =>
+                          patchFuneralBeneficiario(idx, {
+                            apellido: clipLetters(ev.target.value, PERSON_FIELD_LIMITS.apellido),
+                          })
+                        }
+                      />
+                    </Field>
+                    <Field label="Fecha de Nac. *" error={errors[`fben_${idx}_fnac`]}>
+                      <Input
+                        type="date"
+                        value={ben.fechaNac ?? ''}
+                        onChange={(ev) => patchFuneralBeneficiario(idx, { fechaNac: ev.target.value })}
+                      />
+                    </Field>
+                    <Field label="Parentesco *" error={errors[`fben_${idx}_parentesco`]}>
+                      <SearchSelect
+                        value={ben.parentesco}
+                        options={parentescoOptions}
+                        onChange={(value) => patchFuneralBeneficiario(idx, { parentesco: value })}
+                        placeholder="— Seleccionar —"
+                        loading={catalogs.loading}
+                      />
+                    </Field>
+                    <Field label="Teléfono *" error={errors[`fben_${idx}_tel`]}>
+                      <Input
+                        value={formatTelefono(ben.telefono ?? '')}
+                        onChange={(ev) =>
+                          patchFuneralBeneficiario(idx, { telefono: formatTelefono(ev.target.value) })
+                        }
+                        type="tel"
+                        maxLength={PERSON_FIELD_LIMITS.telefonoDisplay}
+                      />
+                    </Field>
+                    <Field label="Sexo">
+                      <SearchSelect
+                        value={ben.sexo}
+                        options={
+                          catalogs.sexos.length
+                            ? catalogs.sexos.map((s) => ({ value: String(s.label), label: s.label }))
+                            : [
+                                { value: 'Masculino', label: 'Masculino' },
+                                { value: 'Femenino', label: 'Femenino' },
+                              ]
+                        }
+                        onChange={(value) => patchFuneralBeneficiario(idx, { sexo: value })}
+                        placeholder="— Seleccionar —"
+                        loading={catalogs.loading}
+                      />
+                    </Field>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-fuchsia-200 text-fuchsia-600 text-sm font-bold"
+                onClick={() =>
+                  setFuneral({
+                    beneficiarios: [
+                      ...(funeral.beneficiarios ?? []),
+                      emptyFuneralBeneficiario(0),
+                    ],
+                  })
+                }
+              >
+                Agregar beneficiario
+              </button>
+            </div>
+          </SectionCard>
+        ) : (
+          <SectionCard
+            Icon={Heart}
+            title="Datos del Beneficiario Preferencial"
+          >
+            <ToggleSwitch
+              checked={hasBeneficiary}
+              onChange={setHasBeneficiary}
+              label="¿Desea agregar un beneficiario preferencial a la póliza?"
+            />
+            {hasBeneficiary && renderPersonForm(beneficiario, setBeneficiario, 'benef_', beneficiarioCiudades, { secondaryIdent: true })}
+          </SectionCard>
+        )}
       </div>
     </div>
   );

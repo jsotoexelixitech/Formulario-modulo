@@ -8,6 +8,7 @@ import {
 import { resolveOcrModelo, resolveOcrTipoPlaca, sanitizeOcrField } from './vehicle-carnet-labels';
 import { extractTomadorFromCertificado } from './carnet-propietario';
 import { applyOcrPersonRoles } from './ocr-person-roles';
+import { applyFuneralOcrCedulas } from './funeral-ocr-apply';
 import type { PersonData } from '../types';
 
 export type BuilderProductBranch =
@@ -207,7 +208,15 @@ export function applyExelixiOcrHandoff(
     }
   }
 
-  const docTypes: OcrDocType[] = ['cedula', 'licencia', 'certificado', 'rif', 'pasaporte'];
+  const docTypes: OcrDocType[] = [
+    'cedula',
+    'cedula_titular',
+    'cedula_beneficiario',
+    'licencia',
+    'certificado',
+    'rif',
+    'pasaporte',
+  ];
   for (const type of docTypes) {
     const fields = handoff.ocrData[type];
     const hash = handoff.documentHashes?.[type];
@@ -291,6 +300,8 @@ export function applyExelixiOcrHandoff(
       },
     );
   }
+
+  applyFuneralOcrCedulas();
 
   setters.setOcrDone(true);
   setters.goTo(2);

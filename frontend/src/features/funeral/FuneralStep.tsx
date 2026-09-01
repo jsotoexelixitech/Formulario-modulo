@@ -337,12 +337,11 @@ export function FuneralStep() {
 
   const validate = async (): Promise<boolean> => {
     const aErr = funeral.asegurados.map((p, i) => validatePerson(p, i === 0));
-    const bErr = funeral.beneficiarios.map((p) => validatePerson(p, false));
 
     setAsegErrors(aErr);
-    setBenefErrors(bErr);
+    setBenefErrors([]);
 
-    const hasPersonError = [...aErr, ...bErr].some((e) => Object.keys(e).length > 0);
+    const hasPersonError = aErr.some((e) => Object.keys(e).length > 0);
     if (hasPersonError) return false;
 
     for (let i = 0; i < funeral.asegurados.length; i++) {
@@ -418,8 +417,8 @@ export function FuneralStep() {
       </SectionCard>
       )}
 
-      {/* Beneficiarios */}
-      {isSeccionActiva('beneficiario') && (
+      {/* Beneficiarios: solo en paso 2 (EmissionStep). No duplicar aquí. */}
+      {false && isSeccionActiva('beneficiario') && (
       <SectionCard
         Icon={Heart}
         title="Beneficiarios"

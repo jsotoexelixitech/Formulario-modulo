@@ -64,8 +64,8 @@ const STEP_META_BY_PRODUCT: Record<'rcv' | 'funerario', Record<2 | 3, StepMeta>>
     },
     3: {
       eyebrow: 'Paso 03 · Personas',
-      title: 'Asegurados y beneficiarios',
-      sub: 'Indica las personas cubiertas y los beneficiarios de la póliza funeraria.',
+      title: 'Personas aseguradas',
+      sub: 'Indica el titular y las personas cubiertas. Los beneficiarios se cargan en el paso anterior.',
     },
   },
 };

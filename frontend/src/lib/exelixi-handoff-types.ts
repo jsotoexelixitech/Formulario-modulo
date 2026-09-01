@@ -4,7 +4,14 @@ import type { PersonData } from '../types';
 
 export const EXELIXI_OCR_HANDOFF_KEY = 'exelixi_ocr_handoff';
 
-export type OcrDocType = 'cedula' | 'licencia' | 'certificado' | 'rif' | 'pasaporte';
+export type OcrDocType =
+  | 'cedula'
+  | 'cedula_titular'
+  | 'cedula_beneficiario'
+  | 'licencia'
+  | 'certificado'
+  | 'rif'
+  | 'pasaporte';
 
 export interface OcrFields {
   nombre?: string;
