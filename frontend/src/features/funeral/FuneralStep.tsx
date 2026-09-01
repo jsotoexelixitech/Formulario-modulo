@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
 import { Field, Input } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
@@ -74,7 +74,13 @@ function PersonFields({
       <Field
         label="Identificación *"
         error={errors.identificacion}
-        hint={onIdentificacionBlur ? 'Al salir del campo se verifica si ya hay póliza vigente' : undefined}
+        hint={
+          identityLoading
+            ? 'Consultando Sis2000…'
+            : onIdentificacionBlur
+              ? 'Al completar la cédula se verifica si se puede asegurar'
+              : undefined
+        }
       >
         <IdentityInput
           tipoDoc={person.tipoDoc || 'V'}
@@ -223,6 +229,8 @@ export function FuneralStep() {
   const [asegErrors, setAsegErrors] = useState<PersonErrors[]>([]);
   const [benefErrors, setBenefErrors] = useState<PersonErrors[]>([]);
   const [cedulaChecking, setCedulaChecking] = useState<Record<number, boolean>>({});
+  const lastAsegCedula = useRef<Record<number, string>>({});
+  const lastAsegOk = useRef<Record<number, boolean>>({});
 
   const parentescoOptions =
     catalogs.parentescos.length > 0
@@ -243,6 +251,7 @@ export function FuneralStep() {
 
   // ── Helpers de listas ─────────────────────────────────────────────────────
   const updateAsegurado = (idx: number, patch: Partial<FuneralPerson>) => {
+    if (patch.identificacion != null) lastAsegCedula.current[idx] = '';
     const next = funeral.asegurados.map((a, i) => (i === idx ? { ...a, ...patch } : a));
     setFuneral({ asegurados: next });
   };
@@ -319,30 +328,59 @@ export function FuneralStep() {
   const checkAseguradoCedula = useCallback(async (idx: number, identificacion: string) => {
     const digits = String(identificacion || '').replace(/\D/g, '');
     if (digits.length < 6) return true;
+    if (lastAsegCedula.current[idx] === digits) {
+      return lastAsegOk.current[idx] !== false;
+    }
+    lastAsegCedula.current[idx] = digits;
     setCedulaChecking((s) => ({ ...s, [idx]: true }));
     try {
       const res = await cedulaTienePolizaVigente(digits);
       if (res.blocked) {
+        lastAsegOk.current[idx] = false;
         setAsegErrors((prev) => {
           const next = [...prev];
           next[idx] = { ...(next[idx] ?? {}), identificacion: res.message };
           return next;
         });
         toast.warning(
-          'Póliza vigente',
-          'Esta cédula ya tiene una póliza funeraria activa. No se puede continuar.',
+          'No se puede asegurar',
+          res.cnpoliza
+            ? `Ya existe una póliza funeraria vigente (${res.cnpoliza}).`
+            : 'Esta cédula ya tiene una póliza funeraria activa. No se puede continuar.',
           8000,
         );
         return false;
       }
+      lastAsegOk.current[idx] = true;
+      toast.success(
+        'Se puede asegurar',
+        'No hay póliza funeraria vigente para esta cédula.',
+        2800,
+      );
       return true;
     } catch {
+      lastAsegCedula.current[idx] = '';
+      lastAsegOk.current[idx] = false;
       toast.warning('No se pudo verificar la cédula', 'Inténtalo de nuevo antes de continuar.', 4000);
       return false;
     } finally {
       setCedulaChecking((s) => ({ ...s, [idx]: false }));
     }
   }, []);
+
+  useEffect(() => {
+    const timers: number[] = [];
+    funeral.asegurados.forEach((p, idx) => {
+      if (idx === 0) return;
+      const digits = String(p.identificacion || '').replace(/\D/g, '');
+      if (digits.length < 6 || lastAsegCedula.current[idx] === digits) return;
+      const t = window.setTimeout(() => {
+        void checkAseguradoCedula(idx, p.identificacion);
+      }, 450);
+      timers.push(t);
+    });
+    return () => timers.forEach((id) => window.clearTimeout(id));
+  }, [funeral.asegurados, checkAseguradoCedula]);
 
   const validate = async (): Promise<boolean> => {
     const aErr = funeral.asegurados.map((p, i) => validatePerson(p, i === 0));

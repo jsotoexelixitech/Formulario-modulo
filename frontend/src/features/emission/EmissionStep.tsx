@@ -275,8 +275,10 @@ export function EmissionStep() {
             [`${prefix}identificacion`]: res.message,
           }));
           toast.warning(
-            'Póliza vigente',
-            'Esta cédula ya tiene una póliza funeraria activa. No se puede continuar.',
+            'No se puede asegurar',
+            res.cnpoliza
+              ? `Ya existe una póliza funeraria vigente (${res.cnpoliza}).`
+              : 'Esta cédula ya tiene una póliza funeraria activa. No se puede continuar.',
             8000,
           );
           return false;
@@ -288,6 +290,11 @@ export function EmissionStep() {
           const { [key]: _removed, ...rest } = prev;
           return rest;
         });
+        toast.success(
+          'Se puede asegurar',
+          'No hay póliza funeraria vigente para esta cédula.',
+          2800,
+        );
         return true;
       } catch {
         lastFuneralCedula.current[prefix] = '';
@@ -305,13 +312,59 @@ export function EmissionStep() {
     [],
   );
 
+  const runFuneralCedulaAuto = useCallback(
+    async (
+      prefix: string,
+      tipoDoc: string,
+      identificacion: string,
+      setPerson: (patch: PersonFormPatch) => void,
+    ): Promise<boolean> => {
+      const digits = String(identificacion || '').replace(/\D/g, '');
+      if (digits.length < 6) return true;
+      const ok = await checkFuneralCedula(prefix, identificacion);
+      if (!ok) return false;
+      await lookupByCedula(prefix, tipoDoc || 'V', identificacion, setPerson);
+      return true;
+    },
+    [checkFuneralCedula, lookupByCedula],
+  );
+
   useEffect(() => {
     if (!checkFuneralFlow) return;
     const digits = String(tomador.identificacion || '').replace(/\D/g, '');
     if (digits.length < 6) return;
-    if (lastFuneralCedula.current.tom_ === digits) return;
-    void checkFuneralCedula('tom_', tomador.identificacion);
-  }, [checkFuneralFlow, tomador.identificacion, checkFuneralCedula]);
+    const timer = window.setTimeout(() => {
+      void runFuneralCedulaAuto(
+        'tom_',
+        tomador.tipoDoc ?? 'V',
+        tomador.identificacion,
+        setTomador,
+      );
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [checkFuneralFlow, tomador.identificacion, tomador.tipoDoc, runFuneralCedulaAuto, setTomador]);
+
+  useEffect(() => {
+    if (!checkFuneralFlow || sameInsured) return;
+    const digits = String(asegurado.identificacion || '').replace(/\D/g, '');
+    if (digits.length < 6) return;
+    const timer = window.setTimeout(() => {
+      void runFuneralCedulaAuto(
+        'aseg_',
+        asegurado.tipoDoc ?? 'V',
+        asegurado.identificacion,
+        setAsegurado,
+      );
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [
+    checkFuneralFlow,
+    sameInsured,
+    asegurado.identificacion,
+    asegurado.tipoDoc,
+    runFuneralCedulaAuto,
+    setAsegurado,
+  ]);
 
   const validate = async () => {
     const e: ValidationErrors = {};
@@ -482,7 +535,9 @@ export function EmissionStep() {
           isRcvEmision
             ? 'Al salir del campo se buscan los datos en Sis2000'
             : checkFuneralFlow
-              ? 'Al salir del campo se verifica si ya hay póliza vigente'
+              ? lookupLoading[prefix]
+                ? 'Consultando Sis2000…'
+                : 'Al completar la cédula se consulta si se puede asegurar y se cargan los datos'
               : undefined
         }
       >
@@ -511,7 +566,7 @@ export function EmissionStep() {
                 }
               : checkFuneralFlow
                 ? (id) => {
-                    void checkFuneralCedula(prefix, id);
+                    void runFuneralCedulaAuto(prefix, person.tipoDoc ?? 'V', id, setPerson);
                   }
                 : undefined
           }
