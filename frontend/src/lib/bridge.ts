@@ -19,6 +19,10 @@
 
 import { useWizardStore } from '../store/wizardStore';
 import { resolveNexusApiUrl } from '../nexus/nexus-core';
+import {
+  adoptNexusTokenFromUrl,
+  getNexusTokenFromUrl,
+} from './nexus-token-client';
 import { canNavigateToStep, getDefaultRequiredDocs } from './wizard-navigation';
 import { getProductConfig } from './product';
 import { BUILDER_PRODUCT_STORAGE_KEY, isExelixiCatalogFlow, ensureExelixiFlowQueryParam } from './exelixi-catalog';
@@ -63,6 +67,10 @@ const HOST_TO_ORDER: Record<string, number> = {
   'form.200-75-131-138.sslip.io': 2,
   'emision.200-75-131-138.sslip.io': 3,
   'pagos.200-75-131-138.sslip.io': 4,
+  'ocr.exelixitech.com': 1,
+  'formulario.exelixitech.com': 2,
+  'emision.exelixitech.com': 3,
+  'pagos.exelixitech.com': 4,
 };
 
 const HOST_TO_TOKEN_KEY: Record<string, string> = {
@@ -70,6 +78,10 @@ const HOST_TO_TOKEN_KEY: Record<string, string> = {
   'form.200-75-131-138.sslip.io': 'nexus_access_token_formulario',
   'emision.200-75-131-138.sslip.io': 'nexus_access_token_emision',
   'pagos.200-75-131-138.sslip.io': 'nexus_access_token_pagos',
+  'ocr.exelixitech.com': 'nexus_access_token_ocr',
+  'formulario.exelixitech.com': 'nexus_access_token_formulario',
+  'emision.exelixitech.com': 'nexus_access_token_emision',
+  'pagos.exelixitech.com': 'nexus_access_token_pagos',
 };
 
 function matchPathPrefix<T>(rules: [string, T][]): T | null {
@@ -99,22 +111,20 @@ function getSidFromUrl(): string | null {
   } catch { return null; }
 }
 
-function getNexusTokenFromUrl(): string | null {
-  try {
-    return new URL(window.location.href).searchParams.get('nexus_token');
-  } catch { return null; }
-}
-
 function moduleOrder(): number | null {
   const envOrder = import.meta.env.VITE_BRIDGE_MODULE_ORDER;
   if (envOrder) {
     const n = Number(envOrder);
-    return Number.isFinite(n) ? n : null;
+    if (Number.isFinite(n)) return n;
   }
   const fromPath = matchPathPrefix(PATH_PREFIX_TO_ORDER);
   if (fromPath !== null) return fromPath;
-  const host = window.location.hostname;
+  const host = window.location.hostname.toLowerCase();
   if (HOST_TO_ORDER[host]) return HOST_TO_ORDER[host];
+  if (host.startsWith('ocr.')) return 1;
+  if (host.startsWith('formulario.') || host.startsWith('form.')) return 2;
+  if (host.startsWith('emision.')) return 3;
+  if (host.startsWith('pagos.')) return 4;
   const port = window.location.port || '';
   return PORT_TO_ORDER[port] ?? null;
 }
@@ -227,15 +237,18 @@ function makeBridge(): BridgeAPI {
       sessionStorage.getItem(getModuleTokenKey()) ||
       getNexusTokenFromUrl();
     if (nexusToken) out.nexus_token = nexusToken;
+    // Solo OCR (order=1) persiste documents; otros módulos tienen slots idle que
+    // sobrescribirían el expediente procesado en la sesión del flujo.
+    if (order !== 1) delete out.documents;
     return out;
   };
 
   // Campos cuyo valor NO debe sobrescribirse durante la hidratación.
-  // Cada módulo gestiona su propio step interno (OCR=1, Form=2/3, Emisión=4, Pagos=5/6).
+  // OCR (order=1) conserva documents locales; el resto necesita el expediente del flujo.
   const HYDRATE_EXCLUDE = new Set([
     'step',
-    'documents',     // OCR mantiene su estado de progreso local
-    'quoteState',    // estados de UI transitorios
+    ...(order === 1 ? ['documents' as const] : []),
+    'quoteState',
     'quoteError',
   ]);
 
@@ -402,6 +415,8 @@ function makeBridge(): BridgeAPI {
 
 async function init() {
   let bridge = makeBridge();
+
+  adoptNexusTokenFromUrl(getModuleTokenKey());
 
   // Si no hay sid pero hay nexus_token, intentar auto-arranque del flujo
   if (!bridge.active && typeof window !== 'undefined') {

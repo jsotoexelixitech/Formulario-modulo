@@ -15,6 +15,23 @@ const MODULE_NEXUS_API: [string, string][] = [
   ['/pagos', '/pagos/nexus-api'],
 ];
 
+/** Producción GCIA — subdominios (paridad con nexusqa en QA). */
+const PRODUCTION_GCIA_NEXUS_API = 'https://nexus-api.exelixitech.com';
+const PRODUCTION_GCIA_FRONT_HOSTS = new Set([
+  'ocr.exelixitech.com',
+  'formulario.exelixitech.com',
+  'emision.exelixitech.com',
+  'pagos.exelixitech.com',
+]);
+
+function resolveProductionGciaNexusApi(): string | null {
+  if (typeof window === 'undefined') return null;
+  if (PRODUCTION_GCIA_FRONT_HOSTS.has(window.location.hostname)) {
+    return PRODUCTION_GCIA_NEXUS_API;
+  }
+  return null;
+}
+
 function resolveModuleNexusApiOnHttps(): string | null {
   if (typeof window === 'undefined' || window.location.protocol !== 'https:') {
     return null;
@@ -33,21 +50,47 @@ function useModuleProxyBuild(): boolean {
   return flag === '1' || flag === 'true';
 }
 
-/** QA: .env.production puede traer cierrelmds/nexus-api; el flag prioriza {módulo}/nexus-api. */
+/** QA/dev: si el build trae cierrelmds pero la página es nexusqa, usar /nexus-api del host actual. */
+function resolveSameOriginNexusApi(
+  trimmed: string,
+  moduleOnHttps: string | null,
+): string | null {
+  if (typeof window === 'undefined' || window.location.protocol !== 'https:') {
+    return null;
+  }
+  let configuredHost = '';
+  try {
+    if (trimmed && !INTERNAL_HTTP_RE.test(trimmed)) {
+      configuredHost = new URL(trimmed).hostname;
+    }
+  } catch {
+    /* ignore */
+  }
+  const pageHost = window.location.hostname;
+  if (!configuredHost || configuredHost !== pageHost) {
+    return moduleOnHttps ?? `${window.location.origin}/nexus-api`;
+  }
+  return null;
+}
+
+/** QA: .env.production puede traer cierrelmds/nexus-api; prioriza host actual en HTTPS. */
 export function resolveNexusApiUrl(configured?: string): string {
+  const productionGcia = resolveProductionGciaNexusApi();
+  if (productionGcia) return productionGcia;
+
   const moduleOnHttps = resolveModuleNexusApiOnHttps();
   if (moduleOnHttps && useModuleProxyBuild()) {
     return moduleOnHttps;
   }
 
   const trimmed = configured?.trim().replace(/\/$/, '') ?? '';
-  const pageIsHttps =
-    typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const sameOrigin = resolveSameOriginNexusApi(trimmed, moduleOnHttps);
+  if (sameOrigin) return sameOrigin;
 
   if (trimmed && !INTERNAL_HTTP_RE.test(trimmed)) {
     return trimmed;
   }
-  if (pageIsHttps && typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
     return moduleOnHttps ?? `${window.location.origin}/nexus-api`;
   }
   if (trimmed) return trimmed;
@@ -69,11 +112,6 @@ export interface NexusVerifyResult {
 }
 
 export async function verifyNexusAccess(nexusApiUrl: string): Promise<NexusVerifyResult> {
-  const tokenFromUrl = new URLSearchParams(window.location.search).get('nexus_token');
-  if (tokenFromUrl && !getNexusToken(STORAGE_KEY)) {
-    persistNexusToken(STORAGE_KEY, tokenFromUrl);
-  }
-
   const token = getNexusToken(STORAGE_KEY);
 
   if (!token) {

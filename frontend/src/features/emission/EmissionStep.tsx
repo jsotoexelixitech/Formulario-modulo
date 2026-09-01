@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
 import { Field, Input, Textarea } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
@@ -6,7 +6,15 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { PersonLocationFields } from '../../components/PersonLocationFields';
 import { useCatalogs, useCiudades } from '../../hooks/useCatalogs';
+import { useProductConfig } from '../../hooks/useProductConfig';
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
+import { isCotizadorFlow } from '../../lib/cotizador-flow';
+import { getProductId, isRcvLaMundialFlow } from '../../lib/product';
+import {
+  diligenciaLabel,
+  isPersonaJuridica,
+  preClasificarDiligencia,
+} from '../../lib/diligencia';
 import { searchProprietary } from '../../lib/api';
 import {
   buildProprietaryCid,
@@ -19,6 +27,10 @@ import { toast } from '../../store/toastStore';
 import { User, Heart, ShieldAlert, FileText } from 'lucide-react';
 import { formatTelefono, isValidPhonePrefix } from '../../lib/phone';
 import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
+import {
+  SECONDARY_IDENTIFICACION_MAX_LENGTH,
+  validateSecondaryPersonIdentificacion,
+} from '../../lib/person-identificacion';
 
 export function SectionCard({
   title,
@@ -74,6 +86,7 @@ interface ValidationErrors {
 }
 
 const emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
 function onlyLetters(v: string): string {
   return v.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
@@ -90,12 +103,29 @@ export function EmissionStep() {
     asegurado, setAsegurado,
     hasBeneficiary, setHasBeneficiary,
     beneficiario, setBeneficiario,
+    diligencia, setDiligencia,
   } = useWizardStore();
 
   const catalogs = useCatalogs();
   const exelixiFlow = isExelixiCatalogFlow();
+  const isRcvEmision = isRcvLaMundialFlow() && !isCotizadorFlow();
+  const producto = getProductId();
+  const { config: formConfig } = useProductConfig(EMPRESA_ID, producto, 'formulario');
+  const showProfesion = isRcvEmision && formConfig?.campos?.cprofesion?.activo !== false;
+  const showActividad = isRcvEmision && formConfig?.campos?.cactividad?.activo !== false;
+  const esPJ = isPersonaJuridica(tomador.tipoDoc);
   const ciudadesState = useCiudades(tomador.cestado);
   const aseguradoCiudades = useCiudades(asegurado.cestado);
+
+  useEffect(() => {
+    if (!isRcvEmision) return;
+    const itipo = preClasificarDiligencia(tomador.tipoDoc);
+    setDiligencia({
+      itipoDiligencia: itipo,
+      clasificadoEn: 'formulario',
+    });
+    setTomador({ itipoDiligencia: itipo });
+  }, [isRcvEmision, tomador.tipoDoc, setDiligencia, setTomador]);
   const beneficiarioCiudades = useCiudades(beneficiario.cestado);
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [lookupLoading, setLookupLoading] = useState<Record<string, boolean>>({});
@@ -106,8 +136,7 @@ export function EmissionStep() {
       prefix: string,
       tipoDoc: string,
       identificacion: string,
-      current: PersonFormPatch,
-      setPerson: (patch: Record<string, unknown>) => void,
+      setPerson: (patch: PersonFormPatch) => void,
     ) => {
       const digits = String(identificacion || '').replace(/\D/g, '');
       if (digits.length < 1) return;
@@ -173,8 +202,11 @@ export function EmissionStep() {
     const len  = (v?: string) => (v ?? '').trim().length;
     const digs = (v?: string) => (v ?? '').replace(/\D/g, '').length;
 
-    const validatePerson = (person: any, prefix: string) => {
-      if (req(person.identificacion)) {
+    const validatePerson = (person: any, prefix: string, opts?: { secondaryIdent?: boolean }) => {
+      if (opts?.secondaryIdent) {
+        const idErr = validateSecondaryPersonIdentificacion(person.identificacion);
+        if (idErr) e[`${prefix}identificacion`] = idErr;
+      } else if (req(person.identificacion)) {
         e[`${prefix}identificacion`] = 'La identificación es obligatoria';
       } else if (digs(person.identificacion) < 1) {
         e[`${prefix}identificacion`] = 'La identificación debe tener al menos 1 dígito';
@@ -206,7 +238,7 @@ export function EmissionStep() {
       } else if (digs(person.telefono) !== 11) {
         e[`${prefix}telefono`] = 'El teléfono debe tener exactamente 11 dígitos';
       } else if (!isValidPhonePrefix(person.telefono || '')) {
-        e[`${prefix}telefono`] = 'El prefijo debe ser válido en Venezuela';
+        e[`${prefix}telefono`] = 'El prefijo no es válido (Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX)';
       }
 
       if (req(person.email)) {
@@ -243,9 +275,18 @@ export function EmissionStep() {
       }
     };
 
-    validatePerson(tomador, 'tom_');
-    if (!sameInsured) validatePerson(asegurado, 'aseg_');
-    if (hasBeneficiary) validatePerson(beneficiario, 'benef_');
+    validatePerson(tomador, 'tom_', {
+      secondaryIdent: isRcvEmision && sameInsured !== false,
+    });
+    if (isRcvEmision && !esPJ) {
+      const hasProf = Boolean(tomador.cprofesion || tomador.xprofesion);
+      const hasAct = Boolean(tomador.cactividad || tomador.xactividad);
+      if (!hasProf && !hasAct) {
+        e.tom_profesion = 'Indique profesión o actividad económica';
+      }
+    }
+    if (!sameInsured) validatePerson(asegurado, 'aseg_', { secondaryIdent: true });
+    if (hasBeneficiary) validatePerson(beneficiario, 'benef_', { secondaryIdent: true });
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -253,17 +294,27 @@ export function EmissionStep() {
 
   (window as any).__validateStep2 = validate;
 
-  const renderPersonForm = (person: any, setPerson: any, prefix: string, ciuState: any) => (
+  const renderPersonForm = (
+    person: any,
+    setPerson: any,
+    prefix: string,
+    ciuState: any,
+    opts?: { secondaryIdent?: boolean },
+  ) => (
     <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
       <Field
         label="Cédula o documento *"
         error={errors[`${prefix}identificacion`]}
-        hint="Al salir del campo se buscan los datos en Sis2000"
+        hint={isRcvEmision ? 'Al salir del campo se buscan los datos en Sis2000' : undefined}
       >
         <IdentityInput
           tipoDoc={person.tipoDoc ?? 'V'}
           identificacion={person.identificacion ?? ''}
-          maxLength={PERSON_FIELD_LIMITS.identificacion}
+          maxLength={
+            opts?.secondaryIdent
+              ? SECONDARY_IDENTIFICACION_MAX_LENGTH
+              : PERSON_FIELD_LIMITS.identificacion
+          }
           loading={Boolean(lookupLoading[prefix])}
           onTipoDocChange={(v) => {
             lastLookupCid.current[prefix] = '';
@@ -273,15 +324,13 @@ export function EmissionStep() {
             lastLookupCid.current[prefix] = '';
             setPerson({ identificacion: clipPersonField('identificacion', v) });
           }}
-          onIdentificacionBlur={(id) => {
-            void lookupByCedula(
-              prefix,
-              person.tipoDoc ?? 'V',
-              id,
-              person as PersonFormPatch,
-              setPerson,
-            );
-          }}
+          onIdentificacionBlur={
+            isRcvEmision
+              ? (id) => {
+                  void lookupByCedula(prefix, person.tipoDoc ?? 'V', id, setPerson);
+                }
+              : undefined
+          }
         />
       </Field>
       <div className="hidden sm:block"></div>
@@ -301,7 +350,7 @@ export function EmissionStep() {
           maxLength={PERSON_FIELD_LIMITS.apellido}
         />
       </Field>
-      <Field label="Teléfono *" error={errors[`${prefix}telefono`]} hint="11 dígitos · Movilnet 0412/0416 · Movistar 0414/0424 · Digitel 0412/0422">
+      <Field label="Teléfono *" error={errors[`${prefix}telefono`]} hint="11 dígitos · Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX">
         <Input
           value={formatTelefono(person.telefono ?? '')}
           onChange={(e) => setPerson({ telefono: formatTelefono(e.target.value) })}
@@ -383,6 +432,34 @@ export function EmissionStep() {
           maxLength={PERSON_FIELD_LIMITS.direccion}
         />
       </Field>
+      {prefix === 'tom_' && isRcvEmision && showProfesion && (
+        <Field label="Profesión *" error={errors.tom_profesion}>
+          <SearchSelect
+            value={person.cprofesion ?? ''}
+            options={catalogs.profesiones.map((o) => ({ value: o.code, label: o.label }))}
+            onChange={(code, label) => {
+              setPerson({ cprofesion: code, xprofesion: label });
+            }}
+            placeholder="— Seleccionar —"
+            loading={catalogs.loading}
+            noOptionsText="Sin profesiones disponibles"
+          />
+        </Field>
+      )}
+      {prefix === 'tom_' && isRcvEmision && showActividad && (
+        <Field label="Actividad económica *" error={errors.tom_profesion}>
+          <SearchSelect
+            value={person.cactividad ?? ''}
+            options={catalogs.actividades.map((o) => ({ value: o.code, label: o.label }))}
+            onChange={(code, label) => {
+              setPerson({ cactividad: code, xactividad: label });
+            }}
+            placeholder="— Seleccionar (si no indicó profesión) —"
+            loading={catalogs.loading}
+            noOptionsText="Sin actividades disponibles"
+          />
+        </Field>
+      )}
     </div>
   );
 
@@ -393,7 +470,14 @@ export function EmissionStep() {
         <SectionCard
           Icon={User}
           title="Datos de la persona que pagará la Póliza (Tomador)"
+          statusLabel={isRcvEmision && diligencia ? diligenciaLabel(diligencia.itipoDiligencia).split(' ')[0] : undefined}
+          statusTone={isRcvEmision && diligencia?.itipoDiligencia === 'C' ? 'warning' : 'success'}
         >
+          {isRcvEmision && esPJ && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+              Persona jurídica: aplica <strong>diligencia completa (DDC)</strong> según circular SAA-02-1079-2026.
+            </div>
+          )}
           {renderPersonForm(tomador, setTomador, 'tom_', ciudadesState)}
         </SectionCard>
 
@@ -424,7 +508,7 @@ export function EmissionStep() {
             onChange={(v) => setSameInsured(!v)}
             label="¿La persona que pagará la Póliza es diferente a la que será asegurada?"
           />
-          {!sameInsured && renderPersonForm(asegurado, setAsegurado, 'aseg_', aseguradoCiudades)}
+          {!sameInsured && renderPersonForm(asegurado, setAsegurado, 'aseg_', aseguradoCiudades, { secondaryIdent: true })}
         </SectionCard>
 
         {/* Beneficiario */}
@@ -437,7 +521,7 @@ export function EmissionStep() {
             onChange={setHasBeneficiary}
             label="¿Desea agregar un beneficiario preferencial a la póliza?"
           />
-          {hasBeneficiary && renderPersonForm(beneficiario, setBeneficiario, 'benef_', beneficiarioCiudades)}
+          {hasBeneficiary && renderPersonForm(beneficiario, setBeneficiario, 'benef_', beneficiarioCiudades, { secondaryIdent: true })}
         </SectionCard>
       </div>
     </div>

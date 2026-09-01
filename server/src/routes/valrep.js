@@ -8,6 +8,8 @@ const {
   getValrepList,
   getValrepStates,
   getValrepCities,
+  getValrepOcupaciones,
+  getValrepActividades,
   validateEmissionAutoViaNestApi,
 } = require('../services/nestApiClient');
 
@@ -33,13 +35,19 @@ const LIST_FALLBACKS = {
   ],
 };
 
+function isGeoCatalogPlaceholder(label, code) {
+  const t = String(label ?? '').trim().toUpperCase();
+  return t === 'TODO' || t === 'TODOS' || t === 'TODAS';
+}
+
 function normalizeItems(rows) {
   return (rows ?? [])
     .map((s) => ({
       code: s.code ?? s.cestado ?? s.cciudad,
       label: String(s.label ?? s.xdescripcion_l ?? '').trim(),
     }))
-    .filter((it) => it.code != null && it.code !== '' && it.label !== '');
+    .filter((it) => it.code != null && it.code !== '' && it.label !== '')
+    .filter((it) => !isGeoCatalogPlaceholder(it.label, it.code));
 }
 
 function logError(tag, err) {
@@ -99,6 +107,26 @@ router.get('/list/:domain', async (req, res) => {
   }
 });
 
+router.get('/ocupaciones', async (_req, res) => {
+  try {
+    const items = await getValrepOcupaciones();
+    res.json({ ok: true, source: 'nest-api', items });
+  } catch (err) {
+    logError('ocupaciones', err);
+    res.status(502).json({ ok: false, error: 'No se pudo obtener profesiones/ocupaciones' });
+  }
+});
+
+router.get('/actividades', async (_req, res) => {
+  try {
+    const items = await getValrepActividades();
+    res.json({ ok: true, source: 'nest-api', items });
+  } catch (err) {
+    logError('actividades', err);
+    res.status(502).json({ ok: false, error: 'No se pudo obtener actividades económicas' });
+  }
+});
+
 router.post('/validate-vehicle', async (req, res) => {
   try {
     const { placa, serial, plan } = req.body ?? {};
@@ -109,15 +137,34 @@ router.post('/validate-vehicle', async (req, res) => {
     });
     res.json(result);
   } catch (err) {
-    if (err.code === 'PLATE_ALREADY_INSURED') {
+    if (
+      err.code === 'PLATE_ALREADY_INSURED'
+      || err.code === 'SERIAL_ALREADY_INSURED'
+      || err.code === 'VEHICLE_ALREADY_INSURED'
+    ) {
       return res.status(400).json({
         success: false,
         code: err.code,
         message: err.message || 'Este vehículo ya cuenta con una póliza vigente.',
+        error: err.message || 'Este vehículo ya cuenta con una póliza vigente.',
+      });
+    }
+    if (err.code === 'INVALID_PLACA_FORMAT' || err.code === 'INVALID_SERIAL_FORMAT') {
+      return res.status(400).json({
+        success: false,
+        code: err.code,
+        message: err.message,
+        error: err.message,
       });
     }
     logError('validate-vehicle', err);
-    res.status(502).json({ success: false, error: 'Error validando vehículo en nest-api' });
+    const msg = err.message || 'Error validando vehículo en nest-api';
+    res.status(502).json({
+      success: false,
+      code: err.code || 'NEST_API_VALIDATE_ERROR',
+      message: msg,
+      error: msg,
+    });
   }
 });
 

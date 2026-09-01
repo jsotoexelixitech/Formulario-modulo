@@ -12,7 +12,9 @@ const {
   getInmaModelos,
   getInmaVersiones,
   getCategoriasUso,
+  getRecargosRcv,
 } = require('../services/nestApiClient');
+const { findMarcaInList } = require('../lib/inmaMarcaMatch');
 
 const router = express.Router();
 
@@ -55,9 +57,14 @@ function findModeloMatch(modelos, modelo) {
   return candidates.reduce((best, cur) => (label(cur).length > label(best).length ? cur : best));
 }
 
-router.get('/anios', async (_req, res) => {
+function parseBinacional(req) {
+  const v = req.query?.binacional ?? req.body?.binacional;
+  return v === true || v === 1 || v === '1' || v === 'true';
+}
+
+router.get('/anios', async (req, res) => {
   try {
-    const data = await getInmaAnios();
+    const data = await getInmaAnios(parseBinacional(req));
     res.json({ success: true, ...data });
   } catch (err) {
     logError('anios', err);
@@ -69,7 +76,7 @@ router.get('/marcas', async (req, res) => {
   const fano = parseInt(req.query.fano, 10);
   if (!fano) return res.status(400).json({ success: false, message: 'fano requerido' });
   try {
-    const data = await getInmaMarcas(fano);
+    const data = await getInmaMarcas(fano, parseBinacional(req));
     res.json({ success: true, data });
   } catch (err) {
     logError('marcas', err);
@@ -82,7 +89,7 @@ router.get('/modelos', async (req, res) => {
   const cmarca = req.query.cmarca;
   if (!fano || !cmarca) return res.status(400).json({ success: false, message: 'fano y cmarca requeridos' });
   try {
-    const data = await getInmaModelos(fano, cmarca);
+    const data = await getInmaModelos(fano, cmarca, parseBinacional(req));
     res.json({ success: true, data });
   } catch (err) {
     logError('modelos', err);
@@ -98,7 +105,7 @@ router.get('/versiones', async (req, res) => {
     return res.status(400).json({ success: false, message: 'fano, cmarca y cmodelo requeridos' });
   }
   try {
-    const data = await getInmaVersiones(fano, cmarca, cmodelo);
+    const data = await getInmaVersiones(fano, cmarca, cmodelo, parseBinacional(req));
     res.json({ success: true, data });
   } catch (err) {
     logError('versiones', err);
@@ -115,7 +122,7 @@ router.get('/categorias-uso', async (req, res) => {
     return res.status(400).json({ success: false, message: 'fano, cmarca, cmodelo y cversion son requeridos' });
   }
   try {
-    const data = await getCategoriasUso(fano, cmarca, cmodelo, cversion);
+    const data = await getCategoriasUso(fano, cmarca, cmodelo, cversion, parseBinacional(req));
     res.json({ success: true, data });
   } catch (err) {
     logError('categorias-uso', err);
@@ -130,21 +137,16 @@ router.get('/resolver', async (req, res) => {
   if (!fano || !marca) return res.status(400).json({ success: false, message: 'fano y marca requeridos' });
 
   try {
-    const marcas = await getInmaMarcas(fano);
-    const normMarca = normCatalogText(marca);
-    const marcaMatch =
-      marcas.find((m) => normCatalogText(m.xmarca) === normMarca) ??
-      marcas.find(
-        (m) =>
-          normCatalogText(m.xmarca).includes(normMarca) ||
-          normMarca.includes(normCatalogText(m.xmarca)),
-      );
+    const binacional = parseBinacional(req);
+    const serial = (req.query.serial || '').trim();
+    const marcas = await getInmaMarcas(fano, binacional);
+    const marcaMatch = findMarcaInList(marcas, marca, serial);
 
     if (!marcaMatch) {
       return res.json({ success: false, fallback: true, message: `Marca "${marca}" no encontrada` });
     }
 
-    const modelos = await getInmaModelos(fano, marcaMatch.cmarca);
+    const modelos = await getInmaModelos(fano, marcaMatch.cmarca, binacional);
     const modeloMatch = modelo ? findModeloMatch(modelos, modelo) : null;
     const resolvedModelo = modeloMatch ?? modelos[0];
 
@@ -157,7 +159,7 @@ router.get('/resolver', async (req, res) => {
       });
     }
 
-    const versiones = await getInmaVersiones(fano, marcaMatch.cmarca, resolvedModelo.cmodelo);
+    const versiones = await getInmaVersiones(fano, marcaMatch.cmarca, resolvedModelo.cmodelo, binacional);
 
     res.json({
       success: true,
@@ -170,6 +172,49 @@ router.get('/resolver', async (req, res) => {
     });
   } catch (err) {
     logError('resolver', err);
+    res.status(502).json({ success: false, message: err.message });
+  }
+});
+
+/** Diagnóstico: marca OCR vs catálogo INMA general y binacional (ctarifabi). */
+router.get('/marca-disponibilidad', async (req, res) => {
+  const fano = parseInt(req.query.fano, 10);
+  const marca = (req.query.marca || '').trim();
+  const serial = (req.query.serial || '').trim();
+  if (!fano || !marca) {
+    return res.status(400).json({ success: false, message: 'fano y marca requeridos' });
+  }
+
+  try {
+    const [marcasGeneral, marcasBinacional] = await Promise.all([
+      getInmaMarcas(fano, false),
+      getInmaMarcas(fano, true),
+    ]);
+    const matchGeneral = findMarcaInList(marcasGeneral, marca, serial);
+    const matchBinacional = findMarcaInList(marcasBinacional, marca, serial);
+
+    res.json({
+      success: true,
+      ocrMarca: marca,
+      inGeneralCatalog: Boolean(matchGeneral),
+      inBinacionalCatalog: Boolean(matchBinacional),
+      xmarcaGeneral: matchGeneral?.xmarca ?? null,
+      xmarcaBinacional: matchBinacional?.xmarca ?? null,
+      cmarcaGeneral: matchGeneral?.cmarca ?? null,
+      cmarcaBinacional: matchBinacional?.cmarca ?? null,
+    });
+  } catch (err) {
+    logError('marca-disponibilidad', err);
+    res.status(502).json({ success: false, message: err.message });
+  }
+});
+
+router.get('/recargos-rcv', async (_req, res) => {
+  try {
+    const recargos = await getRecargosRcv(18);
+    res.json({ success: true, data: recargos });
+  } catch (err) {
+    logError('recargos-rcv', err);
     res.status(502).json({ success: false, message: err.message });
   }
 });

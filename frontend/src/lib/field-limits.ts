@@ -5,6 +5,9 @@
 export const PERSON_FIELD_LIMITS = {
   /** maclient.cci_rif DECIMAL(13,0) */
   identificacion: 13,
+  /** Cédula V/E natural — dígitos permitidos en asegurado, beneficiario y conductor. */
+  venezuelanCedulaDigitsMin: 1,
+  venezuelanCedulaDigitsMax: 8,
   /** maclient.cid CHAR(30) — letra + número */
   cid: 30,
   /** maclient.ipersona CHAR(1) */

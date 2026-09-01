@@ -8,16 +8,40 @@ import { PersonLocationFields } from '../../components/PersonLocationFields';
 import { SearchSelect } from '../../components/ui/SearchSelect';
 import { IdentityInput } from '../../components/ui/IdentityInput';
 import { formatTelefono, isValidPhonePrefix } from '../../lib/phone';
+import { resolveOcrModelo } from '../../lib/vehicle-carnet-labels';
 import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
 import {
   Car, UserCog, Sparkles, ScanLine, ShieldCheck,
   Loader2, AlertTriangle,
 } from 'lucide-react';
 import { toast } from '../../store/toastStore';
-import { cn } from '../../lib/utils';
-import { catalogoApi, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso } from '../../lib/api';
+import { catalogoApi, searchProprietary, validatePlaca, validateSerial, type InmaMarca, type InmaModelo, type InmaVersion, type CategoriaUso, type RecargoRcvItem } from '../../lib/api';
+import {
+  buildProprietaryCid,
+  mapProprietaryToPerson,
+  type ProprietaryInfo,
+} from '../../lib/map-proprietary';
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
+import { isRcvLaMundialFlow } from '../../lib/product';
+import { applyOcrPersonRolesFromDocuments } from '../../lib/ocr-person-roles';
+import { TipoPlacaSelector } from '../../components/TipoPlacaSelector';
+import { placaMaxLength, placaPlaceholder, validatePlacaMessage } from '../../lib/placa-tipo';
+import { isQaDeploy } from '../../lib/deploy-env';
+import { findBestInmaMarca } from '../../lib/inma-marca-match';
+import {
+  isCategoriaToneladas,
+  normalizeToneladasForCategoria,
+} from '../../lib/rcv-cargo-toneladas';
+import {
+  normalizeVehicleSerial,
+  validateVehicleSerialMessage,
+  VEHICLE_SERIAL_MAX_LEN,
+} from '../../lib/vehicle-serial';
+import {
+  SECONDARY_IDENTIFICACION_MAX_LENGTH,
+  validateSecondaryPersonIdentificacion,
+} from '../../lib/person-identificacion';
 import type { VehicleData } from '../../types';
 
 const COLOR_SWATCHES: Record<string, string> = {
@@ -87,10 +111,12 @@ interface VehicleErrors {
   cond_estado?: string;
   cond_ciudad?: string;
   cond_direccion?: string;
+  toneladas?: string;
+  recargoRcv?: string;
 }
 
 // ── Hook catálogo INMA ────────────────────────────────────────────────────────
-function useInmaCatalog() {
+function useInmaCatalog(binacional: boolean) {
   const [marcas,    setMarcas]    = useState<InmaMarca[]>([]);
   const [modelos,   setModelos]   = useState<InmaModelo[]>([]);
   const [versiones, setVersiones] = useState<InmaVersion[]>([]);
@@ -103,31 +129,31 @@ function useInmaCatalog() {
   const loadMarcas = useCallback(async (y: number) => {
     if (!y || y < 1990) return;
     setLoadM(true); setMarcas([]); setModelos([]); setVersiones([]); setCategoriasUso([]);
-    try { setMarcas((await catalogoApi.marcas(y)).data.data ?? []); } catch { /* silencioso */ }
+    try { setMarcas((await catalogoApi.marcas(y, binacional)).data.data ?? []); } catch { /* silencioso */ }
     finally { setLoadM(false); }
-  }, []);
+  }, [binacional]);
 
   const loadModelos = useCallback(async (y: number, cmarca: string) => {
     if (!y || !cmarca) return;
     setLoadMo(true); setModelos([]); setVersiones([]); setCategoriasUso([]);
-    try { setModelos((await catalogoApi.modelos(y, cmarca)).data.data ?? []); } catch { }
+    try { setModelos((await catalogoApi.modelos(y, cmarca, binacional)).data.data ?? []); } catch { }
     finally { setLoadMo(false); }
-  }, []);
+  }, [binacional]);
 
   const loadVersiones = useCallback(async (y: number, cmarca: string, cmodelo: string) => {
     if (!y || !cmarca || !cmodelo) return;
     setLoadV(true); setVersiones([]); setCategoriasUso([]);
-    try { setVersiones((await catalogoApi.versiones(y, cmarca, cmodelo)).data.data ?? []); } catch { }
+    try { setVersiones((await catalogoApi.versiones(y, cmarca, cmodelo, binacional)).data.data ?? []); } catch { }
     finally { setLoadV(false); }
-  }, []);
+  }, [binacional]);
 
   const loadCategoriasUso = useCallback(async (y: number, cmarca: string, cmodelo: string, cversion: string) => {
     if (!y || !cmarca || !cmodelo || !cversion) return;
     setLoadCu(true); setCategoriasUso([]);
-    try { setCategoriasUso((await catalogoApi.categoriasUso(y, cmarca, cmodelo, cversion)).data.data ?? []); }
+    try { setCategoriasUso((await catalogoApi.categoriasUso(y, cmarca, cmodelo, cversion, binacional)).data.data ?? []); }
     catch { /* fallback: el formulario muestra opciones genéricas si la lista queda vacía */ }
     finally { setLoadCu(false); }
-  }, []);
+  }, [binacional]);
 
   const resetModelos  = useCallback(() => { setModelos([]); setVersiones([]); setCategoriasUso([]); }, []);
   const resetVersiones = useCallback(() => { setVersiones([]); setCategoriasUso([]); }, []);
@@ -149,14 +175,123 @@ export function VehicleStep() {
     conductor, setConductor,
     documents,
     selectedPlan,
+    setSameInsured, setAsegurado,
   } = useWizardStore();
 
   const [errors, setErrors] = useState<VehicleErrors>({});
   const [verified, setVerified] = useState(false);
+  const [placaValidating, setPlacaValidating] = useState(false);
+  const [serialValidating, setSerialValidating] = useState(false);
+  const [conductorLookupLoading, setConductorLookupLoading] = useState(false);
+  const [recargosRcv, setRecargosRcv] = useState<RecargoRcvItem[]>([]);
+  const [recargosLoad, setRecargosLoad] = useState(false);
+  const recargosInitDone = useRef(false);
+  const driverFromOcrApplied = useRef(false);
+  const lastValidatedPlaca = useRef('');
+  const lastValidatedSerial = useRef('');
+  const lastConductorLookupCid = useRef('');
   const catalogs = useCatalogs();
   const exelixiFlow = isExelixiCatalogFlow();
   const cotizadorRcv = isCotizadorFlow();
+  const rcvLaMundial = isRcvLaMundialFlow();
+  const isRcvEmision = rcvLaMundial && !cotizadorRcv;
   const conductorCiudades = useCiudades(conductor.cestado);
+  const isBinacional = rcvLaMundial && vehicle.tipoPlaca === 'binacional';
+  const showToneladas = rcvLaMundial && isCategoriaToneladas(vehicle.ccategoria_uso);
+
+  useEffect(() => {
+    if (driverFromOcrApplied.current || cotizadorRcv || hasDriver) return;
+    if (!documents.licencia?.ocr) return;
+    applyOcrPersonRolesFromDocuments(documents, {
+      setSameInsured,
+      setAsegurado,
+      setHasDriver,
+      setConductor,
+    });
+    driverFromOcrApplied.current = true;
+  }, [
+    cotizadorRcv,
+    documents,
+    hasDriver,
+    setAsegurado,
+    setConductor,
+    setHasDriver,
+    setSameInsured,
+  ]);
+
+  useEffect(() => {
+    if (!rcvLaMundial) return;
+    let cancelled = false;
+    setRecargosLoad(true);
+    catalogoApi.recargosRcv()
+      .then((res) => {
+        if (cancelled) return;
+        const list = res.data.data ?? [];
+        setRecargosRcv(list);
+        if (!recargosInitDone.current && list.length > 0) {
+          recargosInitDone.current = true;
+          if (!vehicle.csustanc_rcv) {
+            const targetPct = vehicle.precargorcv ?? 0;
+            const match =
+              list.find((r) => Number(r.porcenta) === Number(targetPct))
+              ?? list.find((r) => Number(r.porcenta) === 0)
+              ?? list[0];
+            setVehicle({
+              precargorcv: Number(match.porcenta),
+              csustanc_rcv: match.csustanc,
+              xsustanc_rcv: match.xsustanc,
+            });
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRecargosRcv([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRecargosLoad(false);
+      });
+    return () => { cancelled = true; };
+  }, [rcvLaMundial, setVehicle]);
+
+  const setTipoPlaca = useCallback((tipoPlaca: VehicleData['tipoPlaca']) => {
+    if (tipoPlaca === 'binacional' && !rcvLaMundial) return;
+    const nextBi = tipoPlaca === 'binacional';
+    const prevBi = vehicle.tipoPlaca === 'binacional';
+    if (nextBi === prevBi && vehicle.tipoPlaca === tipoPlaca) return;
+    // Al cruzar nacional/extranjera ↔ binacional el catálogo cambia (ctarifabi).
+    if (nextBi !== prevBi) {
+      setVehicle({
+        tipoPlaca,
+        cmarca: '',
+        marca: '',
+        cmodelo: '',
+        modelo: '',
+        cversion: '',
+        ccategoria_uso: undefined,
+        xcategoria_uso: '',
+        ccategotr: undefined,
+      });
+      return;
+    }
+    setVehicle({ tipoPlaca });
+  }, [rcvLaMundial, vehicle.tipoPlaca, setVehicle]);
+
+  useEffect(() => {
+    if (rcvLaMundial || vehicle.tipoPlaca !== 'binacional') return;
+    setVehicle({
+      tipoPlaca: 'nacional',
+      cmarca: '',
+      marca: '',
+      cmodelo: '',
+      modelo: '',
+      cversion: '',
+      ccategoria_uso: undefined,
+      xcategoria_uso: '',
+      ccategotr: undefined,
+      cilindrada: '',
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rcvLaMundial]);
 
   // Rango de años del catálogo INMA
   const [anios, setAnios] = useState<number[]>([]);
@@ -170,15 +305,21 @@ export function VehicleStep() {
     loadM, loadMo, loadV, loadCu,
     loadMarcas, loadModelos, loadVersiones, loadCategoriasUso,
     resetModelos, resetVersiones,
-  } = useInmaCatalog();
+  } = useInmaCatalog(isBinacional);
 
   const ocrCert     = documents.certificado.ocr;
   const hasOcr      = !!(ocrCert?.marca || ocrCert?.modelo || ocrCert?.placa);
   const hasOcrCodes = !!(vehicle.cmarca && vehicle.cmodelo);
+  /** QA: placa/serial editables para pruebas; solo INMA base fijo si OCR matcheó códigos. */
+  const qaOcrLock = isQaDeploy() && hasOcr;
+  const qaIdentLock = qaOcrLock && !isQaDeploy();
+  const inmaBasicsLocked = qaOcrLock ? hasOcrCodes : verified;
+  /** Versión y uso no vienen del OCR — en QA deben seguir editables (commit 33a41cb bloqueaba todo). */
+  const versionLocked = !isQaDeploy() && verified;
 
-  // ── Cargar rango de años al montar ────────────────────────────────────────
+  // ── Cargar rango de años (nacional vs binacional) ─────────────────────────
   useEffect(() => {
-    catalogoApi.anios()
+    catalogoApi.anios(isBinacional)
       .then(r => {
         const { min = 2000, max = new Date().getFullYear() + 1 } = r.data as { min?: number; max?: number };
         const y: number[] = [];
@@ -194,11 +335,11 @@ export function VehicleStep() {
         for (let yr = new Date().getFullYear() + 1; yr >= 1990; yr--) y.push(yr);
         setAnios(y);
       });
-  // Solo al montar
+  // Recargar al cambiar nacional ↔ binacional
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isBinacional]);
 
-  // ── Cuando cambia el año: cargar marcas y resetear refs de auto-select ────
+  // ── Cuando cambia el año o el modo binacional: cargar marcas ──────────────
   useEffect(() => {
     const y = parseInt(vehicle.año, 10);
     if (!y || y < 1990) return;
@@ -206,7 +347,7 @@ export function VehicleStep() {
     autoSelectedModelo.current = false;
     resetModelos();
     loadMarcas(y);
-  }, [vehicle.año, loadMarcas, resetModelos]);
+  }, [vehicle.año, isBinacional, loadMarcas, resetModelos]);
 
   // ── Cuando cargan las marcas: auto-seleccionar OCR marca ─────────────────
   useEffect(() => {
@@ -215,10 +356,50 @@ export function VehicleStep() {
     if (vehicle.cmarca) return; // usuario ya eligió
     if (!ocrCert?.marca) return;
 
-    const match = findBestMatch(marcas, ocrCert.marca, 'xmarca' as keyof InmaMarca);
+    const serialHint = ocrCert.serial || vehicle.serial;
+    const match = findBestInmaMarca(marcas, ocrCert.marca, serialHint);
     if (match) {
       autoSelectedMarca.current = true;
       setVehicle({ cmarca: match.cmarca, marca: match.xmarca, cmodelo: '', modelo: '', cversion: '', ccategoria_uso: undefined, xcategoria_uso: '' });
+    } else if (isRcvEmision) {
+      autoSelectedMarca.current = true;
+      const y = parseInt(vehicle.año, 10) || parseInt(String(ocrCert.año ?? ''), 10);
+      const ocrMarca = ocrCert.marca ?? '';
+
+      const warnMarca = (title: string, message: string) => {
+        toast.warning(title, message, isBinacional ? 8000 : 7000);
+      };
+
+      if (isBinacional && y >= 1990 && ocrMarca) {
+        void catalogoApi.marcaDisponibilidad(y, ocrMarca, serialHint)
+          .then(({ data }) => {
+            if (data.inBinacionalCatalog) return;
+            if (data.inGeneralCatalog) {
+              warnMarca(
+                'Marca sin tarifa binacional',
+                `"${ocrMarca}" está en catálogo La Mundial pero no habilitada para plan binacional (${y}). Selecciona otra marca del listado o solicita el alta a La Mundial.`,
+              );
+              return;
+            }
+            warnMarca(
+              'Marca no encontrada',
+              `No encontramos "${ocrMarca}" en el catálogo INMA. Selecciona la marca manualmente en el listado.`,
+            );
+          })
+          .catch(() => {
+            warnMarca(
+              'Marca no encontrada',
+              `No encontramos "${ocrMarca}" en el catálogo binacional. Selecciona la marca manualmente.`,
+            );
+          });
+      } else {
+        warnMarca(
+          'Marca no encontrada',
+          isBinacional
+            ? `No encontramos "${ocrMarca}" en el catálogo binacional. Selecciona la marca manualmente.`
+            : `No encontramos "${ocrMarca}" en el catálogo. Comunícate con soporte para continuar.`,
+        );
+      }
     }
   // Solo cuando marcas cambia
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -238,19 +419,28 @@ export function VehicleStep() {
     if (!modelos.length) return;
     if (autoSelectedModelo.current) return;
     if (vehicle.cmodelo) return;
-    if (!ocrCert?.modelo) return;
+    const ocrModelText = resolveOcrModelo(ocrCert);
+    if (!ocrModelText) return;
 
-    const match = findBestMatch(modelos, ocrCert.modelo, 'xmodelo' as keyof InmaModelo);
+    const match = findBestMatch(modelos, ocrModelText, 'xmodelo' as keyof InmaModelo);
     if (match) {
       autoSelectedModelo.current = true;
       setVehicle({ cmodelo: match.cmodelo, modelo: match.xmodelo, cversion: '', ccategoria_uso: undefined, xcategoria_uso: '' });
     } else {
-      // Fallback: informar que no se encontró el modelo exacto
-      toast.warning(
-        'Modelo no encontrado',
-        `No encontramos "${ocrCert.modelo}" en el catálogo. Selecciónalo manualmente.`,
-        5000,
-      );
+      autoSelectedModelo.current = true;
+      if (isRcvEmision && !isBinacional) {
+        toast.warning(
+          'Modelo no encontrado',
+          `No encontramos "${ocrModelText}" en el catálogo. Comunícate con soporte para continuar.`,
+          7000,
+        );
+      } else {
+        toast.warning(
+          'Modelo no encontrado',
+          `No encontramos "${ocrModelText}" en el catálogo. Selecciónalo manualmente.`,
+          5000,
+        );
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelos]);
@@ -263,7 +453,7 @@ export function VehicleStep() {
     if (vehicle.cmarca && vehicle.cmodelo) return; // ya tenemos códigos
 
     let cancelled = false;
-    catalogoApi.resolver(y, vehicle.marca, vehicle.modelo)
+    catalogoApi.resolver(y, vehicle.marca, vehicle.modelo, isBinacional, vehicle.serial || ocrCert?.serial || '')
       .then(({ data }) => {
         if (cancelled) return;
         if (!data?.success) return;
@@ -292,7 +482,7 @@ export function VehicleStep() {
 
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle.año, vehicle.marca, vehicle.modelo]);
+  }, [vehicle.año, vehicle.marca, vehicle.modelo, isBinacional]);
 
   // ── Cuando cambia cmodelo: cargar versiones ───────────────────────────────
   useEffect(() => {
@@ -353,6 +543,143 @@ export function VehicleStep() {
     return categoriasUso.some((c) => Number(c.ccategoria_uso) === Number(target));
   })();
 
+  // ── Validación remota de placa (fn_validar_placa vía nest-api) ────────────
+  const validatePlacaRemote = useCallback(async (rawPlaca: string) => {
+    if (!isRcvEmision) return;
+
+    const placa = String(rawPlaca || '').trim().toUpperCase();
+    if (placa.length < 6) return;
+    if (lastValidatedPlaca.current === placa) return;
+
+    setPlacaValidating(true);
+    try {
+      const res = await validatePlaca(placa, { type: 'warning' });
+      lastValidatedPlaca.current = placa;
+
+      if (res.blocked || res.is_active) {
+        const msg =
+          res.message ||
+          'La placa ya se encuentra registrada y activa en el sistema.';
+        setErrors((prev) => ({ ...prev, placa: msg }));
+        toast.warning('Placa no disponible', msg, 5000);
+        return;
+      }
+
+      setErrors((prev) => {
+        if (!prev.placa) return prev;
+        const { placa: _removed, ...rest } = prev;
+        return rest;
+      });
+      toast.success('Placa disponible', 'No hay póliza vigente que bloquee esta placa.', 2500);
+    } catch {
+      toast.warning(
+        'No se pudo validar la placa',
+        'Inténtalo de nuevo o continúa y se validará al guardar.',
+        4000,
+      );
+    } finally {
+      setPlacaValidating(false);
+    }
+  }, [isRcvEmision]);
+
+  // ── Validación remota de serial (fn_validar_serialCar vía nest-api) ───────
+  const validateSerialRemote = useCallback(async (rawSerial: string) => {
+    if (!isRcvEmision) return;
+
+    const serial = String(rawSerial || '').trim().toUpperCase();
+    if (!serial) return;
+    if (lastValidatedSerial.current === serial) return;
+
+    setSerialValidating(true);
+    try {
+      const res = await validateSerial(serial, { type: 'warning' });
+      lastValidatedSerial.current = serial;
+
+      if (res.blocked || res.is_active) {
+        const msg =
+          res.message ||
+          'El serial de carrocería ya se encuentra registrado y activo en el sistema.';
+        setErrors((prev) => ({ ...prev, serial: msg }));
+        toast.warning('Serial no disponible', msg, 5000);
+        return;
+      }
+
+      setErrors((prev) => {
+        if (!prev.serial) return prev;
+        const { serial: _removed, ...rest } = prev;
+        return rest;
+      });
+      toast.success('Serial disponible', 'No hay póliza vigente que bloquee este serial.', 2500);
+    } catch {
+      toast.warning(
+        'No se pudo validar el serial',
+        'Inténtalo de nuevo o continúa y se validará al guardar.',
+        4000,
+      );
+    } finally {
+      setSerialValidating(false);
+    }
+  }, [isRcvEmision]);
+
+  // ── Autocompletar conductor por cédula (mismo flujo que EmissionStep) ────
+  const lookupConductorByCedula = useCallback(
+    async (tipoDoc: string, identificacion: string) => {
+      const digits = String(identificacion || '').replace(/\D/g, '');
+      if (digits.length < 1) return;
+
+      const cid = buildProprietaryCid(tipoDoc || 'V', digits);
+      if (lastConductorLookupCid.current === cid) return;
+
+      setConductorLookupLoading(true);
+      try {
+        const tryCids = [digits, cid].filter((v, i, arr) => v && arr.indexOf(v) === i);
+
+        let row: ProprietaryInfo | undefined;
+        let matchedCid = cid;
+
+        for (const candidate of tryCids) {
+          const result = await searchProprietary(candidate);
+          const found = (result.data ?? result.info) as ProprietaryInfo | undefined;
+          if (result.success && found) {
+            row = found;
+            matchedCid = candidate;
+            break;
+          }
+        }
+
+        if (!row) {
+          lastConductorLookupCid.current = cid;
+          toast.info(
+            'Sin datos en Sis2000',
+            'No encontramos ese documento. Complete el formulario manualmente.',
+            3500,
+          );
+          return;
+        }
+
+        const patch = mapProprietaryToPerson(row, {
+          sexos: catalogs.sexos,
+          estadosCivil: catalogs.estadosCivil,
+          estados: catalogs.estados,
+        });
+        if (!patch.identificacion) patch.identificacion = digits;
+
+        setConductor(patch);
+        lastConductorLookupCid.current = matchedCid;
+        toast.success('Datos cargados', 'Se completó el conductor con la información del cliente.', 2800);
+      } catch {
+        toast.warning(
+          'Consulta no disponible',
+          'No se pudo buscar el documento. Complete el formulario manualmente.',
+          4000,
+        );
+      } finally {
+        setConductorLookupLoading(false);
+      }
+    },
+    [catalogs.sexos, catalogs.estadosCivil, catalogs.estados, setConductor],
+  );
+
   // ── Validación ────────────────────────────────────────────────────────────
   const validate = async () => {
     const e: VehicleErrors = {};
@@ -367,16 +694,16 @@ export function VehicleStep() {
       else if (req(vehicle.modelo)) e.modelo = 'El modelo es obligatorio';
       if (req(vehicle.cversion)) e.uso = 'Debes seleccionar la versión exacta del vehículo';
       else if (!vehicle.ccategoria_uso && req(vehicle.uso)) e.uso = 'Selecciona el uso del vehículo';
+      if (rcvLaMundial && showToneladas && (vehicle.ntoneladas == null || Number.isNaN(Number(vehicle.ntoneladas)))) {
+        e.toneladas = 'Indica las toneladas totales (mín. 13 TM)';
+      }
 
       setErrors(e);
       return Object.keys(e).length === 0;
     }
 
-    if (req(vehicle.placa)) {
-      e.placa = 'La placa es obligatoria';
-    } else if (len(vehicle.placa) < 6) {
-      e.placa = 'La placa debe tener al menos 6 caracteres';
-    }
+    const placaErr = validatePlacaMessage(vehicle.placa, vehicle.tipoPlaca ?? 'nacional');
+    if (placaErr) e.placa = placaErr;
 
     if (req(vehicle.año)) e.año = 'Selecciona el año del vehículo';
     if (req(vehicle.marca))  e.marca  = 'La marca es obligatoria';
@@ -386,6 +713,10 @@ export function VehicleStep() {
     if (req(vehicle.cversion)) e.uso = 'Debes seleccionar la versión exacta del vehículo';
     else if (!vehicle.ccategoria_uso && req(vehicle.uso)) e.uso = 'Selecciona el uso del vehículo';
 
+    if (rcvLaMundial && showToneladas && (vehicle.ntoneladas == null || Number.isNaN(Number(vehicle.ntoneladas)))) {
+      e.toneladas = 'Indica las toneladas totales (mín. 13 TM)';
+    }
+
     if (req(vehicle.color)) {
       e.color = 'El color es obligatorio';
     } else if (len(vehicle.color) < 2) {
@@ -394,11 +725,8 @@ export function VehicleStep() {
       e.color = 'El color no puede superar 15 caracteres';
     }
 
-    if (req(vehicle.serial)) {
-      e.serial = 'El serial del vehículo es obligatorio';
-    } else if (len(vehicle.serial) < 10) {
-      e.serial = 'El serial debe tener al menos 10 caracteres';
-    }
+    const serialErr = validateVehicleSerialMessage(vehicle.serial);
+    if (serialErr) e.serial = serialErr;
 
     if (hasDriver && !cotizadorRcv) {
       const nombre   = (conductor.nombre   ?? '').trim();
@@ -428,17 +756,15 @@ export function VehicleStep() {
       } else if (licencia.length > 20) {
         e.cond_licencia = 'La licencia no puede superar 20 caracteres';
       }
-      if (req(conductor.identificacion)) e.cond_identificacion = 'La identificación es obligatoria';
-      else if (digs(conductor.identificacion) > PERSON_FIELD_LIMITS.identificacion) {
-        e.cond_identificacion = `La identificación no puede tener más de ${PERSON_FIELD_LIMITS.identificacion} dígitos`;
-      }
+      const condIdErr = validateSecondaryPersonIdentificacion(conductor.identificacion);
+      if (condIdErr) e.cond_identificacion = condIdErr;
 
       if (req(conductor.telefono)) {
         e.cond_telefono = 'El teléfono es obligatorio';
       } else if (digs(conductor.telefono) !== 11) {
         e.cond_telefono = 'El teléfono debe tener exactamente 11 dígitos';
       } else if (!isValidPhonePrefix(conductor.telefono || '')) {
-        e.cond_telefono = 'El prefijo debe ser válido en Venezuela';
+        e.cond_telefono = 'El prefijo no es válido (Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX)';
       }
 
       if (req(conductor.email)) {
@@ -473,8 +799,8 @@ export function VehicleStep() {
       return false;
     }
 
-    // Validación remota La Mundial — no aplica en cotizador ni flujo Exélixi
-    if (!isExelixiCatalogFlow() && !cotizadorRcv) {
+    // Validación remota La Mundial — solo emisión RCV completa
+    if (isRcvEmision) {
       try {
         const { validateVehicle } = await import('../../lib/api');
         toast.info('Validando vehículo', 'Verificando placa y serial...', 2000);
@@ -482,14 +808,18 @@ export function VehicleStep() {
           plan: selectedPlan?.cplan,
         });
         if (!res.success) {
-          const msg = res.message || 'El vehículo no puede ser asegurado.';
+          const msg = res.message || res.error || 'El vehículo no puede ser asegurado.';
           toast.error('Atención', msg, 6000);
           setErrors({ ...e, placa: msg, serial: msg });
           return false;
         }
-      } catch {
-        toast.error('Error', 'No se pudo validar el vehículo. Inténtalo de nuevo.');
-        setErrors({ ...e, placa: 'No se pudo validar', serial: 'No se pudo validar' });
+      } catch (err) {
+        const msg =
+          err instanceof Error && err.message
+            ? err.message
+            : 'No se pudo validar el vehículo. Inténtalo de nuevo.';
+        toast.error('Error', msg, 6000);
+        setErrors({ ...e, placa: msg, serial: msg });
         return false;
       }
     }
@@ -532,13 +862,15 @@ export function VehicleStep() {
                   )}
                 </p>
                 <p className="text-xs text-indigo-100 mt-0.5 leading-relaxed">
-                  {hasOcrCodes
-                    ? 'Marca y modelo identificados en el catálogo. Solo confirma la versión.'
-                    : 'Revisa los campos y completa lo que falte. Puedes cambiar cualquier valor.'}
+                  {qaOcrLock
+                    ? 'Entorno QA: marca/modelo INMA fijos si el OCR los identificó. Placa, serial y versión puedes ajustarlos para pruebas.'
+                    : hasOcrCodes
+                      ? 'Marca y modelo identificados en el catálogo. Solo confirma la versión.'
+                      : 'Revisa los campos y completa lo que falte. Puedes cambiar cualquier valor.'}
                 </p>
               </div>
             </div>
-            {hasOcrCodes && !verified && (
+            {hasOcrCodes && !verified && !qaOcrLock && (
               <button
                 type="button"
                 onClick={() => {
@@ -554,7 +886,7 @@ export function VehicleStep() {
                 <ShieldCheck size={14} /> Confirmar datos
               </button>
             )}
-            {verified && (
+            {verified && !qaOcrLock && (
               <div className="self-start sm:self-auto flex-shrink-0 flex items-center gap-2">
                 <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-400/95 text-emerald-950 text-xs font-bold ring-1 ring-emerald-300">
                   <ShieldCheck size={14} /> Verificado
@@ -588,89 +920,52 @@ export function VehicleStep() {
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-          {cotizadorRcv ? (
-            <Field label="Origen de placa *">
-              <span className="inline-flex items-center gap-0 rounded-lg bg-slate-100 p-0.5 text-[0.65rem] font-bold border border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setVehicle({ tipoPlaca: 'nacional' })}
-                  className={cn(
-                    'px-3 py-2 rounded-md transition-all',
-                    vehicle.tipoPlaca !== 'extranjera'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700',
-                  )}
-                >
-                  Nacional
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setVehicle({ tipoPlaca: 'extranjera' })}
-                  className={cn(
-                    'px-3 py-2 rounded-md transition-all',
-                    vehicle.tipoPlaca === 'extranjera'
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700',
-                  )}
-                >
-                  Extranjera
-                </button>
-              </span>
-            </Field>
-          ) : (
-          <>
-          {/* Placa con selector de tipo (Nacional / Extranjera) */}
-          <Field
-            label={
-              <span className="flex items-center justify-between gap-2 w-full">
-                <span>Placa</span>
-                <span className="inline-flex items-center gap-0 rounded-lg bg-slate-100 p-0.5 text-[0.65rem] font-bold border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => setVehicle({ tipoPlaca: 'nacional' })}
-                    className={cn(
-                      'px-2.5 py-1 rounded-md transition-all',
-                      vehicle.tipoPlaca === 'nacional'
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700',
-                    )}
-                  >
-                    ✓ Nacional
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVehicle({ tipoPlaca: 'extranjera' })}
-                    className={cn(
-                      'px-2.5 py-1 rounded-md transition-all',
-                      vehicle.tipoPlaca === 'extranjera'
-                        ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700',
-                    )}
-                  >
-                    Extranjera
-                  </button>
-                </span>
-              </span> as unknown as string
-            }
-            error={errors.placa}
-          >
-            <Input
-              value={vehicle.placa}
-              onChange={(e) => setVehicle({ placa: e.target.value.toUpperCase() })}
-              placeholder={vehicle.tipoPlaca === 'extranjera' ? 'ABC-1234' : 'AE123KT'}
-              className="uppercase font-mono tracking-wider"
-              maxLength={vehicle.tipoPlaca === 'extranjera' ? 12 : 8}
+          {(cotizadorRcv || isRcvEmision) && (
+            <TipoPlacaSelector
+              value={vehicle.tipoPlaca}
+              placa={vehicle.placa}
+              certOcr={ocrCert}
+              onChange={setTipoPlaca}
+              showBinacional={rcvLaMundial}
+              disabled={qaIdentLock}
             />
-          </Field>
-          </>
           )}
+
+          <Field
+            label={cotizadorRcv ? 'Placa *' : 'Placa'}
+            error={errors.placa}
+            hint={placaValidating ? 'Validando placa en Sis2000…' : 'Al salir del campo se valida si la placa está activa'}
+          >
+            <div className="relative">
+              <Input
+                value={vehicle.placa}
+                onChange={(e) => {
+                  lastValidatedPlaca.current = '';
+                  setVehicle({ placa: e.target.value.toUpperCase() });
+                }}
+                onBlur={(e) => {
+                  void validatePlacaRemote(e.target.value);
+                }}
+                placeholder={placaPlaceholder(vehicle.tipoPlaca)}
+                className="uppercase font-mono tracking-wider"
+                maxLength={placaMaxLength(vehicle.tipoPlaca)}
+                disabled={placaValidating || qaIdentLock}
+              />
+              {placaValidating && (
+                <Loader2
+                  size={16}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-indigo-500"
+                />
+              )}
+            </div>
+          </Field>
 
           {/* Año — selector del catálogo INMA */}
           <Field label="Año del vehículo *" error={errors.año}>
             {anios.length > 0 ? (
               <Select
                 value={vehicle.año}
-                disabled={verified}
+                disabled={inmaBasicsLocked}
                 onChange={(e) => {
                   setVehicle({ año: e.target.value, cmarca: '', marca: '', cmodelo: '', modelo: '', cversion: '', ccategoria_uso: undefined, xcategoria_uso: '' });
                 }}
@@ -702,7 +997,7 @@ export function VehicleStep() {
             {marcas.length > 0 ? (
               <Select
                 value={vehicle.cmarca ?? ''}
-                disabled={verified}
+                disabled={inmaBasicsLocked}
                 onChange={(e) => {
                   const cmarca = e.target.value;
                   const xmarca = marcas.find(m => m.cmarca === cmarca)?.xmarca ?? '';
@@ -750,7 +1045,7 @@ export function VehicleStep() {
             {modelos.length > 0 ? (
               <Select
                 value={vehicle.cmodelo ?? ''}
-                disabled={verified}
+                disabled={inmaBasicsLocked}
                 onChange={(e) => {
                   const cmodelo = e.target.value;
                   const xmodelo = modelos.find(m => m.cmodelo === cmodelo)?.xmodelo ?? '';
@@ -801,6 +1096,7 @@ export function VehicleStep() {
               {versiones.length > 0 ? (
                 <Select
                   value={vehicle.cversion ?? ''}
+                  disabled={versionLocked}
                   onChange={(e) => {
                     const ver = versiones.find(v => v.cversion === e.target.value);
                     setVehicle({
@@ -877,11 +1173,12 @@ export function VehicleStep() {
                   if (usoLockedByCcategotr) return;
                   const code = e.target.value;
                   const match = categoriasUso.find(c => String(c.ccategoria_uso) === code);
+                  const nextCat = match ? match.ccategoria_uso : undefined;
                   setVehicle({
-                    ccategoria_uso: match ? match.ccategoria_uso : undefined,
+                    ccategoria_uso: nextCat,
                     xcategoria_uso: match?.xcategoria_uso ?? '',
-                    // Mantenemos `uso` (texto) sincronizado para retrocompatibilidad de UI/store
                     uso: match?.xcategoria_uso ?? vehicle.uso,
+                    ...(nextCat != null && !isCategoriaToneladas(nextCat) ? { ntoneladas: undefined } : {}),
                   });
                 }}
                 className={
@@ -907,6 +1204,77 @@ export function VehicleStep() {
             )}
           </Field>
 
+          {rcvLaMundial && (
+            <>
+              <Field
+                label="Actividades asociadas (Recargo RCV) *"
+                hint="Porcentaje adicional sobre la prima RCV. Aplica a nacional, extranjera y binacional."
+                error={errors.recargoRcv}
+              >
+                {recargosLoad ? (
+                  <div className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl bg-slate-50 text-sm text-slate-500 flex items-center gap-2">
+                    <Loader2 size={14} className="animate-spin shrink-0" /> Cargando recargos…
+                  </div>
+                ) : (
+                  <Select
+                    value={
+                      vehicle.csustanc_rcv != null
+                        ? String(vehicle.csustanc_rcv)
+                        : String(recargosRcv.find((r) => Number(r.porcenta) === Number(vehicle.precargorcv ?? 0))?.csustanc ?? '')
+                    }
+                    onChange={(e) => {
+                      const item = recargosRcv.find((r) => String(r.csustanc) === e.target.value);
+                      if (!item) return;
+                      setVehicle({
+                        precargorcv: Number(item.porcenta),
+                        csustanc_rcv: item.csustanc,
+                        xsustanc_rcv: item.xsustanc,
+                      });
+                    }}
+                  >
+                    <option value="">— Selecciona actividad —</option>
+                    {recargosRcv.map((r) => (
+                      <option key={r.csustanc} value={String(r.csustanc)}>
+                        {r.xsustanc}{Number(r.porcenta) > 0 ? ` (+${r.porcenta}%)` : ''}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+
+              {showToneladas && (
+                <Field
+                  label="Toneladas totales *"
+                  error={errors.toneladas}
+                  hint="Solo para categoría >12 TM. Si indica menos de 12, se usará 13 TM (regla La Mundial)."
+                >
+                  <Input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={vehicle.ntoneladas ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setVehicle({
+                        ntoneladas: raw === '' ? undefined : parseInt(raw, 10),
+                      });
+                    }}
+                    onBlur={() => {
+                      const normalized = normalizeToneladasForCategoria(
+                        vehicle.ccategoria_uso,
+                        vehicle.ntoneladas,
+                      );
+                      if (normalized != null && normalized !== vehicle.ntoneladas) {
+                        setVehicle({ ntoneladas: normalized });
+                      }
+                    }}
+                    placeholder="Ej. 15"
+                  />
+                </Field>
+              )}
+            </>
+          )}
+
           {/* Confirmación amigable cuando el vehículo está completo */}
           {codesReady && (
             <div className="sm:col-span-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-700">
@@ -924,6 +1292,7 @@ export function VehicleStep() {
             <div className="relative">
               <Input
                 value={vehicle.color}
+                disabled={qaIdentLock}
                 onChange={(e) => setVehicle({ color: e.target.value.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '').slice(0, 15) })}
                 placeholder="Plateado"
                 maxLength={15}
@@ -938,26 +1307,64 @@ export function VehicleStep() {
           </Field>
 
           {/* Serial de carrocería (VIN) */}
-          <Field label="Serial de carrocería (VIN) *" error={errors.serial} hint="Entre 10 y 17 caracteres alfanuméricos del documento del vehículo">
-            <Input
-              value={vehicle.serial}
-              onChange={(e) => setVehicle({ serial: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 17) })}
-              placeholder="1HGBH41JXMN109186"
-              className="font-mono uppercase tracking-wider"
-              maxLength={17}
-            />
+          <Field
+            label="Serial de carrocería (VIN) *"
+            error={errors.serial}
+            hint={
+              serialValidating
+                ? 'Validando serial en Sis2000…'
+                : 'Como en la licencia de tránsito (máx. 18 caracteres) · Al salir del campo se valida si está activo'
+            }
+          >
+            <div className="relative">
+              <Input
+                value={vehicle.serial}
+                onChange={(e) => {
+                  lastValidatedSerial.current = '';
+                  setVehicle({ serial: normalizeVehicleSerial(e.target.value) });
+                }}
+                onBlur={(e) => {
+                  void validateSerialRemote(e.target.value);
+                }}
+                placeholder="150895 o VIN completo"
+                className="font-mono uppercase tracking-wider"
+                maxLength={VEHICLE_SERIAL_MAX_LEN}
+                disabled={serialValidating || qaIdentLock}
+              />
+              {serialValidating && (
+                <Loader2
+                  size={16}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-indigo-500"
+                />
+              )}
+            </div>
           </Field>
 
           {/* Serial del motor — opcional */}
           <Field label="Serial del motor" hint="Opcional · Máx. 60 caracteres · Aparece en el documento del vehículo">
             <Input
               value={vehicle.serialMotor ?? ''}
+              disabled={qaIdentLock}
               onChange={(e) => setVehicle({ serialMotor: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 60) })}
               placeholder="Ej. 4A123456789"
               className="font-mono uppercase tracking-wider"
               maxLength={60}
             />
           </Field>
+
+          {/* Cilindrada — carnet binacional Colombia (solo RCV La Mundial) */}
+          {isBinacional && (
+          <Field label="Cilindrada (CC)" hint="Opcional · Del carnet binacional colombiano">
+            <Input
+              value={vehicle.cilindrada ?? ''}
+              disabled={qaIdentLock}
+              onChange={(e) => setVehicle({ cilindrada: e.target.value.slice(0, 20) })}
+              placeholder="Ej. 1.998"
+              className="font-mono tracking-wider"
+              maxLength={20}
+            />
+          </Field>
+          )}
           </>
           )}
         </div>
@@ -996,14 +1403,30 @@ export function VehicleStep() {
         />
         {hasDriver && (
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
-              <Field label="Cédula o documento *" error={errors.cond_identificacion}>
+              <Field
+                label="Cédula o documento *"
+                error={errors.cond_identificacion}
+                hint="Al salir del campo se buscan los datos en Sis2000"
+              >
                 <IdentityInput
                   tipoDoc={conductor.tipoDoc ?? 'V'}
                   identificacion={conductor.identificacion}
-                  maxLength={PERSON_FIELD_LIMITS.identificacion}
-                  onTipoDocChange={(v) => setConductor({ tipoDoc: v })}
-                  onIdentificacionChange={(v) =>
-                    setConductor({ identificacion: clipPersonField('identificacion', v) })
+                  maxLength={SECONDARY_IDENTIFICACION_MAX_LENGTH}
+                  loading={conductorLookupLoading}
+                  onTipoDocChange={(v) => {
+                    lastConductorLookupCid.current = '';
+                    setConductor({ tipoDoc: v });
+                  }}
+                  onIdentificacionChange={(v) => {
+                    lastConductorLookupCid.current = '';
+                    setConductor({ identificacion: clipPersonField('identificacion', v) });
+                  }}
+                  onIdentificacionBlur={
+                    isRcvEmision
+                      ? (id) => {
+                          void lookupConductorByCedula(conductor.tipoDoc ?? 'V', id);
+                        }
+                      : undefined
                   }
                 />
               </Field>

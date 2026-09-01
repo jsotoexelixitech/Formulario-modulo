@@ -16,6 +16,10 @@ import type { ExelixiWizardHandoff } from './lib/exelixi-wizard-handoff';
 import { syncTitularFromTomador } from './lib/funeral-sync';
 import { toast } from './store/toastStore';
 import { ChevronLeft, ChevronRight, Sparkles, ShieldCheck } from 'lucide-react';
+import { useProductConfig } from './hooks/useProductConfig';
+import { useUiFlags } from './lib/ui-flags';
+
+const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
 type StepMeta = { eyebrow: string; title: string; sub: string };
 
@@ -30,6 +34,7 @@ function buildExelixiWizardSnapshot(): Partial<ExelixiWizardHandoff> {
     vehicle: snap.vehicle,
     funeral: snap.funeral,
     ocrDone: snap.ocrDone,
+    diligencia: snap.diligencia,
   };
 }
 
@@ -101,6 +106,8 @@ export default function App() {
   const cotizadorRcv = isCotizadorFlow() && isRcv();
   const [localStep, setLocalStep] = useState<2 | 3>(() => (cotizadorRcv || step === 3 ? 3 : 2));
   const product = getProductConfig();
+  const { config } = useProductConfig(EMPRESA_ID, product.id, 'formulario');
+  const { hideStepper, hideFooterBar } = useUiFlags(config);
 
   useEffect(() => {
     if (step === 2 || step === 3) setLocalStep(step);
@@ -187,7 +194,7 @@ export default function App() {
       <div>
         <main className="flex-1 min-h-screen pt-[72px] lg:pt-10 px-4 sm:px-6 lg:px-10 pb-32 lg:pb-12">
           <div className="max-w-5xl mx-auto">
-            <TopStepper />
+            {!hideStepper && <TopStepper />}
 
             <header className="mb-8 animate-fade-in">
               <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -212,24 +219,26 @@ export default function App() {
                 {(cotizadorRcv || localStep === 3) && (usesFuneralStep() ? <FuneralStep /> : usesVehicleStep() ? <VehicleStep /> : null)}
               </div>
 
-              <div className="hidden md:flex items-center justify-between gap-4 px-8 lg:px-10 py-5 border-t border-slate-100/80 bg-gradient-to-b from-slate-50/50 to-white/40 backdrop-blur-sm">
-                <div className="flex items-center gap-2 text-xs text-slate-500">
-                  <ShieldCheck size={13} className="text-emerald-500" />
-                  <span className="font-medium">Cifrado de extremo a extremo · TLS 1.3</span>
-                </div>
-                <div className="flex gap-3">
-                  {!cotizadorRcv && localStep === 3 && (
-                    <Button variant="secondary" onClick={() => navigate(2)}>
-                      <ChevronLeft size={15} />
-                      Atrás
+              {!hideFooterBar && (
+                <div className="hidden md:flex items-center justify-between gap-4 px-8 lg:px-10 py-5 border-t border-slate-100/80 bg-gradient-to-b from-slate-50/50 to-white/40 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <ShieldCheck size={13} className="text-emerald-500" />
+                    <span className="font-medium">Cifrado de extremo a extremo · TLS 1.3</span>
+                  </div>
+                  <div className="flex gap-3">
+                    {!cotizadorRcv && localStep === 3 && (
+                      <Button variant="secondary" onClick={() => navigate(2)}>
+                        <ChevronLeft size={15} />
+                        Atrás
+                      </Button>
+                    )}
+                    <Button variant="primary" onClick={handleNext} className="min-w-[180px]">
+                      {cotizadorRcv ? 'Ver planes' : localStep === 3 ? 'Guardar datos' : 'Continuar'}
+                      <ChevronRight size={15} />
                     </Button>
-                  )}
-                  <Button variant="primary" onClick={handleNext} className="min-w-[180px]">
-                    {cotizadorRcv ? 'Ver planes' : localStep === 3 ? 'Guardar datos' : 'Continuar'}
-                    <ChevronRight size={15} />
-                  </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </section>
 
           </div>

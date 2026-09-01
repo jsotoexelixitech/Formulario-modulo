@@ -9,7 +9,7 @@
  *   GET /api/health
  *   GET /api/catalogo/anios | /marcas | /modelos | /versiones | /categorias-uso | /resolver
  *   GET /api/valrep/state | /city | /list/:domain
- *   POST /api/emissions/propietary
+ *   POST /api/emissions/propietary | /vehicle
  */
 require('dotenv').config();
 const cors = require('cors');

@@ -14,6 +14,7 @@ import type {
   PolicyQuote,
   QuoteState,
 } from '../types';
+import { buildDiligenciaState, preClasificarDiligencia, type DiligenciaState } from '../lib/diligencia';
 import { getProductId } from '../lib/product';
 
 const defaultDoc = (): DocumentState => ({ status: 'idle', progress: 0 });
@@ -58,6 +59,7 @@ const defaultVehicle = (): VehicleData => ({
   serial: '',
   serialMotor: '',
   ntoneladas: undefined,
+  precargorcv: 0,
   uso: 'Particular',
 });
 
@@ -107,6 +109,8 @@ interface WizardActions {
   setQuote: (q: PolicyQuote, vehicleSignature: string) => void;
   setQuoteState: (s: QuoteState, error?: string | null) => void;
   clearQuote: () => void;
+  setDiligencia: (data: Partial<DiligenciaState> | null) => void;
+  setMetadataCanal: (data: Record<string, unknown> | null) => void;
   reset: () => void;
 }
 
@@ -118,6 +122,7 @@ const initialState: WizardState = {
     licencia: defaultDoc(),
     certificado: defaultDoc(),
     rif: defaultDoc(),
+    pasaporte: defaultDoc(),
   },
   ocrDone: false,
   tomador: defaultTomador(),
@@ -141,6 +146,8 @@ const initialState: WizardState = {
   quoteState: 'idle',
   quoteError: null,
   quoteVehicleSignature: null,
+  diligencia: buildDiligenciaState({ itipoDiligencia: 'S', clasificadoEn: 'formulario' }),
+  metadataCanal: null,
 };
 
 export const useWizardStore = create<WizardState & WizardActions>()((set) => ({
@@ -188,7 +195,10 @@ export const useWizardStore = create<WizardState & WizardActions>()((set) => ({
       const next = { ...s.vehicle, ...data };
       // Invalidamos quote si cambian datos relevantes para la cotizacion.
       // Incluimos cmarca/cmodelo/cversion para que el cambio de selector INMA tambiÃ©n invalide.
-      const sigKeys: (keyof VehicleData)[] = ['placa', 'marca', 'modelo', 'año', 'uso', 'cmarca', 'cmodelo', 'cversion', 'ccategoria_uso'];
+      const sigKeys: (keyof VehicleData)[] = [
+        'placa', 'marca', 'modelo', 'año', 'uso', 'cmarca', 'cmodelo', 'cversion',
+        'ccategoria_uso', 'ntoneladas', 'precargorcv', 'tipoPlaca',
+      ];
       const changed = sigKeys.some((k) => s.vehicle[k] !== next[k]);
       if (changed && s.quote) {
         return {
@@ -226,6 +236,25 @@ export const useWizardStore = create<WizardState & WizardActions>()((set) => ({
 
   clearQuote: () =>
     set({ quote: null, quoteState: 'idle', quoteError: null, quoteVehicleSignature: null }),
+
+  setDiligencia: (data) =>
+    set((s) => {
+      if (data === null) {
+        return {
+          diligencia: buildDiligenciaState({
+            itipoDiligencia: preClasificarDiligencia(s.tomador.tipoDoc),
+            clasificadoEn: 'formulario',
+          }),
+        };
+      }
+      const base = s.diligencia ?? buildDiligenciaState({
+        itipoDiligencia: preClasificarDiligencia(s.tomador.tipoDoc),
+        clasificadoEn: 'formulario',
+      });
+      return { diligencia: { ...base, ...data } };
+    }),
+
+  setMetadataCanal: (data) => set({ metadataCanal: data }),
 
   reset: () => set(initialState),
 }));

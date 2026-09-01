@@ -1,4 +1,6 @@
-export type DocType = 'cedula' | 'licencia' | 'certificado' | 'rif';
+export type DocType = 'cedula' | 'licencia' | 'certificado' | 'rif' | 'pasaporte';
+
+export type { DiligenciaState, TipoDiligencia } from '../lib/diligencia';
 
 /** Producto de seguro que se está suscribiendo en el flujo. */
 export type ProductId = 'rcv' | 'funerario';
@@ -27,8 +29,13 @@ export interface OcrResult {
   placa?: string;
   marca?: string;
   modelo?: string;
+  linea?: string;
   año?: string;
   serial?: string;
+  serialMotor?: string;
+  cilindrada?: string;
+  tipoCarnet?: 'nacional' | 'binacional';
+  tipoPlaca?: 'nacional' | 'extranjera' | 'binacional';
   color?: string;
   rif?: string;
   razonSocial?: string | null;
@@ -40,6 +47,7 @@ export interface DocumentState {
   file?: DocumentFile;
   ocr?: OcrResult;
   error?: string;
+  hash?: string;
 }
 
 export type TomadorData = {
@@ -62,6 +70,12 @@ export type TomadorData = {
   cestado?: number;
   /** Código numérico La Mundial de la ciudad (cciudad). Se obtiene del selector de catálogo. */
   cciudad?: number;
+  /** Circular SAA-02-1079-2026 — código profesión La Mundial. */
+  cprofesion?: number | string;
+  cactividad?: number | string;
+  xprofesion?: string;
+  xactividad?: string;
+  itipoDiligencia?: 'S' | 'C';
 };
 
 export type PersonData = {
@@ -146,8 +160,8 @@ export interface FuneralData {
 
 export interface VehicleData {
   placa: string;
-  /** Tipo de placa: nacional (formato venezolano AAA000A/AAA000) o extranjera. */
-  tipoPlaca: 'nacional' | 'extranjera';
+  /** Tipo de placa: nacional (VE), extranjera o binacional (Colombia). */
+  tipoPlaca: 'nacional' | 'extranjera' | 'binacional';
   marca: string;   // nombre descriptivo (ej. "TOYOTA") — para display
   modelo: string;  // nombre descriptivo (ej. "COROLLA") — para display
   año: string;
@@ -170,8 +184,18 @@ export interface VehicleData {
   ctipo?: number;
   /** Serial del motor — opcional, máx. 60 caracteres. Aparece en el documento del vehículo. */
   serialMotor?: string;
-  /** Peso del vehículo en toneladas (nullable; default 60 en backend si no se envía). */
+  /** Cilindrada CC (carnet binacional Colombia). */
+  cilindrada?: string;
+  /** Variante del carnet OCR: nacional (VE) o binacional (CO). */
+  tipoCarnet?: 'nacional' | 'binacional';
+  /** Peso del vehículo en toneladas — solo categoría de uso 11 (>12 TM). */
   ntoneladas?: number;
+  /** Porcentaje recargo RCV (masustac.porcenta). 0 = No aplica. */
+  precargorcv?: number;
+  /** Código masustac.csustanc del recargo seleccionado (auditoría). */
+  csustanc_rcv?: string;
+  /** Etiqueta masustac.xsustanc del recargo seleccionado. */
+  xsustanc_rcv?: string;
 }
 
 export interface PolicyQuote {
@@ -237,4 +261,8 @@ export interface WizardState {
   /** Snapshot del vehiculo con el que se hizo la ultima cotizacion. Sirve para
    *  invalidar la quote si cambian datos relevantes (placa, marca, modelo, año, uso). */
   quoteVehicleSignature: string | null;
+  /** Circular SAA-02-1079-2026 — clasificación DDS/DDC. */
+  diligencia: import('../lib/diligencia').DiligenciaState | null;
+  /** Metadata SSO del token Nexus (cproductor, cusuario, etc.). */
+  metadataCanal: Record<string, unknown> | null;
 }

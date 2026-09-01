@@ -23,7 +23,8 @@ function shouldSkipSplash(): boolean {
     if (isExelixiCatalogFlow()) return true;
     if (isCotizadorFlow()) return true;
     const p = new URLSearchParams(window.location.search);
-    return Boolean(p.get('sid') && p.get('nexus_token'));
+    if (p.get('sid')) return true;
+    return false;
   } catch { return false; }
 }
 

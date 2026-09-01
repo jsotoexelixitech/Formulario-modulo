@@ -4,6 +4,8 @@ import {
   IdCard, Car, FileText, Building2, Sparkles, ScanLine,
   Wand2, Download, MousePointerClick, Camera, Images,
 } from 'lucide-react';
+import { adjustDocsForBinacionalCarnet, isBinacionalCarnet } from '../../lib/ocr-binacional';
+import { resolveOcrTipoPlaca } from '../../lib/vehicle-carnet-labels';
 import { useWizardStore } from '../../store/wizardStore';
 import { uploadDocument, DocTypeMismatchError } from '../../lib/api';
 import { toast } from '../../store/toastStore';
@@ -456,6 +458,7 @@ const DEMO_FILES: Record<DocType, { name: string; mimeType: string; url: string 
   licencia: { name: 'licencia-demo.svg', mimeType: 'image/svg+xml', url: '/samples/licencia-demo.svg' },
   certificado: { name: 'certificado-demo.svg', mimeType: 'image/svg+xml', url: '/samples/certificado-demo.svg' },
   rif: { name: 'rif-demo.svg', mimeType: 'image/svg+xml', url: '/samples/rif-demo.svg' },
+  pasaporte: { name: 'pasaporte-demo.svg', mimeType: 'image/svg+xml', url: '/samples/cedula-demo.svg' },
 };
 
 const DEMO_OCR: Record<DocType, Record<string, string>> = {
@@ -485,6 +488,7 @@ const DEMO_OCR: Record<DocType, Record<string, string>> = {
     rif: 'V-18456329-0',
     razonSocial: 'Maria Fernandez',
   },
+  pasaporte: {},
 };
 
 function makeDemoFile(type: DocType): DocumentFile {
@@ -503,8 +507,28 @@ export function OcrStep() {
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [preview, setPreview] = useState<{ file: DocumentFile; title: string } | null>(null);
 
-  const requiredDocs: DocType[] = ['cedula', 'licencia', 'certificado'];
+  const baseRequired: DocType[] = ['cedula', 'licencia', 'certificado'];
+  const baseOptional: DocType[] = ['rif'];
+  const { requiredDocs, optionalDocs } = adjustDocsForBinacionalCarnet(
+    baseRequired,
+    baseOptional,
+    documents,
+  );
+
+  const visibleDocTypes = new Set([...requiredDocs, ...optionalDocs]);
+  const docConfigs = DOCS.map((d) => ({
+    ...d,
+    optional: optionalDocs.includes(d.type),
+  })).filter((d) => visibleDocTypes.has(d.type));
+
   const allRequiredDone = requiredDocs.every((d) => documents[d]?.status === 'done');
+  const certOcr = documents.certificado?.ocr;
+
+  useEffect(() => {
+    if (!certOcr || documents.certificado?.status !== 'done') return;
+    if (!isBinacionalCarnet(certOcr)) return;
+    setVehicle({ tipoPlaca: 'binacional' });
+  }, [certOcr, documents.certificado?.status, setVehicle]);
 
   useEffect(() => {
     if (allRequiredDone && !ocrDone) {
@@ -529,6 +553,7 @@ export function OcrStep() {
           año: cert.año ?? '',
           color: cert.color ?? '',
           serial: cert.serial ?? '',
+          tipoPlaca: resolveOcrTipoPlaca(cert),
         });
       }
       setOcrDone(true);
@@ -536,7 +561,8 @@ export function OcrStep() {
   }, [allRequiredDone, ocrDone, documents.cedula.ocr, documents.certificado.ocr, setTomador, setVehicle, setOcrDone]);
 
   const completedCount = requiredDocs.filter((d) => documents[d].status === 'done').length;
-  const completionPct = (completedCount / requiredDocs.length) * 100;
+  const completionPct =
+    requiredDocs.length > 0 ? (completedCount / requiredDocs.length) * 100 : 0;
 
   /**
    * Carga un documento demo con simulacion visual (uploading -> processing -> done).
@@ -676,7 +702,7 @@ export function OcrStep() {
               : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4';
         return docGridClass;
       })()}>
-        {DOCS.map((doc) => (
+        {docConfigs.map((doc) => (
           <UploadDocCard
             key={doc.type}
             config={doc}

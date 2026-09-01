@@ -3,9 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { FormularioConfigPanel } from './config/FormularioConfigPanel.tsx'
-import './lib/bridge'
+import bridgeReady from './lib/bridge'
 import { NexusGuard } from './nexus/NexusGuard'
 import { applyExelixiOcrHandoff } from './lib/exelixi-catalog'
+import { applyOcrPersonRolesFromDocuments } from './lib/ocr-person-roles'
 import { isCotizadorFlow } from './lib/cotizador-flow'
 import { applyExelixiBranding } from './lib/exelixi-branding'
 import { useWizardStore } from './store/wizardStore'
@@ -16,16 +17,72 @@ applyExelixiBranding('Formulario');
 
 function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
   useEffect(() => {
-    const { setDocState, setTomador, setVehicle, setOcrDone, goTo } = useWizardStore.getState();
-    if (isCotizadorFlow() && isRcv()) {
-      setOcrDone(true);
-      if (!useWizardStore.getState().vehicle.tipoPlaca) {
-        useWizardStore.getState().setVehicle({ tipoPlaca: 'nacional' });
+    let cancelled = false;
+
+    const runBootstrap = () => {
+      const {
+        setDocState,
+        setTomador,
+        setVehicle,
+        setOcrDone,
+        setDiligencia,
+        goTo,
+        setSameInsured,
+        setAsegurado,
+        setHasDriver,
+        setConductor,
+      } = useWizardStore.getState();
+
+      if (isCotizadorFlow() && isRcv()) {
+        setOcrDone(true);
+        if (!useWizardStore.getState().vehicle.tipoPlaca) {
+          useWizardStore.getState().setVehicle({ tipoPlaca: 'nacional' });
+        }
+        goTo(3);
+        return;
       }
-      goTo(3);
-      return;
-    }
-    applyExelixiOcrHandoff({ setDocState, setTomador, setVehicle, setOcrDone, goTo });
+
+      const handoffApplied = applyExelixiOcrHandoff({
+        setDocState,
+        setTomador,
+        setVehicle,
+        setOcrDone,
+        setDiligencia,
+        goTo,
+        setSameInsured,
+        setAsegurado,
+        setHasDriver,
+        setConductor,
+      });
+
+      if (!handoffApplied && isRcv()) {
+        const latest = useWizardStore.getState().documents;
+        const hasOcr =
+          latest.cedula?.ocr
+          || latest.licencia?.ocr
+          || latest.certificado?.ocr;
+        if (hasOcr) {
+          applyOcrPersonRolesFromDocuments(latest, {
+            setSameInsured,
+            setAsegurado,
+            setHasDriver,
+            setConductor,
+          });
+        }
+      }
+    };
+
+    void (async () => {
+      const sid = new URLSearchParams(window.location.search).get('sid');
+      if (sid) {
+        await bridgeReady;
+        if (window.__bridge?.ready) await window.__bridge.ready;
+      }
+      if (cancelled) return;
+      runBootstrap();
+    })();
+
+    return () => { cancelled = true; };
   }, []);
   return children;
 }

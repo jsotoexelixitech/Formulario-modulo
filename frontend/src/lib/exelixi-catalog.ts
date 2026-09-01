@@ -5,6 +5,10 @@ import {
   type ExelixiOcrHandoff,
   type OcrDocType,
 } from './exelixi-handoff-types';
+import { resolveOcrModelo, resolveOcrTipoPlaca, sanitizeOcrField } from './vehicle-carnet-labels';
+import { extractTomadorFromCertificado } from './carnet-propietario';
+import { applyOcrPersonRoles } from './ocr-person-roles';
+import type { PersonData } from '../types';
 
 export type BuilderProductBranch =
   | 'AUTOMOVIL'
@@ -146,6 +150,25 @@ export function getExelixiCatalogProductView(): ExelixiCatalogProductView | null
 
 export function readOcrHandoff(): ExelixiOcrHandoff | null {
   try {
+    // Preferir query (cross-port local OCR→Formulario) y luego sessionStorage (mismo origen).
+    const fromUrl = new URLSearchParams(window.location.search).get('ocr_handoff');
+    if (fromUrl) {
+      const b64 = fromUrl.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b64.length % 4 === 0 ? '' : '='.repeat(4 - (b64.length % 4));
+      const binary = atob(b64 + pad);
+      const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+      const json = new TextDecoder().decode(bytes);
+      const parsed = JSON.parse(json) as ExelixiOcrHandoff;
+      try {
+        sessionStorage.setItem(EXELIXI_OCR_HANDOFF_KEY, json);
+      } catch { /* ignore */ }
+      // Limpiar el param de la URL para no rehidratar en cada refresh.
+      const url = new URL(window.location.href);
+      url.searchParams.delete('ocr_handoff');
+      window.history.replaceState({}, '', url.toString());
+      return parsed;
+    }
+
     const raw = sessionStorage.getItem(EXELIXI_OCR_HANDOFF_KEY);
     if (!raw) return null;
     return JSON.parse(raw) as ExelixiOcrHandoff;
@@ -158,20 +181,23 @@ function defaultDoc(status: DocumentState['status'] = 'done'): DocumentState {
   return { status, progress: status === 'done' ? 100 : 0 };
 }
 
-/** Hidrata wizardStore con datos del OCR Exélixi (sessionStorage handoff). */
 export function applyExelixiOcrHandoff(
   setters: {
     setDocState: (doc: DocType, state: Partial<DocumentState>) => void;
     setTomador: (data: Partial<TomadorData>) => void;
     setVehicle: (data: Partial<VehicleData>) => void;
     setOcrDone: (done: boolean) => void;
+    setDiligencia?: (data: import('./diligencia').DiligenciaState | Partial<import('./diligencia').DiligenciaState> | null) => void;
+    setSameInsured?: (v: boolean) => void;
+    setAsegurado?: (data: Partial<PersonData>) => void;
+    setHasDriver?: (v: boolean) => void;
+    setConductor?: (data: Partial<PersonData>) => void;
     goTo: (step: number) => void;
   },
 ): boolean {
-  if (!isExelixiCatalogFlow()) return false;
-
   const handoff = readOcrHandoff();
   if (!handoff) return false;
+  // Local OCR→Formulario (?ocr_handoff) también aplica en La Mundial (?product=rcv).
 
   if (handoff.product) {
     try {
@@ -181,18 +207,31 @@ export function applyExelixiOcrHandoff(
     }
   }
 
-  const docTypes: OcrDocType[] = ['cedula', 'licencia', 'certificado', 'rif'];
+  const docTypes: OcrDocType[] = ['cedula', 'licencia', 'certificado', 'rif', 'pasaporte'];
   for (const type of docTypes) {
     const fields = handoff.ocrData[type];
+    const hash = handoff.documentHashes?.[type];
     if (fields) {
-      setters.setDocState(type, { status: 'done', progress: 100, ocr: fields });
+      setters.setDocState(type, { status: 'done', progress: 100, ocr: fields, hash });
     } else {
       setters.setDocState(type, defaultDoc('idle'));
     }
   }
 
+  if (handoff.diligencia && setters.setDiligencia) {
+    setters.setDiligencia(handoff.diligencia);
+  } else if (handoff.itipoDiligencia && setters.setDiligencia) {
+    setters.setDiligencia({
+      itipoDiligencia: handoff.itipoDiligencia,
+      documentosRequeridos: (handoff.documentosRequeridos ?? []) as DocType[],
+      documentHashes: handoff.documentHashes as Partial<Record<DocType, string>>,
+      clasificadoEn: 'ocr',
+      camposObligatorios: ['direccion'],
+    });
+  }
+
   const cedula = handoff.ocrData.cedula;
-  if (cedula) {
+  if (cedula?.nombre || cedula?.identificacion) {
     setters.setTomador({
       nombre: cedula.nombre ?? '',
       apellido: cedula.apellido ?? '',
@@ -206,14 +245,51 @@ export function applyExelixiOcrHandoff(
 
   const cert = handoff.ocrData.certificado;
   if (cert) {
+    if (!cedula?.identificacion && !cedula?.nombre) {
+      const tomadorFromCert = extractTomadorFromCertificado(cert);
+      if (tomadorFromCert) setters.setTomador(tomadorFromCert);
+    }
+    const rcvHandoff = !isExelixiCatalogFlow();
     setters.setVehicle({
       placa: cert.placa ?? '',
       marca: cert.marca ?? '',
-      modelo: cert.modelo ?? '',
+      modelo: resolveOcrModelo(cert),
       año: cert.año ?? cert.anio ?? '',
       color: cert.color ?? '',
-      serial: cert.serial ?? '',
+      serial: sanitizeOcrField(cert.serial),
+      serialMotor: sanitizeOcrField(cert.serialMotor),
+      cilindrada: rcvHandoff ? cert.cilindrada ?? '' : '',
+      tipoCarnet: rcvHandoff ? cert.tipoCarnet : undefined,
+      tipoPlaca: resolveOcrTipoPlaca(cert),
     });
+  }
+
+  if (handoff.hasDriver === true && handoff.conductor && setters.setHasDriver && setters.setConductor) {
+    setters.setHasDriver(true);
+    setters.setConductor(handoff.conductor);
+    if (typeof handoff.sameInsured === 'boolean' && setters.setSameInsured) {
+      setters.setSameInsured(handoff.sameInsured);
+    }
+    if (handoff.asegurado && setters.setAsegurado) {
+      setters.setAsegurado(handoff.asegurado);
+    }
+  } else if (
+    setters.setSameInsured
+    && setters.setAsegurado
+    && setters.setHasDriver
+    && setters.setConductor
+  ) {
+    applyOcrPersonRoles(
+      handoff.ocrData.cedula,
+      handoff.ocrData.certificado,
+      handoff.ocrData.licencia,
+      {
+        setSameInsured: setters.setSameInsured,
+        setAsegurado: setters.setAsegurado,
+        setHasDriver: setters.setHasDriver,
+        setConductor: setters.setConductor,
+      },
+    );
   }
 
   setters.setOcrDone(true);
