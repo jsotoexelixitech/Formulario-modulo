@@ -64,8 +64,8 @@ const STEP_META_BY_PRODUCT: Record<'rcv' | 'funerario', Record<2 | 3, StepMeta>>
     },
     3: {
       eyebrow: 'Paso 03 · Personas',
-      title: 'Asegurados y beneficiarios',
-      sub: 'Indica las personas cubiertas y los beneficiarios de la póliza funeraria.',
+      title: 'Personas aseguradas',
+      sub: 'El titular ya está cargado. Agrega solo otras personas cubiertas si aplica.',
     },
   },
 };
@@ -110,8 +110,13 @@ export default function App() {
   const { hideStepper, hideFooterBar } = useUiFlags(config);
 
   useEffect(() => {
+    if (isFunerario() && step === 3) {
+      setLocalStep(2);
+      goTo(2);
+      return;
+    }
     if (step === 2 || step === 3) setLocalStep(step);
-  }, [step]);
+  }, [step, goTo]);
 
   function navigate(to: 2 | 3) {
     setLocalStep(to);
@@ -131,23 +136,32 @@ export default function App() {
     }
 
     if (localStep === 2) {
-      const validate = (window as unknown as Record<string, unknown>).__validateStep2 as (() => boolean) | undefined;
-      if (validate && !validate()) {
-        toast.warning(
-          'Campos obligatorios incompletos',
-          'Completa nombre, apellido, teléfono, correo, fecha de nacimiento, sexo, estado y ciudad para continuar.',
-        );
-        return;
+      const validate = (window as unknown as Record<string, unknown>).__validateStep2 as
+        | (() => boolean | Promise<boolean>)
+        | undefined;
+      if (validate) {
+        const isValid = await validate();
+        if (!isValid) {
+          toast.warning(
+            'No se puede continuar',
+            'Revisa la cédula y los campos obligatorios. Si ya hay póliza vigente, el proceso se detiene aquí.',
+          );
+          return;
+        }
       }
-      if (!isFunerario() && !usesFuneralStep()) {
+      if (isFunerario() || usesFuneralStep()) {
         syncTitularFromTomador();
       }
       if (skipsPersonasStep()) {
         toast.success(
           '¡Formulario completado!',
-          'Datos del cliente guardados correctamente.',
+          'Datos del cliente y beneficiarios guardados correctamente.',
         );
-        continueToEmisionModule(buildExelixiWizardSnapshot());
+        if (product.exelixiCatalog) {
+          continueToEmisionModule(buildExelixiWizardSnapshot());
+        } else {
+          window.__bridgeAdvance?.();
+        }
         return;
       }
       navigate(3);

@@ -1,31 +1,29 @@
 import { useWizardStore } from '../store/wizardStore';
 
 /**
- * Copia los datos del tomador (paso 2) al titular (primer asegurado funerario).
- * Solo aplica cuando el tomador es también el titular (`differentPayer = false`).
+ * Copia al titular (primer asegurado) los datos ya capturados en el paso 2:
+ * tomador si es la misma persona, o el asegurado si el pagador es otro.
  */
 export function syncTitularFromTomador(): void {
-  const { differentPayer, tomador, funeral, setFuneral } = useWizardStore.getState();
-  if (differentPayer) return;
-
+  const { sameInsured, tomador, asegurado, funeral, setFuneral } = useWizardStore.getState();
+  const src = sameInsured !== false ? tomador : asegurado;
   const titular = funeral.asegurados[0];
-  if (!titular) return;
+  if (!titular || !src) return;
 
   setFuneral({
     asegurados: [
       {
         ...titular,
-        tipoDoc: tomador.tipoDoc || 'V',
-        identificacion: tomador.identificacion,
-        nombre: tomador.nombre,
-        apellido: tomador.apellido,
-        fechaNac: tomador.fechaNac,
-        sexo: tomador.sexo,
+        tipoDoc: src.tipoDoc || 'V',
+        identificacion: src.identificacion,
+        nombre: src.nombre,
+        apellido: src.apellido,
+        fechaNac: src.fechaNac ?? '',
+        sexo: src.sexo ?? '',
         parentesco: '1',
-        telefono: tomador.telefono,
-        email: tomador.email,
+        telefono: src.telefono,
+        email: src.email,
       },
-      ...funeral.asegurados.slice(1),
     ],
   });
 }

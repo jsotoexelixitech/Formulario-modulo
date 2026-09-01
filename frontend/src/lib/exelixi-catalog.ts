@@ -8,6 +8,8 @@ import {
 import { resolveOcrModelo, resolveOcrTipoPlaca, sanitizeOcrField } from './vehicle-carnet-labels';
 import { extractTomadorFromCertificado } from './carnet-propietario';
 import { applyOcrPersonRoles } from './ocr-person-roles';
+import { applyFuneralOcrCedulas } from './funeral-ocr-apply';
+import { toDiligenciaDocTypes, type DiligenciaDocType } from './diligencia';
 import type { PersonData } from '../types';
 
 export type BuilderProductBranch =
@@ -207,7 +209,15 @@ export function applyExelixiOcrHandoff(
     }
   }
 
-  const docTypes: OcrDocType[] = ['cedula', 'licencia', 'certificado', 'rif', 'pasaporte'];
+  const docTypes: OcrDocType[] = [
+    'cedula',
+    'cedula_titular',
+    'cedula_beneficiario',
+    'licencia',
+    'certificado',
+    'rif',
+    'pasaporte',
+  ];
   for (const type of docTypes) {
     const fields = handoff.ocrData[type];
     const hash = handoff.documentHashes?.[type];
@@ -223,8 +233,8 @@ export function applyExelixiOcrHandoff(
   } else if (handoff.itipoDiligencia && setters.setDiligencia) {
     setters.setDiligencia({
       itipoDiligencia: handoff.itipoDiligencia,
-      documentosRequeridos: (handoff.documentosRequeridos ?? []) as DocType[],
-      documentHashes: handoff.documentHashes as Partial<Record<DocType, string>>,
+      documentosRequeridos: toDiligenciaDocTypes(handoff.documentosRequeridos),
+      documentHashes: handoff.documentHashes as Partial<Record<DiligenciaDocType, string>>,
       clasificadoEn: 'ocr',
       camposObligatorios: ['direccion'],
     });
@@ -291,6 +301,8 @@ export function applyExelixiOcrHandoff(
       },
     );
   }
+
+  applyFuneralOcrCedulas();
 
   setters.setOcrDone(true);
   setters.goTo(2);

@@ -20,6 +20,7 @@ const swaggerSpec = require('./swagger');
 const catalogoRoutes = require('./routes/catalogo');
 const valrepRoutes   = require('./routes/valrep');
 const emissionsRoutes = require('./routes/emissions');
+const personasRoutes = require('./routes/personas');
 const nexusAuth      = require('./middleware/nexusAuth');
 
 const app = express();
@@ -53,6 +54,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/catalogo', nexusAuth, catalogoRoutes);
 app.use('/api/valrep',   nexusAuth, valrepRoutes);
 app.use('/api/emissions', nexusAuth, emissionsRoutes);
+app.use('/api/personas', nexusAuth, personasRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error('[modulo-formulario] error:', err);

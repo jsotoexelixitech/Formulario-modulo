@@ -339,6 +339,34 @@ async function validateSerialViaNestApi({ xsercar, xserialcarroceria, fdesde, ty
   };
 }
 
+/**
+ * ¿Póliza funeraria vigente para esta cédula? nest-api POST /personas/poliza-vigente
+ * @param {{ rif: string|number, cramo?: number }} input
+ * @returns {Promise<{ hasVigente: boolean, cnpoliza?: string, cplan?: string, fhasta?: string }>}
+ */
+async function checkPolizaVigentePersonas({ rif, cramo } = {}) {
+  const url = `${getBaseUrl()}/api/v1/personas/poliza-vigente`;
+  const response = await axios.post(
+    url,
+    { rif, cramo: cramo != null ? Number(cramo) : 9 },
+    await axiosOpts({ validateStatus: () => true }),
+  );
+  const body = response.data ?? {};
+  if (response.status >= 400 || body.status === false) {
+    const err = new Error(body?.message || `HTTP ${response.status} poliza-vigente`);
+    err.status = response.status;
+    err.code = body?.code || 'PERSONAS_POLIZA_CHECK_ERROR';
+    throw err;
+  }
+  const data = body.data ?? {};
+  return {
+    hasVigente: Boolean(data.hasVigente),
+    cnpoliza: data.cnpoliza ? String(data.cnpoliza) : undefined,
+    cplan: data.cplan ? String(data.cplan) : undefined,
+    fhasta: data.fhasta ? String(data.fhasta) : undefined,
+  };
+}
+
 module.exports = {
   getBaseUrl,
   getTimeout,
@@ -346,6 +374,7 @@ module.exports = {
   searchProprietaryViaNestApi,
   validatePlacaViaNestApi,
   validateSerialViaNestApi,
+  checkPolizaVigentePersonas,
   getInmaAnios,
   getInmaMarcas,
   getInmaModelos,

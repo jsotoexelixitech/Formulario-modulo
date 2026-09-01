@@ -14,6 +14,9 @@ import { CircularProgress } from '../../components/ui/CircularProgress';
 import { AnimatedCounter } from '../../components/ui/AnimatedCounter';
 import { DocumentPreviewModal } from '../../components/DocumentPreviewModal';
 import type { DocType, DocumentFile } from '../../types';
+import { getProductId } from '../../lib/product';
+import { getDefaultRequiredDocs } from '../../lib/wizard-navigation';
+import { applyFuneralOcrCedulas } from '../../lib/funeral-ocr-apply';
 
 interface DocConfig {
   type: DocType;
@@ -27,10 +30,24 @@ interface DocConfig {
 const DOCS: DocConfig[] = [
   {
     type: 'cedula',
-    label: 'Cédula de identidad',
-    description: 'Documento del tomador',
+    label: 'Cédula del tomador',
+    description: 'Quien paga la póliza',
     Icon: IdCard,
     accent: 'from-indigo-500 to-violet-500',
+  },
+  {
+    type: 'cedula_titular',
+    label: 'Cédula del titular',
+    description: 'Persona asegurada (funerario)',
+    Icon: IdCard,
+    accent: 'from-violet-500 to-fuchsia-500',
+  },
+  {
+    type: 'cedula_beneficiario',
+    label: 'Cédula del beneficiario',
+    description: 'Quien recibe el beneficio',
+    Icon: IdCard,
+    accent: 'from-fuchsia-500 to-rose-500',
   },
   {
     type: 'licencia',
@@ -455,6 +472,8 @@ function UploadDocCard({
  */
 const DEMO_FILES: Record<DocType, { name: string; mimeType: string; url: string }> = {
   cedula: { name: 'cedula-demo.svg', mimeType: 'image/svg+xml', url: '/samples/cedula-demo.svg' },
+  cedula_titular: { name: 'cedula-titular-demo.svg', mimeType: 'image/svg+xml', url: '/samples/cedula-demo.svg' },
+  cedula_beneficiario: { name: 'cedula-benef-demo.svg', mimeType: 'image/svg+xml', url: '/samples/cedula-demo.svg' },
   licencia: { name: 'licencia-demo.svg', mimeType: 'image/svg+xml', url: '/samples/licencia-demo.svg' },
   certificado: { name: 'certificado-demo.svg', mimeType: 'image/svg+xml', url: '/samples/certificado-demo.svg' },
   rif: { name: 'rif-demo.svg', mimeType: 'image/svg+xml', url: '/samples/rif-demo.svg' },
@@ -468,6 +487,24 @@ const DEMO_OCR: Record<DocType, Record<string, string>> = {
     identificacion: '18456329',
     tipoDoc: 'V',
     fechaNacimiento: '1990-04-15',
+    sexo: 'Femenino',
+    estadoCivil: 'Soltero(a)',
+  },
+  cedula_titular: {
+    nombre: 'Jose',
+    apellido: 'Souto',
+    identificacion: '14484932',
+    tipoDoc: 'V',
+    fechaNacimiento: '1979-07-09',
+    sexo: 'Masculino',
+    estadoCivil: 'Casado(a)',
+  },
+  cedula_beneficiario: {
+    nombre: 'Ana',
+    apellido: 'Souto',
+    identificacion: '20111222',
+    tipoDoc: 'V',
+    fechaNacimiento: '2001-03-12',
     sexo: 'Femenino',
     estadoCivil: 'Soltero(a)',
   },
@@ -507,8 +544,9 @@ export function OcrStep() {
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [preview, setPreview] = useState<{ file: DocumentFile; title: string } | null>(null);
 
-  const baseRequired: DocType[] = ['cedula', 'licencia', 'certificado'];
-  const baseOptional: DocType[] = ['rif'];
+  const productId = getProductId();
+  const baseRequired: DocType[] = getDefaultRequiredDocs(productId);
+  const baseOptional: DocType[] = productId === 'funerario' ? [] : ['rif'];
   const { requiredDocs, optionalDocs } = adjustDocsForBinacionalCarnet(
     baseRequired,
     baseOptional,
@@ -532,6 +570,7 @@ export function OcrStep() {
 
   useEffect(() => {
     if (allRequiredDone && !ocrDone) {
+      applyFuneralOcrCedulas();
       const cedula = documents.cedula.ocr;
       if (cedula) {
         setTomador({

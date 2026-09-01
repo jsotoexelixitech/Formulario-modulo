@@ -1,4 +1,11 @@
-export type DocType = 'cedula' | 'licencia' | 'certificado' | 'rif' | 'pasaporte';
+export type DocType =
+  | 'cedula'
+  | 'cedula_titular'
+  | 'cedula_beneficiario'
+  | 'licencia'
+  | 'certificado'
+  | 'rif'
+  | 'pasaporte';
 
 export type { DiligenciaState, TipoDiligencia } from '../lib/diligencia';
 
@@ -85,6 +92,7 @@ export type PersonData = {
   tipoDoc?: string;
   fechaNac?: string;
   parentesco?: string;
+  pporcen?: number;
   licencia?: string;
   relacion?: string;
   telefono?: string;
@@ -131,6 +139,8 @@ export interface FuneralPerson {
   sexo: string;
   /** Código de parentesco La Mundial (1=Titular, 2=Cónyuge, 3=Hijo(a)…). */
   parentesco: string;
+  /** % de beneficio (pebenefi.pporce). La suma de todos debe ser 100. */
+  pporcen?: number;
   telefono?: string;
   email?: string;
 }

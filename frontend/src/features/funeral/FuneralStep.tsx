@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
 import { Field, Input } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
@@ -7,6 +7,14 @@ import { useCatalogs } from '../../hooks/useCatalogs';
 import { useProductConfig } from '../../hooks/useProductConfig';
 import { getProductId } from '../../lib/product';
 import { syncTitularFromTomador } from '../../lib/funeral-sync';
+import { cedulaTienePolizaVigente } from '../../lib/funeral-cedula-check';
+import { formatTelefono, validateRequiredVePhone } from '../../lib/phone';
+import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
+import {
+  SECONDARY_IDENTIFICACION_MAX_LENGTH,
+  validateSecondaryPersonIdentificacion,
+} from '../../lib/person-identificacion';
+import { toast } from '../../store/toastStore';
 import { SectionCard } from '../emission/EmissionStep';
 import type { FuneralPerson } from '../../types';
 import { Users, Heart, Plus, Trash2 } from 'lucide-react';
@@ -17,9 +25,6 @@ const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 function onlyLetters(v: string): string {
   return v.replace(/[^a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]/g, '');
 }
-
-import { formatTelefono, isValidPhonePrefix } from '../../lib/phone';
-import { PERSON_FIELD_LIMITS, clipPersonField } from '../../lib/field-limits';
 
 /** Aplica máscara visual al teléfono: (0414) 123-4567 */
 function maskPhone(v: string | undefined): string {
@@ -50,7 +55,9 @@ function PersonFields({
   parentescoOptions,
   sexoOptions,
   loading,
+  identityLoading,
   onChange,
+  onIdentificacionBlur,
 }: {
   person: FuneralPerson;
   errors: PersonErrors;
@@ -58,19 +65,33 @@ function PersonFields({
   parentescoOptions: { value: string; label: string }[];
   sexoOptions: { value: string; label: string }[];
   loading: boolean;
+  identityLoading?: boolean;
   onChange: (patch: Partial<FuneralPerson>) => void;
+  onIdentificacionBlur?: (identificacion: string) => void;
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <Field label="Identificación *" error={errors.identificacion}>
+      <Field
+        label="Identificación *"
+        error={errors.identificacion}
+        hint={
+          identityLoading
+            ? 'Consultando Sis2000…'
+            : onIdentificacionBlur
+              ? 'Al completar la cédula se verifica si se puede asegurar'
+              : undefined
+        }
+      >
         <IdentityInput
           tipoDoc={person.tipoDoc || 'V'}
           identificacion={person.identificacion}
-          maxLength={PERSON_FIELD_LIMITS.identificacion}
+          maxLength={SECONDARY_IDENTIFICACION_MAX_LENGTH}
+          loading={identityLoading}
           onTipoDocChange={(v) => onChange({ tipoDoc: v })}
           onIdentificacionChange={(v) =>
-            onChange({ identificacion: clipPersonField('identificacion', v) })
+            onChange({ identificacion: v.slice(0, SECONDARY_IDENTIFICACION_MAX_LENGTH) })
           }
+          onIdentificacionBlur={onIdentificacionBlur}
         />
       </Field>
 
@@ -142,7 +163,11 @@ function PersonFields({
         />
       </Field>
 
-      <Field label="Teléfono (Opcional)" error={errors.telefono} hint="Ej. 04121234567">
+      <Field
+        label="Teléfono *"
+        error={errors.telefono}
+        hint="11 dígitos · Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX"
+      >
         <Input
           value={maskPhone(person.telefono)}
           onChange={(e) => onChange({ telefono: formatTelefono(e.target.value) })}
@@ -168,7 +193,7 @@ function PersonFields({
 }
 
 export function FuneralStep() {
-  const { tomador, funeral, setFuneral, differentPayer } = useWizardStore();
+  const { tomador, asegurado, funeral, setFuneral, sameInsured } = useWizardStore();
 
   const producto = getProductId();
   const { config } = useProductConfig(EMPRESA_ID, producto, 'formulario');
@@ -182,13 +207,30 @@ export function FuneralStep() {
   };
 
   useEffect(() => {
-    if (!differentPayer) {
-      syncTitularFromTomador();
-    }
-  }, [differentPayer, tomador.identificacion, tomador.nombre, tomador.apellido, tomador.fechaNac, tomador.sexo, tomador.telefono, tomador.email]);
+    syncTitularFromTomador();
+  }, [
+    sameInsured,
+    tomador.identificacion,
+    tomador.nombre,
+    tomador.apellido,
+    tomador.fechaNac,
+    tomador.sexo,
+    tomador.telefono,
+    tomador.email,
+    asegurado.identificacion,
+    asegurado.nombre,
+    asegurado.apellido,
+    asegurado.fechaNac,
+    asegurado.sexo,
+    asegurado.telefono,
+    asegurado.email,
+  ]);
   const catalogs = useCatalogs();
   const [asegErrors, setAsegErrors] = useState<PersonErrors[]>([]);
   const [benefErrors, setBenefErrors] = useState<PersonErrors[]>([]);
+  const [cedulaChecking, setCedulaChecking] = useState<Record<number, boolean>>({});
+  const lastAsegCedula = useRef<Record<number, string>>({});
+  const lastAsegOk = useRef<Record<number, boolean>>({});
 
   const parentescoOptions =
     catalogs.parentescos.length > 0
@@ -209,6 +251,7 @@ export function FuneralStep() {
 
   // ── Helpers de listas ─────────────────────────────────────────────────────
   const updateAsegurado = (idx: number, patch: Partial<FuneralPerson>) => {
+    if (patch.identificacion != null) lastAsegCedula.current[idx] = '';
     const next = funeral.asegurados.map((a, i) => (i === idx ? { ...a, ...patch } : a));
     setFuneral({ asegurados: next });
   };
@@ -236,25 +279,14 @@ export function FuneralStep() {
   const removeBeneficiario = (idx: number) =>
     setFuneral({ beneficiarios: funeral.beneficiarios.filter((_, i) => i !== idx) });
 
-  // Copia los datos del tomador (paso 2) al titular (primer asegurado).
-  const usarDatosTomador = () => {
-    syncTitularFromTomador();
-  };
-
   // ── Validación ──────────────────────────────────────────────────────────
   const validatePerson = (p: FuneralPerson, isTitular: boolean): PersonErrors => {
     const e: PersonErrors = {};
     const req = (v?: string) => !(v ?? '').trim();
     const len = (v?: string) => (v ?? '').trim().length;
-    const digs = (v?: string) => (v ?? '').replace(/\D/g, '').length;
 
-    if (req(p.identificacion)) {
-      e.identificacion = 'La identificación es obligatoria';
-    } else if (digs(p.identificacion) < 1) {
-      e.identificacion = 'Debe tener al menos 1 dígito';
-    } else if (digs(p.identificacion) > PERSON_FIELD_LIMITS.identificacion) {
-      e.identificacion = `No puede tener más de ${PERSON_FIELD_LIMITS.identificacion} dígitos`;
-    }
+    const idErr = validateSecondaryPersonIdentificacion(p.identificacion);
+    if (idErr) e.identificacion = idErr;
 
     if (req(p.nombre)) {
       e.nombre = 'El nombre es obligatorio';
@@ -281,13 +313,8 @@ export function FuneralStep() {
     if (req(p.sexo)) e.sexo = 'Selecciona el sexo';
     if (!isTitular && req(p.parentesco)) e.parentesco = 'Selecciona el parentesco';
 
-    if (p.telefono) {
-      if (digs(p.telefono) !== 11) {
-        e.telefono = 'El teléfono debe tener exactamente 11 dígitos (ej. 04121234567)';
-      } else if (!isValidPhonePrefix(p.telefono)) {
-        e.telefono = 'El prefijo no es válido (Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX)';
-      }
-    }
+    const phoneErr = validateRequiredVePhone(p.telefono);
+    if (phoneErr) e.telefono = phoneErr;
 
     if (p.email && !emailRe.test(p.email)) {
       e.email = 'Ingresa un correo válido (ej. usuario@dominio.com)';
@@ -298,15 +325,77 @@ export function FuneralStep() {
     return e;
   };
 
-  const validate = (): boolean => {
+  const checkAseguradoCedula = useCallback(async (idx: number, identificacion: string) => {
+    const digits = String(identificacion || '').replace(/\D/g, '');
+    if (digits.length < 6) return true;
+    if (lastAsegCedula.current[idx] === digits) {
+      return lastAsegOk.current[idx] !== false;
+    }
+    lastAsegCedula.current[idx] = digits;
+    setCedulaChecking((s) => ({ ...s, [idx]: true }));
+    try {
+      const res = await cedulaTienePolizaVigente(digits);
+      if (res.blocked) {
+        lastAsegOk.current[idx] = false;
+        setAsegErrors((prev) => {
+          const next = [...prev];
+          next[idx] = { ...(next[idx] ?? {}), identificacion: res.message };
+          return next;
+        });
+        toast.warning(
+          'No se puede asegurar',
+          res.cnpoliza
+            ? `Ya existe una póliza funeraria vigente (${res.cnpoliza}).`
+            : 'Esta cédula ya tiene una póliza funeraria activa. No se puede continuar.',
+          8000,
+        );
+        return false;
+      }
+      lastAsegOk.current[idx] = true;
+      toast.success(
+        'Se puede asegurar',
+        'No hay póliza funeraria vigente para esta cédula.',
+        2800,
+      );
+      return true;
+    } catch {
+      lastAsegCedula.current[idx] = '';
+      lastAsegOk.current[idx] = false;
+      toast.warning('No se pudo verificar la cédula', 'Inténtalo de nuevo antes de continuar.', 4000);
+      return false;
+    } finally {
+      setCedulaChecking((s) => ({ ...s, [idx]: false }));
+    }
+  }, []);
+
+  useEffect(() => {
+    const timers: number[] = [];
+    funeral.asegurados.forEach((p, idx) => {
+      if (idx === 0) return;
+      const digits = String(p.identificacion || '').replace(/\D/g, '');
+      if (digits.length < 6 || lastAsegCedula.current[idx] === digits) return;
+      const t = window.setTimeout(() => {
+        void checkAseguradoCedula(idx, p.identificacion);
+      }, 450);
+      timers.push(t);
+    });
+    return () => timers.forEach((id) => window.clearTimeout(id));
+  }, [funeral.asegurados, checkAseguradoCedula]);
+
+  const validate = async (): Promise<boolean> => {
     const aErr = funeral.asegurados.map((p, i) => validatePerson(p, i === 0));
-    const bErr = funeral.beneficiarios.map((p) => validatePerson(p, false));
 
     setAsegErrors(aErr);
-    setBenefErrors(bErr);
+    setBenefErrors([]);
 
-    const hasPersonError = [...aErr, ...bErr].some((e) => Object.keys(e).length > 0);
-    return !hasPersonError;
+    const hasPersonError = aErr.some((e) => Object.keys(e).length > 0);
+    if (hasPersonError) return false;
+
+    for (let i = 0; i < funeral.asegurados.length; i++) {
+      const ok = await checkAseguradoCedula(i, funeral.asegurados[i].identificacion);
+      if (!ok) return false;
+    }
+    return true;
   };
 
   (window as unknown as Record<string, unknown>).__validateStep3 = validate;
@@ -318,7 +407,7 @@ export function FuneralStep() {
       <SectionCard
         Icon={Users}
         title="Personas aseguradas"
-        description="El titular y las personas cubiertas por la póliza funeraria."
+        description="El titular ya viene del paso 2. Aquí solo agregas otras personas cubiertas."
       >
         <div className="space-y-5">
           {funeral.asegurados.map((aseg, idx) => (
@@ -327,36 +416,43 @@ export function FuneralStep() {
                 <span className="text-[0.7rem] font-black uppercase tracking-wider text-indigo-600">
                   {idx === 0 ? 'Titular' : `Asegurado ${idx + 1}`}
                 </span>
-                <div className="flex items-center gap-2">
-                  {idx === 0 && differentPayer && (
-                    <button
-                      type="button"
-                      onClick={usarDatosTomador}
-                      className="text-[0.7rem] font-bold text-indigo-600 hover:text-indigo-700 hover:underline"
-                    >
-                      Usar mis datos
-                    </button>
-                  )}
-                  {idx > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => removeAsegurado(idx)}
-                      className="inline-flex items-center gap-1 text-[0.7rem] font-bold text-rose-500 hover:text-rose-600"
-                    >
-                      <Trash2 size={12} /> Quitar
-                    </button>
-                  )}
-                </div>
+                {idx > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => removeAsegurado(idx)}
+                    className="inline-flex items-center gap-1 text-[0.7rem] font-bold text-rose-500 hover:text-rose-600"
+                  >
+                    <Trash2 size={12} /> Quitar
+                  </button>
+                )}
               </div>
-              <PersonFields
-                person={aseg}
-                errors={asegErrors[idx] ?? {}}
-                isTitular={idx === 0}
-                parentescoOptions={parentescoOptions}
-                sexoOptions={sexoOptions}
-                loading={catalogs.loading}
-                onChange={(patch) => updateAsegurado(idx, patch)}
-              />
+              {idx === 0 ? (
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  <span className="font-semibold text-slate-800">
+                    {aseg.nombre} {aseg.apellido}
+                  </span>
+                  {aseg.identificacion ? ` · ${aseg.tipoDoc || 'V'}-${aseg.identificacion}` : ''}
+                  <span className="block text-[0.78rem] text-slate-500 mt-1">
+                    {sameInsured !== false
+                      ? 'Es la misma persona del tomador. No hay que volver a cargar los datos.'
+                      : 'Datos cargados en el paso 2. No hay que volver a llenarlos.'}
+                  </span>
+                </p>
+              ) : (
+                <PersonFields
+                  person={aseg}
+                  errors={asegErrors[idx] ?? {}}
+                  isTitular={false}
+                  parentescoOptions={parentescoOptions}
+                  sexoOptions={sexoOptions}
+                  loading={catalogs.loading}
+                  identityLoading={Boolean(cedulaChecking[idx])}
+                  onChange={(patch) => updateAsegurado(idx, patch)}
+                  onIdentificacionBlur={(id) => {
+                    void checkAseguradoCedula(idx, id);
+                  }}
+                />
+              )}
             </div>
           ))}
 
@@ -371,8 +467,8 @@ export function FuneralStep() {
       </SectionCard>
       )}
 
-      {/* Beneficiarios */}
-      {isSeccionActiva('beneficiario') && (
+      {/* Beneficiarios: solo en paso 2 (EmissionStep). No duplicar aquí. */}
+      {false && isSeccionActiva('beneficiario') && (
       <SectionCard
         Icon={Heart}
         title="Beneficiarios"

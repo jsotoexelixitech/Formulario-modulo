@@ -119,6 +119,8 @@ const initialState: WizardState = {
   product: getProductId(),
   documents: {
     cedula: defaultDoc(),
+    cedula_titular: defaultDoc(),
+    cedula_beneficiario: defaultDoc(),
     licencia: defaultDoc(),
     certificado: defaultDoc(),
     rif: defaultDoc(),
@@ -170,7 +172,7 @@ export const useWizardStore = create<WizardState & WizardActions>()((set) => ({
   setTomador: (data) =>
     set((s) => ({ tomador: { ...s.tomador, ...data } })),
 
-  setSameInsured: (sameInsured) => set({ sameInsured }),
+  setSameInsured: (sameInsured) => set({ sameInsured, differentPayer: !sameInsured }),
 
   setAsegurado: (data) =>
     set((s) => ({ asegurado: { ...s.asegurado, ...data } })),

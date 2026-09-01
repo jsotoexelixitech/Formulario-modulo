@@ -131,7 +131,8 @@ export function getProductConfig(): ProductConfig {
 export function usesFuneralStep(): boolean {
   const cfg = getProductConfig();
   if (cfg.exelixiCatalog) return Boolean(cfg.useFuneralStep);
-  return isFunerario();
+  // Funerario La Mundial: el titular es el único asegurado (paso 2). No hay paso de más asegurados.
+  return false;
 }
 
 export function usesVehicleStep(): boolean {
@@ -140,7 +141,8 @@ export function usesVehicleStep(): boolean {
 
 export function skipsPersonasStep(): boolean {
   const cfg = getProductConfig();
-  return Boolean(cfg.exelixiCatalog && cfg.skipPersonasStep);
+  if (cfg.exelixiCatalog) return Boolean(cfg.skipPersonasStep);
+  return isFunerario();
 }
 
 export function isFunerario(): boolean {

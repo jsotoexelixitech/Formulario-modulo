@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import type { DocType, OcrResult, DocumentFile } from '../types';
+import { toOcrEngineDocType } from './ocr-engine-doc';
 import { moduleApiBase } from './app-base';
 import { attachNexusTokenAxios } from './nexus-token-client';
 
@@ -61,7 +62,7 @@ export async function uploadDocument(
 ): Promise<UploadResponse> {
   const form = new FormData();
   form.append('file', file);
-  form.append('docType', docType);
+  form.append('docType', toOcrEngineDocType(docType));
 
   try {
     const response = await api.post<UploadResponse>('/documents/upload', form, {
@@ -667,6 +668,46 @@ export async function validateSerial(
         blocked: true,
         code: axErr.response.data.code ?? 'VALIDATE_SERIAL_ERROR',
         message: axErr.response.data.message ?? 'Error al validar el serial.',
+      };
+    }
+    throw err;
+  }
+}
+
+export interface CheckCedulaPolizaResult {
+  success: boolean;
+  blocked: boolean;
+  code?: string;
+  cnpoliza?: string;
+  message?: string;
+}
+
+/** ¿Hay póliza funeraria vigente para esta cédula? (Sis2000 adpoliza). */
+export async function checkFuneralCedulaPoliza(
+  identificacion: string,
+  cramo = 9,
+): Promise<CheckCedulaPolizaResult> {
+  const rif = String(identificacion || '').replace(/\D/g, '');
+  try {
+    const { data } = await api.post<CheckCedulaPolizaResult>('/personas/poliza-vigente', {
+      rif,
+      cramo,
+    });
+    return {
+      success: data.success !== false,
+      blocked: Boolean(data.blocked),
+      code: data.code,
+      cnpoliza: data.cnpoliza,
+      message: data.message,
+    };
+  } catch (err) {
+    const axErr = err as AxiosError<CheckCedulaPolizaResult>;
+    if (axErr.response?.data) {
+      return {
+        success: false,
+        blocked: Boolean(axErr.response.data.blocked),
+        code: axErr.response.data.code ?? 'PERSONAS_POLIZA_CHECK_ERROR',
+        message: axErr.response.data.message ?? 'No se pudo verificar la cédula.',
       };
     }
     throw err;
