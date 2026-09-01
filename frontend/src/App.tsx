@@ -65,7 +65,7 @@ const STEP_META_BY_PRODUCT: Record<'rcv' | 'funerario', Record<2 | 3, StepMeta>>
     3: {
       eyebrow: 'Paso 03 · Personas',
       title: 'Personas aseguradas',
-      sub: 'Indica el titular y las personas cubiertas. Los beneficiarios se cargan en el paso anterior.',
+      sub: 'El titular ya está cargado. Agrega solo otras personas cubiertas si aplica.',
     },
   },
 };
@@ -144,7 +144,7 @@ export default function App() {
           return;
         }
       }
-      if (!isFunerario() && !usesFuneralStep()) {
+      if (isFunerario() || usesFuneralStep()) {
         syncTitularFromTomador();
       }
       if (skipsPersonasStep()) {

@@ -187,7 +187,7 @@ function PersonFields({
 }
 
 export function FuneralStep() {
-  const { tomador, funeral, setFuneral, differentPayer } = useWizardStore();
+  const { tomador, asegurado, funeral, setFuneral, sameInsured } = useWizardStore();
 
   const producto = getProductId();
   const { config } = useProductConfig(EMPRESA_ID, producto, 'formulario');
@@ -201,10 +201,24 @@ export function FuneralStep() {
   };
 
   useEffect(() => {
-    if (!differentPayer) {
-      syncTitularFromTomador();
-    }
-  }, [differentPayer, tomador.identificacion, tomador.nombre, tomador.apellido, tomador.fechaNac, tomador.sexo, tomador.telefono, tomador.email]);
+    syncTitularFromTomador();
+  }, [
+    sameInsured,
+    tomador.identificacion,
+    tomador.nombre,
+    tomador.apellido,
+    tomador.fechaNac,
+    tomador.sexo,
+    tomador.telefono,
+    tomador.email,
+    asegurado.identificacion,
+    asegurado.nombre,
+    asegurado.apellido,
+    asegurado.fechaNac,
+    asegurado.sexo,
+    asegurado.telefono,
+    asegurado.email,
+  ]);
   const catalogs = useCatalogs();
   const [asegErrors, setAsegErrors] = useState<PersonErrors[]>([]);
   const [benefErrors, setBenefErrors] = useState<PersonErrors[]>([]);
@@ -255,11 +269,6 @@ export function FuneralStep() {
     });
   const removeBeneficiario = (idx: number) =>
     setFuneral({ beneficiarios: funeral.beneficiarios.filter((_, i) => i !== idx) });
-
-  // Copia los datos del tomador (paso 2) al titular (primer asegurado).
-  const usarDatosTomador = () => {
-    syncTitularFromTomador();
-  };
 
   // ── Validación ──────────────────────────────────────────────────────────
   const validatePerson = (p: FuneralPerson, isTitular: boolean): PersonErrors => {
@@ -360,7 +369,7 @@ export function FuneralStep() {
       <SectionCard
         Icon={Users}
         title="Personas aseguradas"
-        description="El titular y las personas cubiertas por la póliza funeraria."
+        description="El titular ya viene del paso 2. Aquí solo agregas otras personas cubiertas."
       >
         <div className="space-y-5">
           {funeral.asegurados.map((aseg, idx) => (
@@ -369,40 +378,43 @@ export function FuneralStep() {
                 <span className="text-[0.7rem] font-black uppercase tracking-wider text-indigo-600">
                   {idx === 0 ? 'Titular' : `Asegurado ${idx + 1}`}
                 </span>
-                <div className="flex items-center gap-2">
-                  {idx === 0 && differentPayer && (
-                    <button
-                      type="button"
-                      onClick={usarDatosTomador}
-                      className="text-[0.7rem] font-bold text-indigo-600 hover:text-indigo-700 hover:underline"
-                    >
-                      Usar mis datos
-                    </button>
-                  )}
-                  {idx > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => removeAsegurado(idx)}
-                      className="inline-flex items-center gap-1 text-[0.7rem] font-bold text-rose-500 hover:text-rose-600"
-                    >
-                      <Trash2 size={12} /> Quitar
-                    </button>
-                  )}
-                </div>
+                {idx > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => removeAsegurado(idx)}
+                    className="inline-flex items-center gap-1 text-[0.7rem] font-bold text-rose-500 hover:text-rose-600"
+                  >
+                    <Trash2 size={12} /> Quitar
+                  </button>
+                )}
               </div>
-              <PersonFields
-                person={aseg}
-                errors={asegErrors[idx] ?? {}}
-                isTitular={idx === 0}
-                parentescoOptions={parentescoOptions}
-                sexoOptions={sexoOptions}
-                loading={catalogs.loading}
-                identityLoading={Boolean(cedulaChecking[idx])}
-                onChange={(patch) => updateAsegurado(idx, patch)}
-                onIdentificacionBlur={(id) => {
-                  void checkAseguradoCedula(idx, id);
-                }}
-              />
+              {idx === 0 ? (
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  <span className="font-semibold text-slate-800">
+                    {aseg.nombre} {aseg.apellido}
+                  </span>
+                  {aseg.identificacion ? ` · ${aseg.tipoDoc || 'V'}-${aseg.identificacion}` : ''}
+                  <span className="block text-[0.78rem] text-slate-500 mt-1">
+                    {sameInsured !== false
+                      ? 'Es la misma persona del tomador. No hay que volver a cargar los datos.'
+                      : 'Datos cargados en el paso 2. No hay que volver a llenarlos.'}
+                  </span>
+                </p>
+              ) : (
+                <PersonFields
+                  person={aseg}
+                  errors={asegErrors[idx] ?? {}}
+                  isTitular={false}
+                  parentescoOptions={parentescoOptions}
+                  sexoOptions={sexoOptions}
+                  loading={catalogs.loading}
+                  identityLoading={Boolean(cedulaChecking[idx])}
+                  onChange={(patch) => updateAsegurado(idx, patch)}
+                  onIdentificacionBlur={(id) => {
+                    void checkAseguradoCedula(idx, id);
+                  }}
+                />
+              )}
             </div>
           ))}
 
