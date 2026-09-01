@@ -9,7 +9,8 @@ import { useCatalogs, useCiudades } from '../../hooks/useCatalogs';
 import { useProductConfig } from '../../hooks/useProductConfig';
 import { isExelixiCatalogFlow } from '../../lib/exelixi-catalog';
 import { isCotizadorFlow } from '../../lib/cotizador-flow';
-import { getProductId, isRcvLaMundialFlow } from '../../lib/product';
+import { getProductId, isFunerario, isRcvLaMundialFlow, usesFuneralStep } from '../../lib/product';
+import { cedulaTienePolizaVigente } from '../../lib/funeral-cedula-check';
 import {
   diligenciaLabel,
   isPersonaJuridica,
@@ -129,6 +130,9 @@ export function EmissionStep() {
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [lookupLoading, setLookupLoading] = useState<Record<string, boolean>>({});
   const lastLookupCid = useRef<Record<string, string>>({});
+  const lastFuneralCedula = useRef<Record<string, string>>({});
+  const lastFuneralOk = useRef<Record<string, boolean>>({});
+  const checkFuneralFlow = isFunerario() || usesFuneralStep();
 
   const lookupByCedula = useCallback(
     async (
@@ -195,7 +199,63 @@ export function EmissionStep() {
     [catalogs.sexos, catalogs.estadosCivil, catalogs.estados],
   );
 
-  const validate = () => {
+  const checkFuneralCedula = useCallback(
+    async (prefix: string, identificacion: string): Promise<boolean> => {
+      const digits = String(identificacion || '').replace(/\D/g, '');
+      if (digits.length < 6) return true;
+      if (lastFuneralCedula.current[prefix] === digits) {
+        return lastFuneralOk.current[prefix] !== false;
+      }
+      lastFuneralCedula.current[prefix] = digits;
+      setLookupLoading((s) => ({ ...s, [prefix]: true }));
+      try {
+        const res = await cedulaTienePolizaVigente(digits);
+        if (res.blocked) {
+          lastFuneralOk.current[prefix] = false;
+          setErrors((prev) => ({
+            ...prev,
+            [`${prefix}identificacion`]: res.message,
+          }));
+          toast.warning(
+            'Póliza vigente',
+            'Esta cédula ya tiene una póliza funeraria activa. No se puede continuar.',
+            8000,
+          );
+          return false;
+        }
+        lastFuneralOk.current[prefix] = true;
+        setErrors((prev) => {
+          const key = `${prefix}identificacion`;
+          if (!prev[key]) return prev;
+          const { [key]: _removed, ...rest } = prev;
+          return rest;
+        });
+        return true;
+      } catch {
+        lastFuneralCedula.current[prefix] = '';
+        lastFuneralOk.current[prefix] = false;
+        toast.warning(
+          'No se pudo verificar la cédula',
+          'Inténtalo de nuevo antes de continuar.',
+          4000,
+        );
+        return false;
+      } finally {
+        setLookupLoading((s) => ({ ...s, [prefix]: false }));
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!checkFuneralFlow) return;
+    const digits = String(tomador.identificacion || '').replace(/\D/g, '');
+    if (digits.length < 6) return;
+    if (lastFuneralCedula.current.tom_ === digits) return;
+    void checkFuneralCedula('tom_', tomador.identificacion);
+  }, [checkFuneralFlow, tomador.identificacion, checkFuneralCedula]);
+
+  const validate = async () => {
     const e: ValidationErrors = {};
     const req  = (v?: string) => !(v ?? '').trim();
     const len  = (v?: string) => (v ?? '').trim().length;
@@ -288,7 +348,17 @@ export function EmissionStep() {
     if (hasBeneficiary) validatePerson(beneficiario, 'benef_', { secondaryIdent: true });
 
     setErrors(e);
-    return Object.keys(e).length === 0;
+    if (Object.keys(e).length > 0) return false;
+
+    if (checkFuneralFlow) {
+      const tomOk = await checkFuneralCedula('tom_', tomador.identificacion);
+      if (!tomOk) return false;
+      if (!sameInsured) {
+        const asegOk = await checkFuneralCedula('aseg_', asegurado.identificacion);
+        if (!asegOk) return false;
+      }
+    }
+    return true;
   };
 
   (window as any).__validateStep2 = validate;
@@ -304,7 +374,13 @@ export function EmissionStep() {
       <Field
         label="Cédula o documento *"
         error={errors[`${prefix}identificacion`]}
-        hint={isRcvEmision ? 'Al salir del campo se buscan los datos en Sis2000' : undefined}
+        hint={
+          isRcvEmision
+            ? 'Al salir del campo se buscan los datos en Sis2000'
+            : checkFuneralFlow
+              ? 'Al salir del campo se verifica si ya hay póliza vigente'
+              : undefined
+        }
       >
         <IdentityInput
           tipoDoc={person.tipoDoc ?? 'V'}
@@ -321,6 +397,7 @@ export function EmissionStep() {
           }}
           onIdentificacionChange={(v) => {
             lastLookupCid.current[prefix] = '';
+            lastFuneralCedula.current[prefix] = '';
             setPerson({ identificacion: clipPersonField('identificacion', v) });
           }}
           onIdentificacionBlur={
@@ -328,7 +405,11 @@ export function EmissionStep() {
               ? (id) => {
                   void lookupByCedula(prefix, person.tipoDoc ?? 'V', id, setPerson);
                 }
-              : undefined
+              : checkFuneralFlow
+                ? (id) => {
+                    void checkFuneralCedula(prefix, id);
+                  }
+                : undefined
           }
         />
       </Field>

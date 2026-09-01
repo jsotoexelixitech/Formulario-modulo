@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
 import { Field, Input } from '../../components/ui/FormField';
 import { IdentityInput } from '../../components/ui/IdentityInput';
@@ -7,6 +7,8 @@ import { useCatalogs } from '../../hooks/useCatalogs';
 import { useProductConfig } from '../../hooks/useProductConfig';
 import { getProductId } from '../../lib/product';
 import { syncTitularFromTomador } from '../../lib/funeral-sync';
+import { cedulaTienePolizaVigente } from '../../lib/funeral-cedula-check';
+import { toast } from '../../store/toastStore';
 import { SectionCard } from '../emission/EmissionStep';
 import type { FuneralPerson } from '../../types';
 import { Users, Heart, Plus, Trash2 } from 'lucide-react';
@@ -50,7 +52,9 @@ function PersonFields({
   parentescoOptions,
   sexoOptions,
   loading,
+  identityLoading,
   onChange,
+  onIdentificacionBlur,
 }: {
   person: FuneralPerson;
   errors: PersonErrors;
@@ -58,19 +62,27 @@ function PersonFields({
   parentescoOptions: { value: string; label: string }[];
   sexoOptions: { value: string; label: string }[];
   loading: boolean;
+  identityLoading?: boolean;
   onChange: (patch: Partial<FuneralPerson>) => void;
+  onIdentificacionBlur?: (identificacion: string) => void;
 }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <Field label="Identificación *" error={errors.identificacion}>
+      <Field
+        label="Identificación *"
+        error={errors.identificacion}
+        hint={onIdentificacionBlur ? 'Al salir del campo se verifica si ya hay póliza vigente' : undefined}
+      >
         <IdentityInput
           tipoDoc={person.tipoDoc || 'V'}
           identificacion={person.identificacion}
           maxLength={PERSON_FIELD_LIMITS.identificacion}
+          loading={identityLoading}
           onTipoDocChange={(v) => onChange({ tipoDoc: v })}
           onIdentificacionChange={(v) =>
             onChange({ identificacion: clipPersonField('identificacion', v) })
           }
+          onIdentificacionBlur={onIdentificacionBlur}
         />
       </Field>
 
@@ -189,6 +201,7 @@ export function FuneralStep() {
   const catalogs = useCatalogs();
   const [asegErrors, setAsegErrors] = useState<PersonErrors[]>([]);
   const [benefErrors, setBenefErrors] = useState<PersonErrors[]>([]);
+  const [cedulaChecking, setCedulaChecking] = useState<Record<number, boolean>>({});
 
   const parentescoOptions =
     catalogs.parentescos.length > 0
@@ -298,7 +311,35 @@ export function FuneralStep() {
     return e;
   };
 
-  const validate = (): boolean => {
+  const checkAseguradoCedula = useCallback(async (idx: number, identificacion: string) => {
+    const digits = String(identificacion || '').replace(/\D/g, '');
+    if (digits.length < 6) return true;
+    setCedulaChecking((s) => ({ ...s, [idx]: true }));
+    try {
+      const res = await cedulaTienePolizaVigente(digits);
+      if (res.blocked) {
+        setAsegErrors((prev) => {
+          const next = [...prev];
+          next[idx] = { ...(next[idx] ?? {}), identificacion: res.message };
+          return next;
+        });
+        toast.warning(
+          'Póliza vigente',
+          'Esta cédula ya tiene una póliza funeraria activa. No se puede continuar.',
+          8000,
+        );
+        return false;
+      }
+      return true;
+    } catch {
+      toast.warning('No se pudo verificar la cédula', 'Inténtalo de nuevo antes de continuar.', 4000);
+      return false;
+    } finally {
+      setCedulaChecking((s) => ({ ...s, [idx]: false }));
+    }
+  }, []);
+
+  const validate = async (): Promise<boolean> => {
     const aErr = funeral.asegurados.map((p, i) => validatePerson(p, i === 0));
     const bErr = funeral.beneficiarios.map((p) => validatePerson(p, false));
 
@@ -306,7 +347,13 @@ export function FuneralStep() {
     setBenefErrors(bErr);
 
     const hasPersonError = [...aErr, ...bErr].some((e) => Object.keys(e).length > 0);
-    return !hasPersonError;
+    if (hasPersonError) return false;
+
+    for (let i = 0; i < funeral.asegurados.length; i++) {
+      const ok = await checkAseguradoCedula(i, funeral.asegurados[i].identificacion);
+      if (!ok) return false;
+    }
+    return true;
   };
 
   (window as unknown as Record<string, unknown>).__validateStep3 = validate;
@@ -355,7 +402,11 @@ export function FuneralStep() {
                 parentescoOptions={parentescoOptions}
                 sexoOptions={sexoOptions}
                 loading={catalogs.loading}
+                identityLoading={Boolean(cedulaChecking[idx])}
                 onChange={(patch) => updateAsegurado(idx, patch)}
+                onIdentificacionBlur={(id) => {
+                  void checkAseguradoCedula(idx, id);
+                }}
               />
             </div>
           ))}

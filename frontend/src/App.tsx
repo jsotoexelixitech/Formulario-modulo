@@ -131,13 +131,18 @@ export default function App() {
     }
 
     if (localStep === 2) {
-      const validate = (window as unknown as Record<string, unknown>).__validateStep2 as (() => boolean) | undefined;
-      if (validate && !validate()) {
-        toast.warning(
-          'Campos obligatorios incompletos',
-          'Completa nombre, apellido, teléfono, correo, fecha de nacimiento, sexo, estado y ciudad para continuar.',
-        );
-        return;
+      const validate = (window as unknown as Record<string, unknown>).__validateStep2 as
+        | (() => boolean | Promise<boolean>)
+        | undefined;
+      if (validate) {
+        const isValid = await validate();
+        if (!isValid) {
+          toast.warning(
+            'No se puede continuar',
+            'Revisa la cédula y los campos obligatorios. Si ya hay póliza vigente, el proceso se detiene aquí.',
+          );
+          return;
+        }
       }
       if (!isFunerario() && !usesFuneralStep()) {
         syncTitularFromTomador();
