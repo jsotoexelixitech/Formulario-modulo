@@ -32,6 +32,7 @@ import {
   enrichBridgePayloadForSave,
   extractActorMetadataFromBridgeData,
 } from './sso-metadata';
+import { persistFlowHandoff } from './flow-handoff';
 
 // ── Configuración por puerto (dev local) o hostname (HTTPS sslip.io) ───────
 const PORT_TO_ORDER: Record<string, number> = {
@@ -244,7 +245,9 @@ function makeBridge(): BridgeAPI {
     // Solo OCR (order=1) persiste documents; otros módulos tienen slots idle que
     // sobrescribirían el expediente procesado en la sesión del flujo.
     if (order !== 1) delete out.documents;
-    return enrichBridgePayloadForSave(out, getModuleTokenKey());
+    const payload = enrichBridgePayloadForSave(out, getModuleTokenKey());
+    persistFlowHandoff(payload);
+    return payload;
   };
 
   // Campos cuyo valor NO debe sobrescribirse durante la hidratación.
