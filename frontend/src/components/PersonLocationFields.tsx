@@ -39,7 +39,7 @@ export function PersonLocationFields({
 }: PersonLocationFieldsProps) {
   return (
     <>
-      <Field label="Estado *" error={errors[`${prefix}estado`]}>
+      <Field anchor={`cli-${prefix}estado`} label="Estado *" error={errors[`${prefix}estado`]}>
         <SearchSelect
           value={person.cestado}
           options={estados.map((s) => ({ value: String(s.code), label: s.label }))}
@@ -56,6 +56,7 @@ export function PersonLocationFields({
         />
       </Field>
       <Field
+        anchor={`cli-${prefix}ciudad`}
         label="Ciudad *"
         error={errors[`${prefix}ciudad`]}
         hint={

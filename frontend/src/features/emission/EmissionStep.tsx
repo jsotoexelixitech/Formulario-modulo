@@ -102,6 +102,33 @@ interface ValidationErrors {
   [key: string]: string;
 }
 
+const CLIENT_FIELD_ORDER = [
+  'identificacion', 'nombre', 'apellido', 'telefono', 'email',
+  'fechaNac', 'sexo', 'estadoCivil', 'estado', 'ciudad', 'direccion',
+];
+const CLIENT_PREFIXES = ['tom_', 'aseg_', 'benef_'];
+
+function focusClientError(errors: ValidationErrors) {
+  const extras = Object.keys(errors)
+    .filter((k) => !CLIENT_PREFIXES.some((p) => CLIENT_FIELD_ORDER.some((f) => k === `${p}${f}`)))
+    .sort();
+  const ordered = [
+    ...CLIENT_PREFIXES.flatMap((p) => CLIENT_FIELD_ORDER.map((f) => `${p}${f}`)),
+    'tom_profesion',
+    ...extras,
+  ];
+  const first = ordered.find((k) => errors[k]);
+  const msg = (first && errors[first]) || 'Revisa los campos obligatorios marcados en rojo.';
+  toast.warning('No se puede continuar', msg, 6000);
+  if (!first) return;
+  window.requestAnimationFrame(() => {
+    const box = document.getElementById(`cli-${first}`);
+    box?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const control = box?.querySelector<HTMLElement>('input, select, textarea, button');
+    control?.focus();
+  });
+}
+
 const emailRe   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMPRESA_ID = Number(import.meta.env.VITE_EMPRESA_ID ?? 1);
 
@@ -491,7 +518,10 @@ export function EmissionStep() {
     }
 
     setErrors(e);
-    if (Object.keys(e).length > 0) return false;
+    if (Object.keys(e).length > 0) {
+      focusClientError(e);
+      return false;
+    }
 
     if (checkFuneralFlow) {
       const first = (funeral.beneficiarios ?? [])[0];
@@ -534,6 +564,7 @@ export function EmissionStep() {
   ) => (
     <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
       <Field
+        anchor={`cli-${prefix}identificacion`}
         label="Cédula o documento *"
         error={errors[`${prefix}identificacion`]}
         hint={
@@ -578,7 +609,7 @@ export function EmissionStep() {
         />
       </Field>
       <div className="hidden sm:block"></div>
-      <Field label="Nombre *" error={errors[`${prefix}nombre`]}>
+      <Field anchor={`cli-${prefix}nombre`} label="Nombre *" error={errors[`${prefix}nombre`]}>
         <Input
           value={person.nombre ?? ''}
           onChange={(e) => setPerson({ nombre: clipLetters(e.target.value, PERSON_FIELD_LIMITS.nombre) })}
@@ -586,7 +617,7 @@ export function EmissionStep() {
           maxLength={PERSON_FIELD_LIMITS.nombre}
         />
       </Field>
-      <Field label="Apellido *" error={errors[`${prefix}apellido`]}>
+      <Field anchor={`cli-${prefix}apellido`} label="Apellido *" error={errors[`${prefix}apellido`]}>
         <Input
           value={person.apellido ?? ''}
           onChange={(e) => setPerson({ apellido: clipLetters(e.target.value, PERSON_FIELD_LIMITS.apellido) })}
@@ -594,7 +625,7 @@ export function EmissionStep() {
           maxLength={PERSON_FIELD_LIMITS.apellido}
         />
       </Field>
-      <Field label="Teléfono *" error={errors[`${prefix}telefono`]} hint="11 dígitos · Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX">
+      <Field anchor={`cli-${prefix}telefono`} label="Teléfono *" error={errors[`${prefix}telefono`]} hint="11 dígitos · Digitel 0412/0422 · Movistar 0414/0424 · Movilnet 0416/0426 · fijos 02XX">
         <Input
           value={formatTelefono(person.telefono ?? '')}
           onChange={(e) => setPerson({ telefono: formatTelefono(e.target.value) })}
@@ -604,7 +635,7 @@ export function EmissionStep() {
           maxLength={PERSON_FIELD_LIMITS.telefonoDisplay}
         />
       </Field>
-      <Field label="Correo electrónico *" error={errors[`${prefix}email`]}>
+      <Field anchor={`cli-${prefix}email`} label="Correo electrónico *" error={errors[`${prefix}email`]}>
         <Input
           value={person.email ?? ''}
           onChange={(e) => setPerson({ email: clipPersonField('email', e.target.value) })}
@@ -624,7 +655,7 @@ export function EmissionStep() {
         catalogsLoading={catalogs.loading}
         exelixiFlow={exelixiFlow}
       />
-      <Field label="Fecha de Nac. *" error={errors[`${prefix}fechaNac`]}>
+      <Field anchor={`cli-${prefix}fechaNac`} label="Fecha de Nac. *" error={errors[`${prefix}fechaNac`]}>
         <Input
           value={person.fechaNac ?? ''}
           onChange={(e) => setPerson({ fechaNac: e.target.value })}
@@ -632,7 +663,7 @@ export function EmissionStep() {
           max={new Date().toISOString().split('T')[0]}
         />
       </Field>
-      <Field label="Sexo *" error={errors[`${prefix}sexo`]}>
+      <Field anchor={`cli-${prefix}sexo`} label="Sexo *" error={errors[`${prefix}sexo`]}>
         <SearchSelect
           value={person.sexo}
           options={
@@ -648,7 +679,7 @@ export function EmissionStep() {
           loading={catalogs.loading}
         />
       </Field>
-      <Field label="Estado Civil *" error={errors[`${prefix}estadoCivil`]}>
+      <Field anchor={`cli-${prefix}estadoCivil`} label="Estado Civil *" error={errors[`${prefix}estadoCivil`]}>
         <SearchSelect
           value={person.estadoCivil}
           options={
@@ -667,7 +698,7 @@ export function EmissionStep() {
         />
       </Field>
       <div className="hidden sm:block"></div>
-      <Field label="Dirección *" error={errors[`${prefix}direccion`]} full>
+      <Field anchor={`cli-${prefix}direccion`} label="Dirección *" error={errors[`${prefix}direccion`]} full>
         <Textarea
           value={person.direccion ?? ''}
           onChange={(e) => setPerson({ direccion: clipPersonField('direccion', e.target.value) })}
@@ -677,7 +708,7 @@ export function EmissionStep() {
         />
       </Field>
       {prefix === 'tom_' && isRcvEmision && showProfesion && (
-        <Field label="Profesión *" error={errors.tom_profesion}>
+        <Field anchor="cli-tom_profesion" label="Profesión *" error={errors.tom_profesion}>
           <SearchSelect
             value={person.cprofesion ?? ''}
             options={catalogs.profesiones.map((o) => ({ value: o.code, label: o.label }))}
@@ -787,7 +818,7 @@ export function EmissionStep() {
                     )}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="Cédula *" error={errors[`fben_${idx}_id`]}>
+                    <Field anchor={`cli-fben_${idx}_id`} label="Cédula *" error={errors[`fben_${idx}_id`]}>
                       <IdentityInput
                         tipoDoc={ben.tipoDoc || 'V'}
                         identificacion={ben.identificacion}
@@ -801,6 +832,7 @@ export function EmissionStep() {
                       />
                     </Field>
                     <Field
+                      anchor={`cli-fben_${idx}_pct`}
                       label="% Beneficio *"
                       error={errors[`fben_${idx}_pct`]}
                       hint="La suma de todos debe ser 100"
@@ -815,7 +847,7 @@ export function EmissionStep() {
                         }
                       />
                     </Field>
-                    <Field label="Nombre *" error={errors[`fben_${idx}_nombre`]}>
+                    <Field anchor={`cli-fben_${idx}_nombre`} label="Nombre *" error={errors[`fben_${idx}_nombre`]}>
                       <Input
                         value={ben.nombre}
                         onChange={(ev) =>
@@ -825,7 +857,7 @@ export function EmissionStep() {
                         }
                       />
                     </Field>
-                    <Field label="Apellido *" error={errors[`fben_${idx}_apellido`]}>
+                    <Field anchor={`cli-fben_${idx}_apellido`} label="Apellido *" error={errors[`fben_${idx}_apellido`]}>
                       <Input
                         value={ben.apellido}
                         onChange={(ev) =>
@@ -835,14 +867,14 @@ export function EmissionStep() {
                         }
                       />
                     </Field>
-                    <Field label="Fecha de Nac. *" error={errors[`fben_${idx}_fnac`]}>
+                    <Field anchor={`cli-fben_${idx}_fnac`} label="Fecha de Nac. *" error={errors[`fben_${idx}_fnac`]}>
                       <Input
                         type="date"
                         value={ben.fechaNac ?? ''}
                         onChange={(ev) => patchFuneralBeneficiario(idx, { fechaNac: ev.target.value })}
                       />
                     </Field>
-                    <Field label="Parentesco *" error={errors[`fben_${idx}_parentesco`]}>
+                    <Field anchor={`cli-fben_${idx}_parentesco`} label="Parentesco *" error={errors[`fben_${idx}_parentesco`]}>
                       <SearchSelect
                         value={ben.parentesco}
                         options={parentescoOptions}
@@ -851,7 +883,7 @@ export function EmissionStep() {
                         loading={catalogs.loading}
                       />
                     </Field>
-                    <Field label="Teléfono *" error={errors[`fben_${idx}_tel`]}>
+                    <Field anchor={`cli-fben_${idx}_tel`} label="Teléfono *" error={errors[`fben_${idx}_tel`]}>
                       <Input
                         value={formatTelefono(ben.telefono ?? '')}
                         onChange={(ev) =>

@@ -1386,10 +1386,10 @@ export function VehicleStep() {
             <Input
               value={vehicle.serialMotor ?? ''}
               disabled={qaIdentLock}
-              onChange={(e) => setVehicle({ serialMotor: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 60) })}
+              onChange={(e) => setVehicle({ serialMotor: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, VEHICLE_SERIAL_MAX_LEN) })}
               placeholder="Ej. 4A123456789"
               className="font-mono uppercase tracking-wider"
-              maxLength={60}
+              maxLength={VEHICLE_SERIAL_MAX_LEN}
             />
           </Field>
 

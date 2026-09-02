@@ -142,10 +142,6 @@ export default function App() {
       if (validate) {
         const isValid = await validate();
         if (!isValid) {
-          toast.warning(
-            'No se puede continuar',
-            'Revisa la cédula y los campos obligatorios. Si ya hay póliza vigente, el proceso se detiene aquí.',
-          );
           return;
         }
       }
