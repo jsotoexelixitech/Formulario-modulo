@@ -198,6 +198,7 @@ export function EmissionStep() {
       prefix: string,
       tipoDoc: string,
       identificacion: string,
+      current: PersonFormPatch,
       setPerson: (patch: PersonFormPatch) => void,
     ) => {
       const digits = String(identificacion || '').replace(/\D/g, '');
@@ -318,13 +319,14 @@ export function EmissionStep() {
       prefix: string,
       tipoDoc: string,
       identificacion: string,
+      current: PersonFormPatch,
       setPerson: (patch: PersonFormPatch) => void,
     ): Promise<boolean> => {
       const digits = String(identificacion || '').replace(/\D/g, '');
       if (digits.length < 6) return true;
       const ok = await checkFuneralCedula(prefix, identificacion);
       if (!ok) return false;
-      await lookupByCedula(prefix, tipoDoc || 'V', identificacion, setPerson);
+      await lookupByCedula(prefix, tipoDoc || 'V', identificacion, current, setPerson);
       return true;
     },
     [checkFuneralCedula, lookupByCedula],
@@ -339,6 +341,7 @@ export function EmissionStep() {
         'tom_',
         tomador.tipoDoc ?? 'V',
         tomador.identificacion,
+        tomador,
         setTomador,
       );
     }, 450);
@@ -354,6 +357,7 @@ export function EmissionStep() {
         'aseg_',
         asegurado.tipoDoc ?? 'V',
         asegurado.identificacion,
+        asegurado,
         setAsegurado,
       );
     }, 450);
@@ -563,11 +567,11 @@ export function EmissionStep() {
           onIdentificacionBlur={
             isRcvEmision
               ? (id) => {
-                  void lookupByCedula(prefix, person.tipoDoc ?? 'V', id, setPerson);
+                  void lookupByCedula(prefix, person.tipoDoc ?? 'V', id, person, setPerson);
                 }
               : checkFuneralFlow
                 ? (id) => {
-                    void runFuneralCedulaAuto(prefix, person.tipoDoc ?? 'V', id, setPerson);
+                    void runFuneralCedulaAuto(prefix, person.tipoDoc ?? 'V', id, person, setPerson);
                   }
                 : undefined
           }
