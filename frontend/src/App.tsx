@@ -9,7 +9,8 @@ import { Button } from './components/ui/Button';
 import { EmissionStep } from './features/emission/EmissionStep';
 import { VehicleStep } from './features/vehicle/VehicleStep';
 import { FuneralStep } from './features/funeral/FuneralStep';
-import { getProductConfig, isFunerario, isRcv, skipsPersonasStep, usesFuneralStep, usesVehicleStep } from './lib/product';
+import { getProductConfig, isFunerario, isRcv, persistProductFromHints, skipsPersonasStep, usesFuneralStep, usesVehicleStep } from './lib/product';
+import { applyMetadataFromNexusToken } from './lib/nexus-token-client';
 import { continueToEmisionModule } from './lib/exelixi-catalog';
 import { continueToEmisionCotizador, isCotizadorFlow } from './lib/cotizador-flow';
 import type { ExelixiWizardHandoff } from './lib/exelixi-wizard-handoff';
@@ -101,8 +102,17 @@ export default function App() {
     return <FormularioConfigPanel />;
   }
 
-  const { goTo } = useWizardStore();
+  const { goTo, setMetadataCanal } = useWizardStore();
   const step = useWizardStore((s) => s.step);
+
+  useEffect(() => {
+    applyMetadataFromNexusToken('nexus_access_token_formulario', (metadata) => {
+      setMetadataCanal(metadata);
+      if (metadata.product === 'funerario' || metadata.product === 'rcv') {
+        persistProductFromHints({ product: String(metadata.product) });
+      }
+    });
+  }, [setMetadataCanal]);
   const cotizadorRcv = isCotizadorFlow() && isRcv();
   const [localStep, setLocalStep] = useState<2 | 3>(() => (cotizadorRcv || step === 3 ? 3 : 2));
   const product = getProductConfig();
