@@ -111,6 +111,26 @@ export interface NexusVerifyResult {
   reason?: string;
 }
 
+function nexusApiCandidates(primary: string): string[] {
+  const out: string[] = [];
+  const push = (raw?: string | null) => {
+    const t = raw?.trim().replace(/\/$/, '');
+    if (t && !out.includes(t)) out.push(t);
+  };
+  push(primary);
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    const origin = window.location.origin;
+    const path = window.location.pathname.replace(/\/$/, '') || '/';
+    for (const [prefix, apiPath] of MODULE_NEXUS_API) {
+      if (path === prefix || path.startsWith(`${prefix}/`)) {
+        push(`${origin}${apiPath}`);
+      }
+    }
+    push(`${origin}/nexus-api`);
+  }
+  return out;
+}
+
 export async function verifyNexusAccess(nexusApiUrl: string): Promise<NexusVerifyResult> {
   const token = getNexusToken(STORAGE_KEY);
 
@@ -121,34 +141,51 @@ export async function verifyNexusAccess(nexusApiUrl: string): Promise<NexusVerif
     };
   }
 
-  try {
-    const res = await fetch(`${nexusApiUrl.replace(/\/$/, '')}/api/access/verify`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
+  let lastReason = 'No se pudo conectar con el servidor de autorización.';
 
-    const data = await res.json();
+  for (const base of nexusApiCandidates(nexusApiUrl)) {
+    try {
+      const res = await fetch(`${base}/api/access/verify`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (data.active) {
-      // Token deslizante: el backend reemite un nexus_token fresco en cada
-      // verify. Se guarda para que la sesión no caduque (el token del navegador
-      // expira en 1 h; así se renueva en cada verify sin recargar la página).
-      if (data.access_token) {
-        persistNexusToken(STORAGE_KEY, data.access_token);
-      }
-      return {
-        active: true,
-        product: data.product,
-        empresa: data.empresa,
-        submodulo: data.submodulo,
+      const text = await res.text();
+      let data: {
+        active?: boolean;
+        access_token?: string;
+        product?: NexusVerifyResult['product'];
+        empresa?: NexusVerifyResult['empresa'];
+        submodulo?: NexusVerifyResult['submodulo'];
+        reason?: string;
       };
-    }
+      try {
+        data = JSON.parse(text) as typeof data;
+      } catch {
+        lastReason = `El servidor de autorización no respondió JSON (${res.status} en ${base}).`;
+        continue;
+      }
 
-    return { active: false, reason: data.reason ?? 'Servicio no disponible para esta empresa.' };
-  } catch {
-    return { active: false, reason: 'No se pudo conectar con el servidor de autorización.' };
+      if (data.active) {
+        if (data.access_token) {
+          persistNexusToken(STORAGE_KEY, data.access_token);
+        }
+        return {
+          active: true,
+          product: data.product,
+          empresa: data.empresa,
+          submodulo: data.submodulo,
+        };
+      }
+
+      lastReason = data.reason ?? 'Servicio no disponible para esta empresa.';
+    } catch {
+      /* probar siguiente candidato */
+    }
   }
+
+  return { active: false, reason: lastReason };
 }

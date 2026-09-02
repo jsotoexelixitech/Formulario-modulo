@@ -8,6 +8,7 @@ cd "$ROOT/frontend"
 unset PORT VITE_APP_BASE VITE_EMISSION_CONTINUE_BASE DATABASE_URL 2>/dev/null || true
 export VITE_APP_BASE=./
 export VITE_DEPLOY_PREFIX=/formulario
+export VITE_NEXUS_USE_MODULE_PROXY=1
 export VITE_EMISION_CONTINUE_BASE=/emision
 echo "Build Formulario VITE_APP_BASE=${VITE_APP_BASE} VITE_DEPLOY_PREFIX=${VITE_DEPLOY_PREFIX}"
 npm run build
