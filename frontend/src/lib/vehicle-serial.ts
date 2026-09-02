@@ -1,11 +1,21 @@
 /** Sis2000 xserialcarroceria / xsercar: NVARCHAR(60). */
 export const VEHICLE_SERIAL_MAX_LEN = 60;
 
+/** Serial de motor en el formulario RCV (tope de captura). */
+export const MOTOR_SERIAL_MAX_LEN = 20;
+
 export function normalizeVehicleSerial(raw: string): string {
   return String(raw || '')
     .replace(/[^a-zA-Z0-9]/g, '')
     .toUpperCase()
     .slice(0, VEHICLE_SERIAL_MAX_LEN);
+}
+
+export function normalizeMotorSerial(raw: string): string {
+  return String(raw || '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase()
+    .slice(0, MOTOR_SERIAL_MAX_LEN);
 }
 
 export function validateVehicleSerialMessage(serial?: string | null): string | undefined {

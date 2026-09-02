@@ -35,8 +35,10 @@ import {
 } from '../../lib/rcv-cargo-toneladas';
 import {
   normalizeVehicleSerial,
+  normalizeMotorSerial,
   validateVehicleSerialMessage,
   VEHICLE_SERIAL_MAX_LEN,
+  MOTOR_SERIAL_MAX_LEN,
 } from '../../lib/vehicle-serial';
 import {
   SECONDARY_IDENTIFICACION_MAX_LENGTH,
@@ -756,6 +758,11 @@ export function VehicleStep() {
     const serialErr = validateVehicleSerialMessage(vehicle.serial);
     if (serialErr) e.serial = serialErr;
 
+    const motorClipped = normalizeMotorSerial(vehicle.serialMotor ?? '');
+    if ((vehicle.serialMotor ?? '') !== motorClipped) {
+      setVehicle({ serialMotor: motorClipped });
+    }
+
     if (hasDriver && !cotizadorRcv) {
       const nombre   = (conductor.nombre   ?? '').trim();
       const apellido = (conductor.apellido ?? '').trim();
@@ -1382,14 +1389,14 @@ export function VehicleStep() {
           </Field>
 
           {/* Serial del motor — opcional */}
-          <Field label="Serial del motor" hint="Opcional · Máx. 60 caracteres · Aparece en el documento del vehículo">
+          <Field label="Serial del motor" hint={`Opcional · Máx. ${MOTOR_SERIAL_MAX_LEN} caracteres · Aparece en el documento del vehículo`}>
             <Input
               value={vehicle.serialMotor ?? ''}
               disabled={qaIdentLock}
-              onChange={(e) => setVehicle({ serialMotor: e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, VEHICLE_SERIAL_MAX_LEN) })}
+              onChange={(e) => setVehicle({ serialMotor: normalizeMotorSerial(e.target.value) })}
               placeholder="Ej. 4A123456789"
               className="font-mono uppercase tracking-wider"
-              maxLength={VEHICLE_SERIAL_MAX_LEN}
+              maxLength={MOTOR_SERIAL_MAX_LEN}
             />
           </Field>
 

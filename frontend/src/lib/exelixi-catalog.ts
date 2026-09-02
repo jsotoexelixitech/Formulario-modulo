@@ -6,6 +6,7 @@ import {
   type OcrDocType,
 } from './exelixi-handoff-types';
 import { resolveOcrModelo, resolveOcrTipoPlaca, sanitizeOcrField } from './vehicle-carnet-labels';
+import { normalizeMotorSerial } from './vehicle-serial';
 import { extractTomadorFromCertificado } from './carnet-propietario';
 import { applyOcrPersonRoles } from './ocr-person-roles';
 import { applyFuneralOcrCedulas } from './funeral-ocr-apply';
@@ -267,7 +268,7 @@ export function applyExelixiOcrHandoff(
       año: cert.año ?? cert.anio ?? '',
       color: cert.color ?? '',
       serial: sanitizeOcrField(cert.serial),
-      serialMotor: sanitizeOcrField(cert.serialMotor),
+      serialMotor: normalizeMotorSerial(sanitizeOcrField(cert.serialMotor)),
       cilindrada: rcvHandoff ? cert.cilindrada ?? '' : '',
       tipoCarnet: rcvHandoff ? cert.tipoCarnet : undefined,
       tipoPlaca: resolveOcrTipoPlaca(cert),
