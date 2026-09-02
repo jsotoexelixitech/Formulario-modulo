@@ -145,13 +145,22 @@ export async function verifyNexusAccess(nexusApiUrl: string): Promise<NexusVerif
 
   for (const base of nexusApiCandidates(nexusApiUrl)) {
     try {
-      const res = await fetch(`${base}/api/access/verify`, {
+      const url = `${base}/api/access/verify?_=${Date.now()}`;
+      const res = await fetch(url, {
         method: 'GET',
+        cache: 'no-store',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
         },
       });
+
+      if (res.status === 304) {
+        lastReason = `verify en caché 304 (${base}); se ignoró.`;
+        continue;
+      }
 
       const text = await res.text();
       let data: {

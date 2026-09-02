@@ -46,7 +46,14 @@ export function nexusPreviewProxyPlugin(
         dest,
         { method: req.method, headers },
         (proxyRes) => {
-          res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
+          const headers = { ...proxyRes.headers };
+          if (pathname.includes('/access/verify')) {
+            headers['cache-control'] = 'no-store, no-cache, must-revalidate';
+            headers['pragma'] = 'no-cache';
+            delete headers['etag'];
+            delete headers['last-modified'];
+          }
+          res.writeHead(proxyRes.statusCode ?? 502, headers);
           proxyRes.pipe(res);
         },
       );
