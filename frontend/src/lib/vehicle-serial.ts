@@ -1,5 +1,5 @@
-/** Sis2000 xserialcarroceria / xsercar: NVARCHAR(60). */
-export const VEHICLE_SERIAL_MAX_LEN = 60;
+/** Tope de captura del serial de carrocería en el formulario RCV. */
+export const VEHICLE_SERIAL_MAX_LEN = 20;
 
 /** Serial de motor en el formulario RCV (tope de captura). */
 export const MOTOR_SERIAL_MAX_LEN = 20;

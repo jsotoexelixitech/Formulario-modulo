@@ -760,7 +760,11 @@ export function VehicleStep() {
       e.color = 'El color no puede superar 15 caracteres';
     }
 
-    const serialErr = validateVehicleSerialMessage(vehicle.serial);
+    const serialClipped = normalizeVehicleSerial(vehicle.serial ?? '');
+    if ((vehicle.serial ?? '') !== serialClipped) {
+      setVehicle({ serial: serialClipped });
+    }
+    const serialErr = validateVehicleSerialMessage(serialClipped);
     if (serialErr) e.serial = serialErr;
 
     const motorClipped = normalizeMotorSerial(vehicle.serialMotor ?? '');

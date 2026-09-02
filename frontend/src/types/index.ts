@@ -192,7 +192,7 @@ export interface VehicleData {
   xcategoria_uso?: string;
   /** Tipo de vehículo INMA (1=particular, 2=rústico, 3=carga…) — set al elegir versión. Usado en planesRcv. */
   ctipo?: number;
-  /** Serial del motor — opcional, máx. 60 caracteres. Aparece en el documento del vehículo. */
+  /** Serial del motor — opcional, máx. 20 caracteres. Aparece en el documento del vehículo. */
   serialMotor?: string;
   /** Cilindrada CC (carnet binacional Colombia). */
   cilindrada?: string;
