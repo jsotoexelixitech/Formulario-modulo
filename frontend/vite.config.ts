@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
   const modulePrefix =
     resolvePublicModulePrefix(env, base) || (base === '/' ? '' : '/formulario');
   const nexusTarget = env.VITE_NEXUS_API_PROXY || 'http://127.0.0.1:3092';
+  const flowTarget = env.VITE_FLOW_API_PROXY || 'http://127.0.0.1:3091';
 
   const proxy = withNexusPreviewProxy(
     prefixDevProxy(base, {
@@ -35,10 +36,10 @@ export default defineConfig(({ mode }) => {
   return {
     base,
     plugins: [
-      nexusPreviewProxyPlugin(modulePrefix, nexusTarget),
+      nexusPreviewProxyPlugin(modulePrefix, nexusTarget, flowTarget),
       react(),
       tailwindcss(),
-      spaPreviewFallback(base),
+      spaPreviewFallback(base, modulePrefix),
     ],
     server: {
       host: true,

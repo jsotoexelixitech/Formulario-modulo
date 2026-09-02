@@ -364,6 +364,27 @@ function makeBridge(): BridgeAPI {
       return out ?? { finished: true };
     } catch (e) {
       console.warn('[bridge] advance failed', e);
+      if (order === 2) {
+        const emisionBase = (
+          (import.meta.env.VITE_EMISION_CONTINUE_BASE as string | undefined)?.replace(/\/$/, '')
+          || '/emision'
+        );
+        const params = new URLSearchParams();
+        if (sid) params.set('sid', sid);
+        const token =
+          getNexusTokenFromUrl()
+          || (typeof sessionStorage !== 'undefined'
+            ? sessionStorage.getItem(getModuleTokenKey())
+            : null);
+        if (token) params.set('nexus_token', token);
+        try {
+          const product = sessionStorage.getItem('exelixi_product') || 'rcv';
+          params.set('product', product);
+        } catch {
+          params.set('product', 'rcv');
+        }
+        window.location.href = `${emisionBase}/?${params.toString()}`;
+      }
       return { finished: true };
     }
   };
