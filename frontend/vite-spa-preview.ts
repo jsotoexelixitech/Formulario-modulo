@@ -2,9 +2,10 @@ import type { Plugin } from 'vite';
 import { isBackendProxyPath } from './vite-paths';
 
 /** Fallback SPA para `vite preview` bajo subpath (/formulario/, /pagos/, etc.). */
-export function spaPreviewFallback(base: string): Plugin {
+export function spaPreviewFallback(base: string, deployPrefix = ''): Plugin {
   const normalizedBase = base === './' ? '/' : base.endsWith('/') ? base : `${base}/`;
   const basePath = normalizedBase.replace(/\/$/, '');
+  const publicPrefix = deployPrefix.replace(/\/$/, '');
 
   return {
     name: 'spa-preview-fallback',
@@ -20,6 +21,19 @@ export function spaPreviewFallback(base: string): Plugin {
         const qs = search ? `?${search}` : '';
 
         if (isBackendProxyPath(pathname)) {
+          next();
+          return;
+        }
+
+        if (
+          base === './'
+          && publicPrefix
+          && (pathname === publicPrefix
+            || pathname === `${publicPrefix}/`
+            || pathname.startsWith(`${publicPrefix}/`))
+          && !pathname.includes('.')
+        ) {
+          req.url = `/index.html${qs}`;
           next();
           return;
         }
