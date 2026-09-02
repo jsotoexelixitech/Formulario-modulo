@@ -97,6 +97,7 @@ interface VehicleErrors {
   año?: string;
   marca?: string;
   modelo?: string;
+  version?: string;
   uso?: string;
   color?: string;
   serial?: string;
@@ -113,6 +114,29 @@ interface VehicleErrors {
   cond_direccion?: string;
   toneladas?: string;
   recargoRcv?: string;
+}
+
+const VEHICLE_ERROR_ORDER: (keyof VehicleErrors)[] = [
+  'placa', 'año', 'marca', 'modelo', 'version', 'uso', 'toneladas',
+  'color', 'serial',
+  'cond_identificacion', 'cond_nombre', 'cond_apellido', 'cond_licencia',
+  'cond_telefono', 'cond_email', 'cond_sexo', 'cond_estadoCivil',
+  'cond_estado', 'cond_ciudad', 'cond_direccion',
+];
+
+function focusVehicleError(errors: VehicleErrors, opts?: { silent?: boolean }) {
+  const first = VEHICLE_ERROR_ORDER.find((k) => errors[k]);
+  const msg = (first && errors[first]) || 'Completa los datos del vehículo marcados en rojo.';
+  if (!opts?.silent) {
+    toast.warning('No se puede continuar', msg, 6000);
+  }
+  if (!first) return;
+  window.requestAnimationFrame(() => {
+    const box = document.getElementById(`veh-${first}`);
+    box?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const control = box?.querySelector<HTMLElement>('input, select, textarea');
+    control?.focus();
+  });
 }
 
 // ── Hook catálogo INMA ────────────────────────────────────────────────────────
@@ -310,12 +334,12 @@ export function VehicleStep() {
   const ocrCert     = documents.certificado.ocr;
   const hasOcr      = !!(ocrCert?.marca || ocrCert?.modelo || ocrCert?.placa);
   const hasOcrCodes = !!(vehicle.cmarca && vehicle.cmodelo);
-  /** QA: placa/serial editables para pruebas; solo INMA base fijo si OCR matcheó códigos. */
+  /** QA: placa/serial editables para pruebas; no auto-bloquear INMA. */
   const qaOcrLock = isQaDeploy() && hasOcr;
-  const qaIdentLock = qaOcrLock && !isQaDeploy();
-  const inmaBasicsLocked = qaOcrLock ? hasOcrCodes : verified;
-  /** Versión y uso no vienen del OCR — en QA deben seguir editables (commit 33a41cb bloqueaba todo). */
-  const versionLocked = !isQaDeploy() && verified;
+  const qaIdentLock = false;
+  /** Solo se bloquean año/marca/modelo si el usuario confirma (nunca en QA). */
+  const inmaBasicsLocked = !isQaDeploy() && verified;
+  const versionLocked = false;
 
   // ── Cargar rango de años (nacional vs binacional) ─────────────────────────
   useEffect(() => {
@@ -692,14 +716,18 @@ export function VehicleStep() {
       if (req(vehicle.cmarca)) e.marca = 'La marca es obligatoria';
       if (req(vehicle.cmodelo)) e.modelo = 'Selecciona el modelo del catálogo';
       else if (req(vehicle.modelo)) e.modelo = 'El modelo es obligatorio';
-      if (req(vehicle.cversion)) e.uso = 'Debes seleccionar la versión exacta del vehículo';
+      if (req(vehicle.cversion)) e.version = 'Debes seleccionar la versión exacta del vehículo';
       else if (!vehicle.ccategoria_uso && req(vehicle.uso)) e.uso = 'Selecciona el uso del vehículo';
       if (rcvLaMundial && showToneladas && (vehicle.ntoneladas == null || Number.isNaN(Number(vehicle.ntoneladas)))) {
         e.toneladas = 'Indica las toneladas totales (mín. 13 TM)';
       }
 
       setErrors(e);
-      return Object.keys(e).length === 0;
+      if (Object.keys(e).length > 0) {
+        focusVehicleError(e);
+        return false;
+      }
+      return true;
     }
 
     const placaErr = validatePlacaMessage(vehicle.placa, vehicle.tipoPlaca ?? 'nacional');
@@ -710,7 +738,7 @@ export function VehicleStep() {
     if (req(vehicle.cmodelo)) e.modelo = 'Selecciona el modelo del catálogo';
     else if (req(vehicle.modelo)) e.modelo = 'El modelo es obligatorio';
 
-    if (req(vehicle.cversion)) e.uso = 'Debes seleccionar la versión exacta del vehículo';
+    if (req(vehicle.cversion)) e.version = 'Debes seleccionar la versión exacta del vehículo';
     else if (!vehicle.ccategoria_uso && req(vehicle.uso)) e.uso = 'Selecciona el uso del vehículo';
 
     if (rcvLaMundial && showToneladas && (vehicle.ntoneladas == null || Number.isNaN(Number(vehicle.ntoneladas)))) {
@@ -794,8 +822,9 @@ export function VehicleStep() {
     }
 
     setErrors(e);
-    
+
     if (Object.keys(e).length > 0) {
+      focusVehicleError(e);
       return false;
     }
 
@@ -810,7 +839,9 @@ export function VehicleStep() {
         if (!res.success) {
           const msg = res.message || res.error || 'El vehículo no puede ser asegurado.';
           toast.error('Atención', msg, 6000);
-          setErrors({ ...e, placa: msg, serial: msg });
+          const next = { ...e, placa: msg, serial: msg };
+          setErrors(next);
+          focusVehicleError(next, { silent: true });
           return false;
         }
       } catch (err) {
@@ -819,7 +850,9 @@ export function VehicleStep() {
             ? err.message
             : 'No se pudo validar el vehículo. Inténtalo de nuevo.';
         toast.error('Error', msg, 6000);
-        setErrors({ ...e, placa: msg, serial: msg });
+        const next = { ...e, placa: msg, serial: msg };
+        setErrors(next);
+        focusVehicleError(next, { silent: true });
         return false;
       }
     }
@@ -863,9 +896,9 @@ export function VehicleStep() {
                 </p>
                 <p className="text-xs text-indigo-100 mt-0.5 leading-relaxed">
                   {qaOcrLock
-                    ? 'Entorno QA: marca/modelo INMA fijos si el OCR los identificó. Placa, serial y versión puedes ajustarlos para pruebas.'
+                    ? 'Entorno QA: puedes cambiar año, marca, modelo, versión y serial. Completa lo que falte para continuar.'
                     : hasOcrCodes
-                      ? 'Marca y modelo identificados en el catálogo. Solo confirma la versión.'
+                      ? 'Marca y modelo identificados en el catálogo. Confirma o cambia la versión.'
                       : 'Revisa los campos y completa lo que falte. Puedes cambiar cualquier valor.'}
                 </p>
               </div>
@@ -932,6 +965,7 @@ export function VehicleStep() {
           )}
 
           <Field
+            anchor="veh-placa"
             label={cotizadorRcv ? 'Placa *' : 'Placa'}
             error={errors.placa}
             hint={placaValidating ? 'Validando placa en Sis2000…' : 'Al salir del campo se valida si la placa está activa'}
@@ -961,7 +995,7 @@ export function VehicleStep() {
           </Field>
 
           {/* Año — selector del catálogo INMA */}
-          <Field label="Año del vehículo *" error={errors.año}>
+          <Field anchor="veh-año" label="Año del vehículo *" error={errors.año}>
             {anios.length > 0 ? (
               <Select
                 value={vehicle.año}
@@ -985,6 +1019,7 @@ export function VehicleStep() {
 
           {/* Marca */}
           <Field
+            anchor="veh-marca"
             label={
               <span className="flex items-center gap-1.5">
                 Marca
@@ -1033,6 +1068,7 @@ export function VehicleStep() {
 
           {/* Modelo */}
           <Field
+            anchor="veh-modelo"
             label={
               <span className="flex items-center gap-1.5">
                 Modelo
@@ -1081,6 +1117,8 @@ export function VehicleStep() {
           {/* Versión + Uso — emparejados en la misma fila (cada uno media columna) */}
           {(vehicle.cmodelo || loadV) && (
             <Field
+              anchor="veh-version"
+              error={errors.version}
               label={
                 <span className="flex items-center gap-1.5">
                   Versión
@@ -1128,6 +1166,7 @@ export function VehicleStep() {
 
           {/* Uso — categorías dinámicas según la versión seleccionada */}
           <Field
+            anchor="veh-uso"
             error={errors.uso}
             label={
               <span className="flex items-center gap-1.5">
@@ -1244,6 +1283,7 @@ export function VehicleStep() {
 
               {showToneladas && (
                 <Field
+                  anchor="veh-toneladas"
                   label="Toneladas totales *"
                   error={errors.toneladas}
                   hint="Solo para categoría >12 TM. Si indica menos de 12, se usará 13 TM (regla La Mundial)."
@@ -1288,7 +1328,7 @@ export function VehicleStep() {
           {!cotizadorRcv && (
           <>
           {/* Color */}
-          <Field label="Color *" error={errors.color}>
+          <Field anchor="veh-color" label="Color *" error={errors.color}>
             <div className="relative">
               <Input
                 value={vehicle.color}
@@ -1308,12 +1348,13 @@ export function VehicleStep() {
 
           {/* Serial de carrocería (VIN) */}
           <Field
+            anchor="veh-serial"
             label="Serial de carrocería (VIN) *"
             error={errors.serial}
             hint={
               serialValidating
                 ? 'Validando serial en Sis2000…'
-                : 'Como en la licencia de tránsito (máx. 18 caracteres) · Al salir del campo se valida si está activo'
+                : `Como en la licencia de tránsito (máx. ${VEHICLE_SERIAL_MAX_LEN} caracteres) · Al salir del campo se valida si está activo`
             }
           >
             <div className="relative">
@@ -1404,6 +1445,7 @@ export function VehicleStep() {
         {hasDriver && (
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
               <Field
+                anchor="veh-cond_identificacion"
                 label="Cédula o documento *"
                 error={errors.cond_identificacion}
                 hint="Al salir del campo se buscan los datos en Sis2000"
@@ -1431,7 +1473,7 @@ export function VehicleStep() {
                 />
               </Field>
               <div className="hidden sm:block"></div>
-              <Field label="Nombre *" error={errors.cond_nombre}>
+              <Field anchor="veh-cond_nombre" label="Nombre *" error={errors.cond_nombre}>
                 <Input
                   value={conductor.nombre}
                   onChange={(e) =>
@@ -1445,7 +1487,7 @@ export function VehicleStep() {
                   maxLength={PERSON_FIELD_LIMITS.nombre}
                 />
               </Field>
-              <Field label="Apellido *" error={errors.cond_apellido}>
+              <Field anchor="veh-cond_apellido" label="Apellido *" error={errors.cond_apellido}>
                 <Input
                   value={conductor.apellido}
                   onChange={(e) =>
@@ -1459,7 +1501,7 @@ export function VehicleStep() {
                   maxLength={PERSON_FIELD_LIMITS.apellido}
                 />
               </Field>
-              <Field label="Teléfono *" error={errors.cond_telefono} hint="Exactamente 11 dígitos, ej. 04121234567">
+              <Field anchor="veh-cond_telefono" label="Teléfono *" error={errors.cond_telefono} hint="Exactamente 11 dígitos, ej. 04121234567">
                 <Input
                   value={formatTelefono(conductor.telefono ?? '')}
                   onChange={(e) => setConductor({ telefono: formatTelefono(e.target.value) })}
@@ -1469,7 +1511,7 @@ export function VehicleStep() {
                   inputMode="numeric"
                 />
               </Field>
-              <Field label="Correo electrónico *" error={errors.cond_email}>
+              <Field anchor="veh-cond_email" label="Correo electrónico *" error={errors.cond_email}>
                 <Input
                   value={conductor.email ?? ''}
                   onChange={(e) => setConductor({ email: clipPersonField('email', e.target.value) })}
@@ -1492,14 +1534,14 @@ export function VehicleStep() {
               <Field label="Fecha de nacimiento *">
                 <Input value={conductor.fechaNac ?? ''} onChange={(e) => setConductor({ fechaNac: e.target.value })} type="date" />
               </Field>
-              <Field label="Sexo *" error={errors.cond_sexo}>
+              <Field anchor="veh-cond_sexo" label="Sexo *" error={errors.cond_sexo}>
                 <SearchSelect
                   value={conductor.sexo}
                   options={catalogs.sexos.length > 0 ? catalogs.sexos.map((s) => ({ value: String(s.label), label: s.label })) : [{ value: 'Femenino', label: 'Femenino' }, { value: 'Masculino', label: 'Masculino' }]}
                   onChange={(value) => setConductor({ sexo: value })} placeholder="— Seleccionar —" loading={catalogs.loading}
                 />
               </Field>
-              <Field label="Estado civil *" error={errors.cond_estadoCivil}>
+              <Field anchor="veh-cond_estadoCivil" label="Estado civil *" error={errors.cond_estadoCivil}>
                 <SearchSelect
                   value={conductor.estadoCivil}
                   options={catalogs.estadosCivil.length > 0 ? catalogs.estadosCivil.map((s) => ({ value: String(s.label), label: s.label })) : [{ value: 'Soltero(a)', label: 'Soltero(a)' }, { value: 'Casado(a)', label: 'Casado(a)' }, { value: 'Divorciado(a)', label: 'Divorciado(a)' }, { value: 'Viudo(a)', label: 'Viudo(a)' }]}
@@ -1507,7 +1549,7 @@ export function VehicleStep() {
                 />
               </Field>
               <div className="hidden sm:block"></div>
-              <Field label="Dirección *" error={errors.cond_direccion} full>
+              <Field anchor="veh-cond_direccion" label="Dirección *" error={errors.cond_direccion} full>
                 <Textarea
                   value={conductor.direccion ?? ''}
                   onChange={(e) =>
@@ -1518,7 +1560,7 @@ export function VehicleStep() {
                   maxLength={PERSON_FIELD_LIMITS.direccion}
                 />
               </Field>
-              <Field label="Número de licencia de conducir *" error={errors.cond_licencia} hint="Máx. 20 caracteres alfanuméricos" full>
+              <Field anchor="veh-cond_licencia" label="Número de licencia de conducir *" error={errors.cond_licencia} hint="Máx. 20 caracteres alfanuméricos" full>
                 <Input
                   value={conductor.licencia ?? ''}
                   onChange={(e) => setConductor({ licencia: e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20) })}

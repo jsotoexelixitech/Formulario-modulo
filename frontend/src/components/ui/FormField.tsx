@@ -8,11 +8,16 @@ interface FieldProps {
   full?: boolean;
   children: React.ReactNode;
   className?: string;
+  /** Ancla para scroll/foco cuando hay error de validación. */
+  anchor?: string;
 }
 
-export function Field({ label, error, hint, full, children, className }: FieldProps) {
+export function Field({ label, error, hint, full, children, className, anchor }: FieldProps) {
   return (
-    <div className={cn('flex flex-col gap-1.5', full && 'sm:col-span-2', className)}>
+    <div
+      id={anchor}
+      className={cn('flex flex-col gap-1.5', full && 'sm:col-span-2', className)}
+    >
       <label className="text-[0.78rem] font-bold text-slate-600 tracking-wide">
         {label}
       </label>
