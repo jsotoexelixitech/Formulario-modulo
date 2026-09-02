@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useWizardStore } from '../../store/wizardStore';
 import { Field, Input, Select, Textarea } from '../../components/ui/FormField';
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch';
@@ -224,6 +224,11 @@ export function VehicleStep() {
   const conductorCiudades = useCiudades(conductor.cestado);
   const isBinacional = rcvLaMundial && vehicle.tipoPlaca === 'binacional';
   const showToneladas = rcvLaMundial && isCategoriaToneladas(vehicle.ccategoria_uso);
+
+  // Al entrar desde cliente el scroll queda abajo (conductor habitual). Ir a datos del vehículo.
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, []);
 
   useEffect(() => {
     if (driverFromOcrApplied.current || cotizadorRcv || hasDriver) return;
