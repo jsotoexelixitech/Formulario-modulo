@@ -199,6 +199,7 @@ export function EmissionStep() {
       tipoDoc: string,
       identificacion: string,
       setPerson: (patch: PersonFormPatch) => void,
+      current: PersonFormPatch,
     ) => {
       const digits = String(identificacion || '').replace(/\D/g, '');
       if (digits.length < 1) return;
@@ -319,12 +320,13 @@ export function EmissionStep() {
       tipoDoc: string,
       identificacion: string,
       setPerson: (patch: PersonFormPatch) => void,
+      current: PersonFormPatch,
     ): Promise<boolean> => {
       const digits = String(identificacion || '').replace(/\D/g, '');
       if (digits.length < 6) return true;
       const ok = await checkFuneralCedula(prefix, identificacion);
       if (!ok) return false;
-      await lookupByCedula(prefix, tipoDoc || 'V', identificacion, setPerson);
+      await lookupByCedula(prefix, tipoDoc || 'V', identificacion, setPerson, current);
       return true;
     },
     [checkFuneralCedula, lookupByCedula],
@@ -340,6 +342,7 @@ export function EmissionStep() {
         tomador.tipoDoc ?? 'V',
         tomador.identificacion,
         setTomador,
+        tomador,
       );
     }, 450);
     return () => window.clearTimeout(timer);
@@ -355,6 +358,7 @@ export function EmissionStep() {
         asegurado.tipoDoc ?? 'V',
         asegurado.identificacion,
         setAsegurado,
+        asegurado,
       );
     }, 450);
     return () => window.clearTimeout(timer);
@@ -563,11 +567,11 @@ export function EmissionStep() {
           onIdentificacionBlur={
             isRcvEmision
               ? (id) => {
-                  void lookupByCedula(prefix, person.tipoDoc ?? 'V', id, setPerson);
+                  void lookupByCedula(prefix, person.tipoDoc ?? 'V', id, setPerson, person);
                 }
               : checkFuneralFlow
                 ? (id) => {
-                    void runFuneralCedulaAuto(prefix, person.tipoDoc ?? 'V', id, setPerson);
+                    void runFuneralCedulaAuto(prefix, person.tipoDoc ?? 'V', id, setPerson, person);
                   }
                 : undefined
           }
