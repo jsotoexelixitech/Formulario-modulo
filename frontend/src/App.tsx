@@ -212,7 +212,7 @@ export default function App() {
       </div>
 
       <div>
-        <main className="flex-1 min-h-screen pt-[72px] lg:pt-10 px-4 sm:px-6 lg:px-10 pb-32 lg:pb-12">
+        <main className="flex-1 min-h-screen pt-[72px] lg:pt-10 px-4 sm:px-6 lg:px-10 pb-[calc(7.5rem+env(safe-area-inset-bottom))] lg:pb-12">
           <div className="max-w-5xl mx-auto">
             {!hideStepper && <TopStepper />}
 
@@ -223,7 +223,7 @@ export default function App() {
                     <Sparkles size={11} className="text-indigo-500" />
                     {meta.eyebrow}
                   </p>
-                  <h1 className="font-display text-3xl sm:text-[2.5rem] font-black text-slate-900 tracking-tight leading-tight">
+                  <h1 className="font-display text-[1.7rem] sm:text-[2.5rem] font-black text-slate-900 tracking-tight leading-tight">
                     {meta.title}
                   </h1>
                   <p className="text-slate-500 text-sm mt-2 max-w-xl leading-relaxed">
@@ -234,7 +234,7 @@ export default function App() {
             </header>
 
             <section key={localStep} className="surface-card overflow-hidden step-enter">
-              <div className="p-6 sm:p-8 lg:p-10">
+              <div className="p-4 sm:p-8 lg:p-10">
                 {!cotizadorRcv && localStep === 2 && <EmissionStep />}
                 {(cotizadorRcv || localStep === 3) && (usesFuneralStep() ? <FuneralStep /> : usesVehicleStep() ? <VehicleStep /> : null)}
               </div>
@@ -265,7 +265,7 @@ export default function App() {
         </main>
       </div>
 
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 py-3 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
         <div className="flex gap-2">
           {!cotizadorRcv && localStep === 3 && (
             <Button variant="secondary" className="flex-1" onClick={() => navigate(2)}>
