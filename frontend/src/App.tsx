@@ -11,6 +11,7 @@ import { VehicleStep } from './features/vehicle/VehicleStep';
 import { FuneralStep } from './features/funeral/FuneralStep';
 import { getProductConfig, isFunerario, isRcv, persistProductFromHints, skipsPersonasStep, usesFuneralStep, usesVehicleStep } from './lib/product';
 import { applyMetadataFromNexusToken } from './lib/nexus-token-client';
+import { mergeMarketplaceActorMetadata } from './lib/sso-metadata';
 import { continueToEmisionModule } from './lib/exelixi-catalog';
 import { continueToEmisionCotizador, isCotizadorFlow } from './lib/cotizador-flow';
 import type { ExelixiWizardHandoff } from './lib/exelixi-wizard-handoff';
@@ -107,7 +108,8 @@ export default function App() {
 
   useEffect(() => {
     applyMetadataFromNexusToken('nexus_access_token_formulario', (metadata) => {
-      setMetadataCanal(metadata);
+      const current = useWizardStore.getState().metadataCanal || {};
+      setMetadataCanal(mergeMarketplaceActorMetadata({ ...current, ...metadata }));
       if (metadata.product === 'funerario' || metadata.product === 'rcv') {
         persistProductFromHints({ product: String(metadata.product) });
       }

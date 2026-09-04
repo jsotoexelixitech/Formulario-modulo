@@ -12,9 +12,19 @@ import { isCotizadorFlow } from './lib/cotizador-flow'
 import { applyExelixiBranding } from './lib/exelixi-branding'
 import { useWizardStore } from './store/wizardStore'
 import { isFunerario, isRcv, usesFuneralStep } from './lib/product'
+import { applyMetadataFromNexusToken, getNexusTokenFromUrl } from './lib/nexus-token-client'
+import { mergeMarketplaceActorMetadata, rememberMarketplaceActorFromToken } from './lib/sso-metadata'
 
 // Identidad Exélixi (colores + favicon) solo si el flujo activo es el catálogo.
 applyExelixiBranding('Formulario');
+
+rememberMarketplaceActorFromToken(getNexusTokenFromUrl());
+applyMetadataFromNexusToken('nexus_access_token_formulario', (metadata) => {
+  const store = useWizardStore.getState();
+  store.setMetadataCanal(
+    mergeMarketplaceActorMetadata({ ...(store.metadataCanal || {}), ...metadata }),
+  );
+});
 
 function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
   useEffect(() => {
