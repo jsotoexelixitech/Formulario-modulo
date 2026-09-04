@@ -397,19 +397,16 @@ export function EmissionStep() {
   const runFuneralCedulaAuto = useCallback(
     async (
       prefix: string,
-      tipoDoc: string,
+      _tipoDoc: string,
       identificacion: string,
-      setPerson: (patch: PersonFormPatch) => void,
-      current: PersonFormPatch,
     ): Promise<boolean> => {
       const digits = String(identificacion || '').replace(/\D/g, '');
       if (digits.length < 6) return true;
       const ok = await checkFuneralCedula(prefix, identificacion);
       if (!ok) return false;
-      await lookupByCedula(prefix, tipoDoc || 'V', identificacion, setPerson, current);
       return true;
     },
-    [checkFuneralCedula, lookupByCedula],
+    [checkFuneralCedula],
   );
 
   useEffect(() => {
@@ -417,29 +414,17 @@ export function EmissionStep() {
     const digits = String(tomador.identificacion || '').replace(/\D/g, '');
     if (digits.length < 6) return;
     const timer = window.setTimeout(() => {
-      void runFuneralCedulaAuto(
-        'tom_',
-        tomador.tipoDoc ?? 'V',
-        tomador.identificacion,
-        setTomador,
-        tomador,
-      );
+      void runFuneralCedulaAuto('tom_', tomador.tipoDoc ?? 'V', tomador.identificacion);
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [checkFuneralFlow, tomador.identificacion, tomador.tipoDoc, runFuneralCedulaAuto, setTomador]);
+  }, [checkFuneralFlow, tomador.identificacion, tomador.tipoDoc, runFuneralCedulaAuto]);
 
   useEffect(() => {
     if (!checkFuneralFlow || sameInsured) return;
     const digits = String(asegurado.identificacion || '').replace(/\D/g, '');
     if (digits.length < 6) return;
     const timer = window.setTimeout(() => {
-      void runFuneralCedulaAuto(
-        'aseg_',
-        asegurado.tipoDoc ?? 'V',
-        asegurado.identificacion,
-        setAsegurado,
-        asegurado,
-      );
+      void runFuneralCedulaAuto('aseg_', asegurado.tipoDoc ?? 'V', asegurado.identificacion);
     }, 450);
     return () => window.clearTimeout(timer);
   }, [
@@ -448,7 +433,6 @@ export function EmissionStep() {
     asegurado.identificacion,
     asegurado.tipoDoc,
     runFuneralCedulaAuto,
-    setAsegurado,
   ]);
 
   const validate = async () => {
@@ -655,7 +639,7 @@ export function EmissionStep() {
                 }
               : checkFuneralFlow
                 ? (id) => {
-                    void runFuneralCedulaAuto(prefix, person.tipoDoc ?? 'V', id, setPerson, person);
+                    void runFuneralCedulaAuto(prefix, person.tipoDoc ?? 'V', id);
                   }
                 : undefined
           }

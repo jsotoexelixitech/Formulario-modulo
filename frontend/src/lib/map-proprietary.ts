@@ -148,16 +148,29 @@ function hasPersonFieldValue(val: unknown): boolean {
   return true;
 }
 
+/** Sis2000 automático: contacto/ubicación. Nunca identidad (eso lo pone el OCR o el usuario). */
+const SIS2000_CONTACT_KEYS: Array<keyof PersonFormPatch> = [
+  'telefono',
+  'email',
+  'estado',
+  'cestado',
+  'ciudad',
+  'cciudad',
+  'direccion',
+  'xprofesion',
+  'xactividad',
+];
+
 /**
- * Solo las claves vacías en `current` que Sis2000 puede rellenar.
- * No incluye identidad ya presente (OCR o usuario).
+ * Solo huecos de contacto. No copia nombre, apellido, fecha, sexo ni cédula.
  */
 export function sis2000EmptyFill(
   current: PersonFormPatch,
   incoming: PersonFormPatch,
 ): PersonFormPatch {
   const fill: PersonFormPatch = {};
-  for (const [key, val] of Object.entries(incoming) as Array<[keyof PersonFormPatch, unknown]>) {
+  for (const key of SIS2000_CONTACT_KEYS) {
+    const val = incoming[key];
     if (!hasPersonFieldValue(val)) continue;
     if (hasPersonFieldValue(current[key])) continue;
     (fill as Record<string, unknown>)[key] = val;

@@ -7,10 +7,11 @@ import bridgeReady from './lib/bridge'
 import { NexusGuard } from './nexus/NexusGuard'
 import { applyExelixiOcrHandoff } from './lib/exelixi-catalog'
 import { applyOcrPersonRolesFromDocuments } from './lib/ocr-person-roles'
+import { applyFuneralOcrCedulas } from './lib/funeral-ocr-apply'
 import { isCotizadorFlow } from './lib/cotizador-flow'
 import { applyExelixiBranding } from './lib/exelixi-branding'
 import { useWizardStore } from './store/wizardStore'
-import { isRcv } from './lib/product'
+import { isFunerario, isRcv, usesFuneralStep } from './lib/product'
 
 // Identidad Exélixi (colores + favicon) solo si el flujo activo es el catálogo.
 applyExelixiBranding('Formulario');
@@ -69,6 +70,10 @@ function ExelixiHandoffBootstrap({ children }: { children: ReactNode }) {
             setConductor,
           });
         }
+      }
+
+      if (isFunerario() || usesFuneralStep()) {
+        applyFuneralOcrCedulas();
       }
     };
 
