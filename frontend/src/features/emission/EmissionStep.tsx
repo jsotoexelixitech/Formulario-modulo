@@ -34,6 +34,19 @@ import {
 } from '../../lib/person-identificacion';
 import type { FuneralPerson } from '../../types';
 
+/** Años cumplidos desde YYYY-MM-DD (calendario, sin UTC). */
+function edadCumplida(iso?: string): number | null {
+  const m = String(iso || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]);
+  const d = Number(m[3]);
+  const n = new Date();
+  let e = n.getFullYear() - y;
+  if (n.getMonth() + 1 < mo || (n.getMonth() + 1 === mo && n.getDate() < d)) e--;
+  return e >= 0 ? e : null;
+}
+
 function emptyFuneralBeneficiario(pporcen = 100): FuneralPerson {
   return {
     tipoDoc: 'V',
@@ -270,9 +283,19 @@ export function EmissionStep() {
         // Conservar el número que acaba de escribir el usuario si el API no trae cci_rif
         if (!patch.identificacion) patch.identificacion = digits;
 
+        const currentFecha = String(current.fechaNac ?? '').slice(0, 10);
+        const sisFecha = String(patch.fechaNac ?? '').slice(0, 10);
+        const keptOcrFecha = Boolean(currentFecha) && Boolean(sisFecha) && currentFecha !== sisFecha;
+
         setPerson(mergeNonEmptyPersonPatch(current, patch));
         lastLookupCid.current[prefix] = matchedCid;
-        toast.success('Datos cargados', 'Se completó el formulario con la información del cliente.', 2800);
+        toast.success(
+          'Datos cargados',
+          keptOcrFecha
+            ? 'Se conservó la fecha de la cédula. El resto se completó desde Sis2000.'
+            : 'Se completó el formulario con la información del cliente.',
+          keptOcrFecha ? 4000 : 2800,
+        );
       } catch {
         toast.warning(
           'Consulta no disponible',
@@ -655,7 +678,18 @@ export function EmissionStep() {
         catalogsLoading={catalogs.loading}
         exelixiFlow={exelixiFlow}
       />
-      <Field anchor={`cli-${prefix}fechaNac`} label="Fecha de Nac. *" error={errors[`${prefix}fechaNac`]}>
+      <Field
+        anchor={`cli-${prefix}fechaNac`}
+        label="Fecha de Nac. *"
+        error={errors[`${prefix}fechaNac`]}
+        hint={(() => {
+          const edad = edadCumplida(person.fechaNac);
+          if (edad == null) return undefined;
+          return edad > 80
+            ? `${edad} años cumplidos · el plan funerario admite hasta 80`
+            : `${edad} años cumplidos`;
+        })()}
+      >
         <Input
           value={person.fechaNac ?? ''}
           onChange={(e) => setPerson({ fechaNac: e.target.value })}

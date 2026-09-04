@@ -141,9 +141,16 @@ export function mapProprietaryToPerson(
   return patch;
 }
 
+function hasPersonFieldValue(val: unknown): boolean {
+  if (val == null) return false;
+  if (typeof val === 'string') return val.trim() !== '';
+  if (typeof val === 'number') return Number.isFinite(val);
+  return true;
+}
+
 /**
- * Fusiona autofill Sis2000 sin pisar datos ya ingresados por el usuario.
- * Solo aplica valores no vacíos del patch entrante.
+ * Fusiona autofill Sis2000 sin pisar OCR ni datos ya ingresados.
+ * Solo rellena claves vacías del formulario actual.
  */
 export function mergeNonEmptyPersonPatch(
   current: PersonFormPatch,
@@ -151,9 +158,8 @@ export function mergeNonEmptyPersonPatch(
 ): PersonFormPatch {
   const out: PersonFormPatch = { ...current };
   for (const [key, val] of Object.entries(incoming) as Array<[keyof PersonFormPatch, unknown]>) {
-    if (val == null) continue;
-    if (typeof val === 'string' && val.trim() === '') continue;
-    if (typeof val === 'number' && !Number.isFinite(val)) continue;
+    if (!hasPersonFieldValue(val)) continue;
+    if (hasPersonFieldValue(out[key])) continue;
     (out as Record<string, unknown>)[key] = val;
   }
   return out;
