@@ -149,6 +149,23 @@ function hasPersonFieldValue(val: unknown): boolean {
 }
 
 /**
+ * Solo las claves vacías en `current` que Sis2000 puede rellenar.
+ * No incluye identidad ya presente (OCR o usuario).
+ */
+export function sis2000EmptyFill(
+  current: PersonFormPatch,
+  incoming: PersonFormPatch,
+): PersonFormPatch {
+  const fill: PersonFormPatch = {};
+  for (const [key, val] of Object.entries(incoming) as Array<[keyof PersonFormPatch, unknown]>) {
+    if (!hasPersonFieldValue(val)) continue;
+    if (hasPersonFieldValue(current[key])) continue;
+    (fill as Record<string, unknown>)[key] = val;
+  }
+  return fill;
+}
+
+/**
  * Fusiona autofill Sis2000 sin pisar OCR ni datos ya ingresados.
  * Solo rellena claves vacías del formulario actual.
  */
@@ -156,13 +173,7 @@ export function mergeNonEmptyPersonPatch(
   current: PersonFormPatch,
   incoming: PersonFormPatch,
 ): PersonFormPatch {
-  const out: PersonFormPatch = { ...current };
-  for (const [key, val] of Object.entries(incoming) as Array<[keyof PersonFormPatch, unknown]>) {
-    if (!hasPersonFieldValue(val)) continue;
-    if (hasPersonFieldValue(out[key])) continue;
-    (out as Record<string, unknown>)[key] = val;
-  }
-  return out;
+  return { ...current, ...sis2000EmptyFill(current, incoming) };
 }
 
 /** CID Sis2000 típico: letra de documento + número (ej. V18456329). */

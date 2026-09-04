@@ -20,10 +20,11 @@ import { searchProprietary } from '../../lib/api';
 import {
   buildProprietaryCid,
   mapProprietaryToPerson,
-  mergeNonEmptyPersonPatch,
+  sis2000EmptyFill,
   type PersonFormPatch,
   type ProprietaryInfo,
 } from '../../lib/map-proprietary';
+import { funeralOcrIdentityPatch, funeralRoleFromPrefix } from '../../lib/funeral-ocr-apply';
 import { toast } from '../../store/toastStore';
 import { User, Heart, ShieldAlert, FileText } from 'lucide-react';
 import { formatTelefono, isValidPhonePrefix, validateRequiredVePhone } from '../../lib/phone';
@@ -190,7 +191,25 @@ export function EmissionStep() {
   const lastLookupCid = useRef<Record<string, string>>({});
   const lastFuneralCedula = useRef<Record<string, string>>({});
   const lastFuneralOk = useRef<Record<string, boolean>>({});
+  const ocrForced = useRef<Record<string, string>>({});
   const checkFuneralFlow = isFunerario() || usesFuneralStep();
+  const tomOcrFnac = useWizardStore((s) => s.documents.cedula?.ocr?.fechaNacimiento ?? '');
+  const titOcrFnac = useWizardStore((s) => s.documents.cedula_titular?.ocr?.fechaNacimiento ?? '');
+
+  useEffect(() => {
+    if (!checkFuneralFlow) return;
+    const force = (prefix: 'tom_' | 'aseg_', setter: (p: PersonFormPatch) => void) => {
+      const role = prefix === 'tom_' ? 'tomador' : 'asegurado';
+      const ocr = funeralOcrIdentityPatch(role);
+      const key = `${ocr.identificacion ?? ''}|${ocr.fechaNac ?? ''}`;
+      if (!ocr.fechaNac && !ocr.nombre) return;
+      if (ocrForced.current[prefix] === key) return;
+      ocrForced.current[prefix] = key;
+      setter(ocr);
+    };
+    force('tom_', setTomador);
+    if (!sameInsured) force('aseg_', setAsegurado);
+  }, [checkFuneralFlow, sameInsured, tomOcrFnac, titOcrFnac, setTomador, setAsegurado]);
 
   const parentescoOptions =
     catalogs.parentescos.length > 0
@@ -239,7 +258,7 @@ export function EmissionStep() {
       tipoDoc: string,
       identificacion: string,
       setPerson: (patch: PersonFormPatch) => void,
-      current: PersonFormPatch,
+      _current?: PersonFormPatch,
     ) => {
       const digits = String(identificacion || '').replace(/\D/g, '');
       if (digits.length < 1) return;
@@ -280,14 +299,25 @@ export function EmissionStep() {
           estadosCivil: catalogs.estadosCivil,
           estados: catalogs.estados,
         });
-        // Conservar el número que acaba de escribir el usuario si el API no trae cci_rif
         if (!patch.identificacion) patch.identificacion = digits;
 
-        const currentFecha = String(current.fechaNac ?? '').slice(0, 10);
-        const sisFecha = String(patch.fechaNac ?? '').slice(0, 10);
-        const keptOcrFecha = Boolean(currentFecha) && Boolean(sisFecha) && currentFecha !== sisFecha;
+        const store = useWizardStore.getState();
+        const latest: PersonFormPatch =
+          prefix === 'tom_'
+            ? store.tomador
+            : prefix === 'aseg_'
+              ? store.asegurado
+              : store.beneficiario;
+        const role = funeralRoleFromPrefix(prefix);
+        const ocrIdentity = role ? funeralOcrIdentityPatch(role) : {};
+        // OCR manda en identidad; Sis2000 solo rellena huecos (teléfono, dirección…).
+        const fill = sis2000EmptyFill({ ...latest, ...ocrIdentity }, patch);
+        setPerson({ ...fill, ...ocrIdentity });
 
-        setPerson(mergeNonEmptyPersonPatch(current, patch));
+        const ocrFecha = String(ocrIdentity.fechaNac ?? '').slice(0, 10);
+        const sisFecha = String(patch.fechaNac ?? '').slice(0, 10);
+        const keptOcrFecha = Boolean(ocrFecha) && Boolean(sisFecha) && ocrFecha !== sisFecha;
+
         lastLookupCid.current[prefix] = matchedCid;
         toast.success(
           'Datos cargados',
